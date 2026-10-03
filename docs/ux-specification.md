@@ -1,6 +1,6 @@
 # Takt — functional UX specification
 
-**Status:** Agreed UX direction, documented before implementation.
+**Status:** Agreed UX direction, refined for the first implementation milestone.
 
 **Last updated:** October 3, 2026.
 
@@ -36,9 +36,9 @@ The first version is for desktop browsers with a mouse or trackpad. The interfac
 - Mobile or tablet interaction design.
 - Persistence, autosave, cloud storage, local file formats, and document reopening.
 - Export controls and output formats. For now, assume the user takes a screenshot for a presentation.
-- Visual design, including typography, spacing, exact colors, icons, and the final appearance of controls. These belong to a separate session.
+- Pixel-level visual implementation choices that are not fixed by the selected prototype.
 
-The general visual preference recorded for that later session is modern and corporate rather than playful. This document does not develop that direction further.
+The selected Apricot prototype is the visual reference. This functional specification does not duplicate its typography, spacing, colors, icons, or control appearance.
 
 ## 2. Core UX principles
 
@@ -79,7 +79,7 @@ A new document opens with:
 - A relative timeline whose fixed origin is Week 0.
 - A short hint in the empty row: **“Drag to create a bar · Double-click for a milestone.”**
 
-The hint disappears after the first item is created. Whether it returns if the document becomes empty again is not yet specified.
+The hint disappears while any bar or milestone exists. It returns whenever the document has no bars or milestones, including after deleting every item or undoing the first creation. Show it once in the first visible empty row rather than in every empty row.
 
 Week 0 exists before any item is created. The first bar does not define or shift the origin. Drawing a bar in Week 3 creates a bar in Week 3.
 
@@ -118,7 +118,7 @@ The chosen date does not have to be a Monday. Each week is a seven-day period st
 
 Calendar mode labels weeks by their starting dates. Bars still occupy whole weeks. Switching between relative and calendar displays preserves their positions and the calendar reference.
 
-The exact date-picker interaction, date format, and behavior when calendar mode is selected before a reference exists are open details.
+Selecting calendar mode before a reference exists opens a compact date-picker popover. The selected date represents the start of Week 0. Cancelling the popover leaves relative-week mode selected. After a reference exists, selecting a week heading can set or replace the date assigned to the start of that specific week; the remaining labels are derived in seven-day increments. The exact date-display format remains open.
 
 ### 5.3 Milestone timing
 
@@ -126,7 +126,7 @@ A milestone created anywhere inside a week is placed at that week's **end**, vis
 
 In calendar mode, its meaning is the final date of that seven-day period. For a week beginning October 5, the milestone represents October 11, even though its visual boundary is shared with the beginning of the following week.
 
-Dragging a milestone chooses the nearest week-ending boundary. It can also move between rows. Exact behavior for a milestone dropped directly on an existing milestone is still open.
+Dragging a milestone chooses the nearest week-ending boundary. It can also move between rows. A milestone may share a row and time region with a bar and does not participate in bar collisions. Initially, only one milestone may occupy a given week-ending boundary in a given row. A duplicate creation or drop is invalid and does not move the existing milestone.
 
 ## 6. Editor controls and navigation
 
@@ -155,7 +155,7 @@ Zoom changes the viewing scale, not the time precision: editing remains in whole
 
 Navigation must coexist with creation gestures. An ordinary drag in empty row space creates a bar; Space-drag is the distinct panning gesture.
 
-Exact zoom limits, initial visible range, wheel sensitivity, and whether zoom centers on the pointer are not yet specified.
+The initial view is approximately Week -2 through Week 9 at the prototype's default week width. The initial zoom range is roughly 50% to 200%. Ctrl/Cmd plus mouse-wheel zoom preserves the time under the pointer; toolbar zoom preserves the time at the viewport center. Exact zoom steps and wheel sensitivity remain tunable implementation details.
 
 ## 7. Creating and naming items
 
@@ -169,11 +169,13 @@ Exact zoom limits, initial visible range, wheel sensitivity, and whether zoom ce
 
 Enter finishes naming. Escape skips naming while retaining the newly created bar. A label is optional.
 
-The distinction between escaping inline naming and cancelling an unfinished drag matters; drag cancellation is not yet specified.
+Dragging leftward across an interval creates the same bar as dragging rightward across it. A press and release without a meaningful drag creates nothing, preserving double-click as the milestone gesture.
+
+If the new interval conflicts with existing bars, they preview a cascading push to the right. Release commits the creation and the complete final push as one action. Escape during the unfinished drag, or an interrupted gesture such as loss of the active pointer, restores the pre-gesture state and creates no history entry.
 
 ### 7.2 Creating a bar through the context menu
 
-Right-clicking a week within a row provides **“Add bar here.”** It creates a one-week bar at that row and week, then starts inline naming. End handles can subsequently extend it.
+Right-clicking a week within a row provides **“Add bar here.”** It creates a one-week bar at that row and week, pushing conflicting bars to the right under the same rules as drag creation, then starts inline naming. End handles can subsequently extend it.
 
 The context menu must use the location where it was opened, even if choosing the command moves the pointer away from that location.
 
@@ -189,11 +191,13 @@ Double-clicking a section heading, row name, bar label, or milestone label edits
 
 Dragging a label still moves its item; the label is not an area that blocks direct manipulation. Dedicated bar end handles remain resize targets.
 
-Exact behavior for very small bars, labels that do not fit, and text extending outside an item is left to the interaction and visual-design follow-up.
+Display labels are clipped to the available item width and expose the complete name on hover. During inline editing, the input may extend beyond a narrow bar. One-week bars retain usable resize targets, and a visible label remains part of the bar's drag target.
 
 ## 8. Selection, movement, and resizing
 
 Only one item is selected at a time. There is no Shift-click multi-selection, selection rectangle, or grouped movement of independently selected items.
+
+Clicking empty chart space clears selection. Right-clicking an item selects it before opening its context menu. A context menu opened over empty lane space retains the exact row and week at which it was opened. Collapsing a section clears the selection if the selected item becomes hidden.
 
 ### 8.1 Bar movement
 
@@ -201,11 +205,13 @@ Dragging anywhere on the bar body moves it in time. It can also move to a differ
 
 The dragged bar follows the pointer continuously. A subtle preview indicates the whole-week result. Releasing settles the bar onto the nearest whole-week position.
 
+When the pointer crosses rows, each hovered row previews the collision result that would follow a drop there. Leaving the row restores its committed arrangement. Only the destination row at pointer-up changes.
+
 ### 8.2 Bar resizing
 
 Dragging the left or right end handle changes the corresponding boundary. The result settles onto the nearest whole-week boundary.
 
-The opposite boundary stays in place. Bars represent at least one whole week; the exact interaction at the minimum length and whether handles can cross are details to resolve before implementation.
+The opposite boundary stays in place. Bars represent at least one whole week. A resize stops at that minimum; handles cannot cross or exchange roles. An exact halfway snapping tie resolves to the later week boundary.
 
 ### 8.3 Milestone movement
 
@@ -220,7 +226,9 @@ Dragging a row's name area moves that entire row:
 
 Dragging a section heading reorders the section as a unit. Reordering rows or sections does not alter dates or relative weeks.
 
-The exact drop indicators, behavior when dragging into a collapsed section, and distinction between selecting a row and dragging it are open interaction details.
+The dragged row or section remains attached to the pointer as one visual object, including all contents that move with it. When it crosses the midpoint of a neighboring structural position, surrounding content animates to show the proposed insertion point. Moving back reverses that preview; release commits the arrangement currently shown.
+
+Hovering a dragged row over a collapsed section for a short delay, initially around half a second, temporarily expands that section with animation. Leaving collapses it again if it was originally collapsed. Cancelling restores the original collapse states. Dropping the row into the section leaves the destination expanded so the result remains visible.
 
 ## 9. Bar collisions and cascading pushes
 
@@ -262,17 +270,17 @@ Extend A by one week:
 
 B moves one week right and pushes C one week right. Both preserve their original durations.
 
-### 9.4 Changes stay when the pointer reverses
+### 9.4 Preview displacement is reversible
 
-If the user drags back or shrinks A after it has pushed B and C, B and C do not automatically return to their earlier positions. This applies even while the same drag gesture is still in progress.
+Collision changes made during a gesture are a preview derived from the state at pointer-down. If the user drags back or shrinks A after it has pushed B and C, B and C flow back when the current snapped proposal no longer conflicts with them.
 
-The displaced positions are retained. Undo is the explicit way to restore the state before that gesture. Redo reapplies the completed edit.
+Only the arrangement visible at pointer-up becomes committed. Escape or an interrupted gesture restores the complete state from before pointer-down and creates no undo entry. Undo is used after a completed gesture to restore that pre-gesture state; redo reapplies the complete committed result.
 
-### 9.5 Creation and other edge cases
+### 9.5 Creation and milestones
 
-The no-overlap rule also constrains what can be created, but the response when drawing a new bar across existing bars has not been decided. Do not silently choose between rejecting creation, limiting its range, or pushing existing bars.
+Drawing or menu-creating a bar across existing bars pushes conflicting bars to the right, cascading as needed. Creation and all resulting displacement are one committed action.
 
-Milestones are point markers rather than bars. Whether they can share a position, appear inside bars, or participate in any collision handling remains open; the agreed pushing rule concerns bars.
+Milestones are point markers rather than bars. They may appear within bars and do not participate in bar collision handling. The one-milestone-per-row-and-boundary rule is independent of bar overlap.
 
 ## 10. Motion and snapping
 
@@ -287,7 +295,9 @@ Affected bars must visibly glide to their displaced positions. They should not t
 
 When the pointer is released, the manipulated item settles smoothly into its whole-week result. Animation must preserve the final non-overlap rule and the duration of every pushed bar.
 
-The precise animation duration, easing, treatment of rapid pointer reversals, and reduced-motion behavior are implementation details to specify later. A smoothness requirement should not be interpreted as permission to introduce lag into direct pointer tracking.
+The dragged bar, milestone, row, or section remains visually attached to the pointer without intentional animation delay. Surrounding content and final snapped settlement begin with a short transition of roughly 150 ms. Exact easing and per-operation timing remain tunable. Reduced-motion behavior is not required for the first milestone. Smoothness is not permission to introduce lag into direct pointer tracking.
+
+Holding a dragged object near a viewport edge automatically scrolls the chart. Timeline operations scroll horizontally; cross-row and structural operations may scroll vertically. Scrolling stops immediately when the pointer leaves the edge zone or the gesture ends.
 
 ## 11. Sections, rows, and add controls
 
@@ -301,17 +311,17 @@ These controls provide discovery and an alternative to right-clicking. Their fin
 
 ### 11.2 Context-menu structure actions
 
-Right-clicking a section provides actions to add a row and add a section.
+Right-clicking a section provides actions to add a row and add a section. A context-created section is inserted immediately after the section whose menu was opened.
 
 Right-clicking a row provides insertion above or below. Rename, color-related actions, and deletion appear where applicable to the selected object.
 
-The exact placement of a new section created from a section's context menu, and the names assigned to new rows and sections, remain open.
+New rows and sections store an empty name, display **“Unnamed row”** or **“Unnamed section”** as a placeholder, and immediately enter inline naming.
 
 ### 11.3 Collapse and expansion
 
 A section can collapse to hide its rows and expand to reveal them again. Collapsing does not remove items or change their time positions.
 
-How the add-row control appears in a collapsed section, and whether a new row automatically expands that section, are not yet specified.
+Expansion and collapse are animated. The add-row control remains available for a collapsed section. Using it expands the section, creates the row, and begins inline naming. A section may remain empty after its last row is deleted.
 
 ## 12. Colors and inheritance
 
@@ -337,23 +347,29 @@ Whether the palette includes arbitrary custom-color entry in the first draft is 
 
 Deleting a row or section requires confirmation. The confirmation should make the scope understandable: a row deletion also removes its items; a section deletion also removes its rows and all their items.
 
-Cancelling the confirmation leaves the chart unchanged. Confirmed deletion remains undoable.
+Cancelling the confirmation leaves the chart unchanged. Confirmed deletion remains undoable. Rows and sections require confirmation even when empty.
 
-Confirmation for individual bars and milestones is not part of the agreed requirement. Exact deletion shortcuts and whether empty rows or sections use the same confirmation are open details.
+Delete or Backspace removes a selected bar or milestone immediately and undoably. These shortcuts do not delete chart objects while the user is typing in an input.
 
 ### 13.2 Undo boundaries
 
-Undo and redo must cover creation, movement, resizing, naming, recoloring, row and section reorganization, and deletion.
+Undo and redo must cover creation, movement, resizing, naming, recoloring, row and section reorganization, deletion, calendar-reference changes, and switching between relative-week and calendar-date displays.
 
 A completed drag is one action even when it pushes several bars. Undo restores the complete state before that gesture, including every affected bar's position. Redo restores the complete resulting state.
 
 For the collision example above, one undo returns A, B, and C to their original ranges. The user does not need to undo each push separately.
 
-Exact keyboard shortcuts, undo treatment of view changes, and how repeated text input is grouped are not yet specified.
+Creation and initial naming are separate actions. Creating an item commits one entry and opens its inline editor. Committing its initial name creates another entry. The first undo restores the empty name; the next removes the item and restores all displacement caused by its creation. Escape during initial naming keeps the item unnamed and creates no naming entry.
+
+Renaming an existing object commits one action on Enter or focus loss. Escape restores the pre-edit name. While an inline editor is active, Ctrl/Cmd+Z belongs to text editing. Outside an editor, Ctrl/Cmd+Z undoes an editor action; Ctrl/Cmd+Shift+Z redoes, and Ctrl+Y also redoes on Windows.
+
+Selection, scrolling, panning, zoom, open overlays, and ordinary section collapse/expansion are outside history. They do not clear redo. A new editor action after undo clears redo.
+
+Undo and redo must reveal their result. If the affected content is inside a collapsed section, the section automatically expands with animation and the viewport scrolls enough to show the changed object when necessary. That automatic reveal is not a history action.
 
 ## 14. Acceptance scenarios
 
-These are behavioral checks for the eventual implementation, not a request to build automated tests during documentation.
+These are behavioral checks for the implementation. Every agreed interaction requires automated coverage before it is considered complete, using rule/state tests and scripted real-browser tests at the appropriate levels.
 
 | Scenario | Expected result |
 | --- | --- |
@@ -367,29 +383,33 @@ These are behavioral checks for the eventual implementation, not a request to bu
 | Double-click the same label | The label becomes editable in place. |
 | Resize into an adjacent bar | The other bar moves without changing duration. |
 | Push into a chain of bars | All necessary bars move smoothly; no final overlap remains. |
-| Reverse a drag after pushing other bars | Pushed bars retain their displaced positions. |
+| Reverse a drag after pushing other bars | Pushed bars flow back when the current snapped proposal no longer conflicts with them. |
+| Cancel a drag after previewing pushes | Every affected item returns to its pre-gesture state and no history entry is created. |
 | Undo that completed drag | All affected items return to their pre-gesture state in one undo. |
 | Drop a bar into an occupied row | Conflicting destination bars are pushed right with durations preserved. |
+| Drag a bar across several rows | Each hovered row previews and reverses its pushes; only the row used at release is committed. |
 | Move a row between sections | Its items preserve their time positions and follow the color-inheritance rules. |
 | Reorder a section | Its rows and items move together without changing time positions. |
+| Hover a row over a collapsed section | The section opens after a short delay, closes again on leave, and remains open after a successful drop. |
 | Delete a populated section | Confirmation explains the contents affected; cancellation changes nothing; confirmed deletion is undoable. |
 | Assign a calendar date to Week 3 | All calendar labels follow that week-start reference at seven-day intervals. |
 | Switch back to relative weeks | Positions and the calendar reference are preserved. |
+| Undo a hidden-content change | The containing section expands and the changed content is revealed. |
+| Delete every item | The creation hint returns once in the first visible empty row. |
 | Zoom or pan | Only the view changes; editing precision remains whole weeks. |
 
-## 15. Remaining decisions
+## 15. Keyboard scope for the first milestone
 
-The core direction is agreed. The following are genuine gaps, not implicit requirements:
+Keyboard operation covers standard controls, inline naming, deletion, cancellation, and undo/redo. Chart positioning, resizing, and structural movement remain drag-based initially. Menu-based numeric editing and direct arrow-key manipulation may be considered later; they are not part of this milestone.
 
-1. **Creation collisions:** what happens when a newly drawn or menu-created bar conflicts with an existing bar?
-2. **Drag cancellation:** how does the user cancel an unfinished gesture, and does cancellation restore all pushed bars?
-3. **Snapping ties and minimum duration:** how are exact halfway positions resolved, and what happens at a bar's minimum length?
-4. **Calendar setup:** what happens when calendar mode is selected before a reference date exists, and how can the reference be replaced?
-5. **Milestone coexistence:** can multiple milestones share a boundary, and how are milestones placed over bars handled?
-6. **Deletion details:** individual-item deletion, keyboard shortcuts, and confirmation for empty containers.
-7. **Structural insertion:** the position of a context-created section, naming defaults, and collapsed-section drop/add behavior.
-8. **Dense content:** editing labels on small bars and handling long names without losing drag targets.
-9. **Navigation and motion details:** initial range, zoom limits, animation timings, and reduced-motion behavior.
-10. **Undo details:** keyboard shortcuts, text-edit grouping, and whether calendar-reference changes belong to undo history.
+## 16. Remaining details and deferred work
 
-Resolve these as focused interaction decisions before the affected behavior is implemented. Visual styling, persistence, and export remain separate future workstreams.
+The interaction decisions required to begin implementation are settled. The following lower-level details remain intentionally tunable:
+
+1. The exact calendar date-display format.
+2. Exact zoom steps and wheel sensitivity within the agreed range.
+3. Final animation easing and whether individual operations need timings different from the initial 150 ms value.
+4. The precise collapsed-section hover delay around the initial half-second value.
+5. Whether the first color palette permits arbitrary custom-color entry in addition to fixed choices.
+
+Persistence, autosave, document reopening, export, a home screen, mobile interaction design, and desktop packaging remain outside the first implementation milestone. The first milestone is a working editor whose contents reset on refresh.
