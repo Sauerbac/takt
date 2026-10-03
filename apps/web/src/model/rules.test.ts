@@ -115,6 +115,8 @@ describe('gesture transactions', () => {
     expect(gesture.tracking.start).toBeCloseTo(0.4);
     expect(gesture.preview.bars[0].start).toBe(0);
     gesture.update(0.8);
+    expect(gesture.validDrop).toBe(false);
+    gesture.update(0.8, 300);
     expect(ranges(gesture.preview)).toEqual([
       ['a', 1, 3],
       ['b', 3, 5],
@@ -150,6 +152,7 @@ describe('gesture transactions', () => {
     });
     expect(gesture.tracking).toEqual({ start: 0.8, end: 2.6 });
     gesture.update(2.6);
+    gesture.update(2.6, 300);
     expect(gesture.tracking.start).toBeCloseTo(1.5);
     expect(gesture.tracking.end).toBeCloseTo(3.3);
     expect(ranges(gesture.commit())).toEqual([
@@ -225,6 +228,7 @@ describe('gesture transactions', () => {
     for (const kind of ['move', 'resize-left'] as const) {
       const gesture = new Gesture(chain(), kind, 'c', 4, 80);
       gesture.update(3);
+      if (kind === 'move') gesture.update(3, 300);
       expect(gesture.preview.bars[0].start).toBe(-1);
       gesture.update(4);
       expect(gesture.preview).toEqual(chain());

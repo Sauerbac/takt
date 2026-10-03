@@ -6,6 +6,7 @@ import {
   interval,
   laneGeometry,
   settled,
+  readyToDrop,
 } from '../helpers';
 
 test.beforeEach(async ({ page }) => {
@@ -139,6 +140,7 @@ test('moving by the label previews and reverses right and left cascades with ato
   await page.mouse.move(from.x, from.y);
   await interval(page.getByTestId('bar-b'), 2, 4);
   await page.mouse.move(from.x + lane.width, from.y);
+  await readyToDrop(page);
   await page.mouse.up();
   await expectPosition(page, 'a', 1, 3);
   await expectPosition(page, 'b', 3, 5);
@@ -152,6 +154,7 @@ test('moving by the label previews and reverses right and left cascades with ato
   await settled(page.getByTestId('bar-c'));
   const left = await beginBarDrag(page, 'c');
   await page.mouse.move(left.x - lane.width, left.y);
+  await readyToDrop(page);
   await page.mouse.up();
   await expectPosition(page, 'a', -1, 1);
   await expectPosition(page, 'b', 1, 3);
@@ -197,6 +200,7 @@ test('real pointer proposals resolve exact halfway ties toward the later boundar
   await interval(page.getByTestId('snap-preview'), 0, 2);
   await page.mouse.move(from.x + lane.width / 2, from.y);
   await interval(page.getByTestId('snap-preview'), 1, 3);
+  await readyToDrop(page);
   await page.mouse.up();
   await expectPosition(page, 'a', 1, 3);
   await page.keyboard.press('Control+z');
@@ -238,6 +242,7 @@ test('pointer capture allows an outside release; pointer loss and window blur ca
   const lane = await laneGeometry(page);
   const from = await beginBarDrag(page, 'a');
   await page.mouse.move(from.x + lane.width, from.y - 90);
+  await readyToDrop(page);
   await page.mouse.up();
   await expectPosition(page, 'a', 1, 3);
   await page.keyboard.press('Control+z');

@@ -4,8 +4,11 @@ import type { Page, Locator } from '@playwright/test';
 export async function laneGeometry(page: Page) {
   const bounds = await page.getByTestId('lane').boundingBox();
   if (!bounds) throw new Error('Timeline is not visible');
+  const firstWeek = Number(
+    await page.getByTestId('lane').getAttribute('data-first-week'),
+  );
   return {
-    x: (week: number) => bounds.x + ((week + 2) * bounds.width) / 12,
+    x: (week: number) => bounds.x + ((week - firstWeek) * bounds.width) / 12,
     y: bounds.y + 22,
     width: bounds.width / 12,
   };
@@ -31,6 +34,18 @@ export async function draw(
 export async function interval(bar: Locator, start: number, end: number) {
   await expect(bar).toHaveAttribute('data-start', String(start));
   await expect(bar).toHaveAttribute('data-end', String(end));
+}
+export async function readyToDrop(page: Page) {
+  await expect(page.getByTestId('snap-preview')).toHaveAttribute(
+    'data-valid',
+    'true',
+  );
+}
+export async function pauseClock(page: Page) {
+  const time = new Date('2026-10-03T12:00:00Z');
+  // Leave room for real time between installation and pausing, especially in Firefox.
+  await page.clock.install({ time: new Date(time.getTime() - 60_000) });
+  await page.clock.pauseAt(time);
 }
 export async function beginBarDrag(
   page: Page,

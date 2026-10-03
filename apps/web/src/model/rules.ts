@@ -3,11 +3,14 @@ import type { Bar, ChartDocument } from './document';
 export const snapWeek = (week: number): number => Math.floor(week + 0.5);
 export type PushDirection = 'left' | 'right';
 
-// Resolve only endpoint collisions, preserving the original ordering and durations.
+// Resolve endpoint collisions, or retain a movement push from its activated neighbor.
+// The anchor keeps that neighbor and the reached chain ahead even after passing
+// their committed intervals; all displacement is still derived from this document.
 export function placeBar(
   document: ChartDocument,
   proposal: Bar,
   direction: PushDirection,
+  pushFrom?: string,
 ): ChartDocument {
   const others = document.bars
     .filter((bar) => bar.id !== proposal.id)
@@ -15,8 +18,11 @@ export function placeBar(
   if (direction === 'right') {
     others.sort((a, b) => a.start - b.start);
     let boundary = proposal.end;
+    let anchored = false;
     for (const bar of others) {
-      if (bar.end <= proposal.start || bar.start >= boundary) continue;
+      anchored ||= bar.id === pushFrom;
+      if ((!anchored && bar.end <= proposal.start) || bar.start >= boundary)
+        continue;
       const duration = bar.end - bar.start;
       bar.start = boundary;
       bar.end = boundary + duration;
@@ -25,8 +31,11 @@ export function placeBar(
   } else {
     others.sort((a, b) => b.start - a.start);
     let boundary = proposal.start;
+    let anchored = false;
     for (const bar of others) {
-      if (bar.start >= proposal.end || bar.end <= boundary) continue;
+      anchored ||= bar.id === pushFrom;
+      if ((!anchored && bar.start >= proposal.end) || bar.end <= boundary)
+        continue;
       const duration = bar.end - bar.start;
       bar.end = boundary;
       bar.start = boundary - duration;

@@ -22,7 +22,7 @@ The complete design exploration is preserved in [archive/ui-prototypes](archive/
 
 ## Browser application
 
-The first vertical slice lives in `apps/web`, built with Svelte 5, Vite, and TypeScript. It supports drawing, inline naming, moving and resizing bars in one row, reversible collision previews, cancellation, and atomic undo/redo. Contents reset on refresh.
+The browser app lives in `apps/web`, built with Svelte 5, Vite, and TypeScript. It supports drawing, inline naming, moving and resizing bars in one row, reversible collision previews, cancellation, and atomic undo/redo. Moving waits 300 ms of continuous snapped contact before pushing, allowing passage through neighbors to change their order; an early overlapping drop cancels. Activated pushes continue for any distance. Moving forward above 1,000 CSS px/second allows overtaking and restores the pushed bars to their original positions; retraction brings the chain back with the dragged bar at any speed. Drawing and resizing still push immediately. Horizontal edge auto-scroll reveals earlier and later weeks during those gestures, with speed increasing toward each edge. Section/row labels stay pinned horizontally. Week 0 remains fixed and viewport changes stay outside history. Contents reset on refresh.
 
 Use Node.js 22.12+ and npm. From the repository root:
 
@@ -61,6 +61,6 @@ Screenshot baselines are Chromium/Windows-specific. Keep their browser version c
 
 ### Component fixtures
 
-Component fixtures are available through the development server at `/tests/fixtures/index.html?state=Empty`, `?state=Chain`, and `?state=Narrow`. They expose the same production components with deterministic initial data, and are excluded from the static production entry.
+Component fixtures are available through the development server at `/tests/fixtures/index.html?state=Empty`, `?state=Chain`, `?state=Narrow`, `?state=Separated`, and `?state=EdgeContact`. The last two expose separated collision destinations and sustained contact during edge scrolling. They render the same production components with deterministic initial data, and are excluded from the static production entry.
 
-The implementation follows the staged sequence in the implementation decisions. Additional rows and sections, milestones, timeline navigation, calendar mode, context menus, persistence, export, and desktop packaging remain future work.
+The implementation follows the staged sequence in the implementation decisions. Additional rows and sections, milestones, general scrolling/panning/zoom, calendar mode, context menus, persistence, export, and desktop packaging remain future work.

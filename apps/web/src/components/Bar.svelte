@@ -7,6 +7,7 @@
     weekWidth,
     tracking,
     selected,
+    invalid = false,
     editing,
     draft,
     onstart,
@@ -18,6 +19,7 @@
     weekWidth: number;
     tracking?: Interval;
     selected: boolean;
+    invalid?: boolean;
     editing: boolean;
     draft: string;
     onstart: (event: PointerEvent, kind: GestureKind, id: string) => void;
@@ -40,6 +42,7 @@
 <div
   class="bar"
   class:selected
+  class:invalid
   class:tracking={!!tracking}
   class:editing
   data-testid={`bar-${bar.id}`}
@@ -47,7 +50,7 @@
   data-end={bar.end}
   style:left={`${(position.start - FIRST_WEEK) * weekWidth + BAR_INSET}px`}
   style:width={`${Math.max(1, (position.end - position.start) * weekWidth - BAR_INSET * 2)}px`}
-  title={`${bar.name || 'Unnamed bar'} · Weeks ${bar.start}–${bar.end - 1}`}
+  title={`${invalid ? 'Cannot drop here · Move clear or hold to push · ' : ''}${bar.name || 'Unnamed bar'} · Weeks ${bar.start}–${bar.end - 1}`}
   onpointerdown={(event) => {
     if (!editing) onstart(event, 'move', bar.id);
     else event.stopPropagation();
@@ -120,6 +123,10 @@
     transition: none;
     cursor: grabbing;
     z-index: 3;
+  }
+  .bar.invalid {
+    border: 1px dashed #a23e42;
+    cursor: not-allowed;
   }
   .bar span {
     overflow: hidden;

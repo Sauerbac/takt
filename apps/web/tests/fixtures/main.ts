@@ -20,6 +20,21 @@ const states = {
       { id: 'a', start: 3, end: 4, name: 'A long label that must be clipped' },
     ],
   },
+  Separated: {
+    ...emptyDocument(),
+    bars: [
+      { id: 'a', start: 0, end: 1, name: 'Research' },
+      { id: 'b', start: 2, end: 3, name: 'Synthesis' },
+      { id: 'c', start: 5, end: 6, name: 'Review' },
+    ],
+  },
+  EdgeContact: {
+    ...emptyDocument(),
+    bars: [
+      { id: 'a', start: 0, end: 1, name: 'Research' },
+      { id: 'b', start: 8, end: 16, name: 'Long work period' },
+    ],
+  },
 };
 const name = new URLSearchParams(location.search).get('state') ?? 'Empty';
 if (!(name in states)) throw new Error(`Unknown component state: ${name}`);

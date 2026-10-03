@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { tick } from 'svelte';
+  import { onDestroy, tick } from 'svelte';
   import { emptyDocument } from '../model/document';
   import type { ChartDocument } from '../model/document';
   import { History } from '../model/history';
@@ -12,6 +12,8 @@
     pointerWeek,
     displayedInterval,
     BAR_INSET,
+    edgeVelocity,
+    LABEL_WIDTH,
   } from '../viewport';
   import IconButton from './IconButton.svelte';
   import Bar from './Bar.svelte';
@@ -26,6 +28,8 @@
   let motion = $state<{
     meaningful: boolean;
     tracking: { start: number; end: number };
+    proposal: { start: number; end: number } | null;
+    validDrop: boolean;
   } | null>(null);
   let draft = $state('');
   let canUndo = $state(false);
@@ -35,19 +39,36 @@
   let laneWidth = $state(900);
   let pointerId: number | null = null;
   let captureOwner: HTMLElement | null = null;
+  let pointer: { x: number; y: number } | null = null;
+  let scrollFrame: number | null = null;
+  let scrollTime = 0;
+  let pushTimer: ReturnType<typeof setTimeout> | null = null;
   const weekWidth = $derived(laneWidth / WEEK_COUNT);
+  const timelineShift = $derived((FIRST_WEEK - view.firstWeek) * weekWidth);
+  const weeks = $derived(
+    Array.from(
+      { length: WEEK_COUNT + 1 },
+      (_, i) => Math.floor(view.firstWeek) + i,
+    ),
+  );
   const shown = $derived(document);
+
+  onDestroy(() => {
+    stopScrolling();
+    stopPushTimer();
+  });
 
   function syncHistory() {
     document = history.document;
     canUndo = history.canUndo;
     canRedo = history.canRedo;
   }
-  function weekAt(event: PointerEvent) {
+  function weekAt(clientX: number) {
     return pointerWeek(
-      event.clientX,
+      clientX,
       lane.getBoundingClientRect().left,
       weekWidth,
+      view.firstWeek,
     );
   }
   function start(
@@ -65,31 +86,111 @@
             pressedBar.getBoundingClientRect(),
             lane.getBoundingClientRect().left,
             weekWidth,
+            view.firstWeek,
           )
         : undefined;
     finishName(true);
     view.selectedId = kind === 'draw' ? null : id;
     pointerId = event.pointerId;
+    pointer = { x: event.clientX, y: event.clientY };
     gesture = new Gesture(
       history.document,
       kind,
       id,
-      weekAt(event),
+      weekAt(event.clientX),
       weekWidth,
       displayed,
     );
-    motion = { meaningful: false, tracking: gesture.tracking };
+    motion = {
+      meaningful: false,
+      tracking: gesture.tracking,
+      proposal: null,
+      validDrop: true,
+    };
     // Capture on the pressed surface so clicks and double-clicks keep their bar target.
     captureOwner = event.currentTarget as HTMLElement;
     captureOwner.setPointerCapture(event.pointerId);
   }
   function move(event: PointerEvent) {
     if (!gesture || event.pointerId !== pointerId) return;
-    gesture.update(weekAt(event));
+    pointer = { x: event.clientX, y: event.clientY };
+    updateProposal();
+    updateScrolling();
+  }
+  function updateScrolling() {
+    if (scrollVelocity() === 0) stopScrolling();
+    else if (scrollFrame === null) {
+      scrollTime = performance.now();
+      scrollFrame = requestAnimationFrame(scroll);
+    }
+  }
+  function updateProposal() {
+    if (!gesture || !pointer) return;
+    gesture.update(weekAt(pointer.x), performance.now(), pointer.x);
     document = gesture.preview;
-    motion = { meaningful: gesture.meaningful, tracking: gesture.tracking };
+    motion = {
+      meaningful: gesture.meaningful,
+      tracking: gesture.tracking,
+      proposal: gesture.proposal,
+      validDrop: gesture.validDrop,
+    };
+    stopPushTimer();
+    if (gesture.pushAt !== null) {
+      pushTimer = setTimeout(
+        () => {
+          pushTimer = null;
+          updateProposal();
+        },
+        Math.max(0, Math.ceil(gesture.pushAt - performance.now())),
+      );
+    }
+  }
+  function stopPushTimer() {
+    if (pushTimer !== null) clearTimeout(pushTimer);
+    pushTimer = null;
+  }
+  function viewportScrolled() {
+    if (!gesture) return;
+    updateProposal();
+    updateScrolling();
+  }
+  function visibleTimeline() {
+    const chart = viewport.getBoundingClientRect();
+    const row = lane.getBoundingClientRect();
+    return {
+      left: Math.max(row.left, chart.left + viewport.clientLeft + LABEL_WIDTH),
+      right: Math.min(
+        row.right,
+        chart.left + viewport.clientLeft + viewport.clientWidth,
+      ),
+      top: chart.top + viewport.clientTop,
+      bottom: chart.top + viewport.clientTop + viewport.clientHeight,
+    };
+  }
+  function scrollVelocity() {
+    return gesture?.meaningful && pointer
+      ? edgeVelocity(pointer, visibleTimeline())
+      : 0;
+  }
+  function scroll(time: number) {
+    scrollFrame = null;
+    const velocity = scrollVelocity();
+    if (velocity === 0) return;
+    view.firstWeek += (velocity * (time - scrollTime)) / 1000 / weekWidth;
+    scrollTime = time;
+    // Re-project a stationary pointer after every view change. The transaction
+    // still derives collisions and history from its committed pointer-down snapshot.
+    updateProposal();
+    scrollFrame = requestAnimationFrame(scroll);
+  }
+  function stopScrolling() {
+    if (scrollFrame !== null) cancelAnimationFrame(scrollFrame);
+    scrollFrame = null;
   }
   function releaseCapture() {
+    stopScrolling();
+    stopPushTimer();
+    pointer = null;
     const id = pointerId;
     pointerId = null;
     if (id !== null && captureOwner?.hasPointerCapture(id))
@@ -164,11 +265,12 @@
       await tick();
       const bar = document.bars.find((bar) => bar.id === command.revealId);
       if (bar) {
-        const left = (bar.start - FIRST_WEEK) * weekWidth + 218;
-        const right = (bar.end - FIRST_WEEK) * weekWidth + 218;
-        if (left < viewport.scrollLeft) viewport.scrollLeft = left;
-        else if (right > viewport.scrollLeft + viewport.clientWidth)
-          viewport.scrollLeft = right - viewport.clientWidth;
+        const bounds = visibleTimeline();
+        const left = weekAt(bounds.left);
+        const right = weekAt(bounds.right);
+        if (bar.start < left) view.firstWeek += bar.start - left;
+        else if (bar.end > right)
+          view.firstWeek += Math.min(bar.end - right, bar.start - left);
       }
     }
   }
@@ -253,13 +355,17 @@
     aria-label="Whole-week Gantt chart"
     tabindex="0"
     onpointerdown={backgroundPress}
+    onscroll={viewportScrolled}
+    style:--labels={`${LABEL_WIDTH}px`}
   >
     <div class="chart">
       <div class="chart-header">
         <div class="lane-heading">Sections &amp; rows</div>
         <div class="weeks">
-          {#each Array.from({ length: WEEK_COUNT }, (_, i) => FIRST_WEEK + i) as week}<div
+          {#each weeks as week}<div
               class="week"
+              style:left={`${(week - view.firstWeek) * weekWidth}px`}
+              style:width={`${weekWidth}px`}
             >
               Week {week < 0 ? `−${-week}` : week}
             </div>{/each}
@@ -279,10 +385,12 @@
           bind:this={lane}
           bind:clientWidth={laneWidth}
           style:--week={`${weekWidth}px`}
+          style:background-position-x={`${timelineShift}px`}
           role="region"
           aria-label="Timeline row"
           tabindex="-1"
           data-testid="lane"
+          data-first-week={view.firstWeek}
           onpointerdown={(event) => start(event, 'draw')}
           onpointermove={move}
           onpointerup={end}
@@ -294,35 +402,45 @@
           {#if shown.bars.length === 0}<span class="hint"
               >Drag to create a bar · Double-click for a milestone.</span
             >{/if}
-          {#if gesture && motion?.meaningful}
-            {@const proposal = shown.bars.find((bar) => bar.id === gesture?.id)}
-            {#if proposal}<div
-                class="snap-preview"
-                data-testid="snap-preview"
-                data-start={proposal.start}
-                data-end={proposal.end}
-                style:left={`${(proposal.start - FIRST_WEEK) * weekWidth + BAR_INSET}px`}
-                style:width={`${(proposal.end - proposal.start) * weekWidth - BAR_INSET * 2}px`}
-              ></div>{/if}
-          {/if}
-          {#each shown.bars as bar (bar.id)}
-            <Bar
-              {bar}
-              {weekWidth}
-              selected={view.selectedId === bar.id || gesture?.id === bar.id}
-              editing={view.editingId === bar.id}
-              {draft}
-              tracking={motion &&
-              gesture?.id === bar.id &&
-              (gesture.kind !== 'draw' || motion.meaningful)
-                ? motion.tracking
-                : undefined}
-              onstart={start}
-              onrename={rename}
-              ondraft={(value) => (draft = value)}
-              onfinish={finishName}
-            />
-          {/each}
+          <div
+            class="timeline-content"
+            style:transform={`translateX(${timelineShift}px)`}
+          >
+            {#if gesture && motion?.meaningful}
+              {@const proposal = motion.proposal}
+              {#if proposal}<div
+                  class="snap-preview"
+                  class:invalid={!motion.validDrop}
+                  data-testid="snap-preview"
+                  data-start={proposal.start}
+                  data-end={proposal.end}
+                  data-valid={motion.validDrop}
+                  style:left={`${(proposal.start - FIRST_WEEK) * weekWidth + BAR_INSET}px`}
+                  style:width={`${(proposal.end - proposal.start) * weekWidth - BAR_INSET * 2}px`}
+                ></div>{/if}
+            {/if}
+            {#each shown.bars as bar (bar.id)}
+              <Bar
+                bar={gesture?.id === bar.id && motion?.proposal
+                  ? { ...bar, ...motion.proposal }
+                  : bar}
+                {weekWidth}
+                selected={view.selectedId === bar.id || gesture?.id === bar.id}
+                invalid={gesture?.id === bar.id && motion?.validDrop === false}
+                editing={view.editingId === bar.id}
+                {draft}
+                tracking={motion &&
+                gesture?.id === bar.id &&
+                (gesture.kind !== 'draw' || motion.meaningful)
+                  ? motion.tracking
+                  : undefined}
+                onstart={start}
+                onrename={rename}
+                ondraft={(value) => (draft = value)}
+                onfinish={finishName}
+              />
+            {/each}
+          </div>
         </div>
       </div>
     </div>
@@ -411,7 +529,15 @@
   .section,
   .row {
     display: grid;
-    grid-template-columns: 218px minmax(0, 1fr);
+    grid-template-columns: var(--labels) minmax(0, 1fr);
+  }
+  .lane-heading,
+  .section-label,
+  .row-label {
+    position: sticky;
+    left: 0;
+    z-index: 5;
+    background: var(--surface);
   }
   .chart-header {
     height: 54px;
@@ -429,10 +555,12 @@
     color: var(--muted);
   }
   .weeks {
-    display: grid;
-    grid-template-columns: repeat(12, 1fr);
+    position: relative;
+    overflow: clip;
   }
   .week {
+    position: absolute;
+    height: 100%;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -447,6 +575,7 @@
     border-bottom: 1px solid var(--line);
   }
   .section-label {
+    background: var(--section-bg);
     display: flex;
     align-items: center;
     gap: 8px;
@@ -500,6 +629,14 @@
     font-size: 14px;
     color: var(--muted);
   }
+  .timeline-content {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+  }
+  .timeline-content :global(.bar) {
+    pointer-events: auto;
+  }
   .snap-preview {
     position: absolute;
     height: 34px;
@@ -508,6 +645,10 @@
     background: #f3b18430;
     border-radius: var(--bar-radius);
     pointer-events: none;
+  }
+  .snap-preview.invalid {
+    border-color: #a23e42;
+    background: #a23e4220;
   }
   footer {
     display: flex;

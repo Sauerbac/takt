@@ -69,7 +69,7 @@ Every drag gesture has three conceptual states:
 
 1. **Start:** capture the complete committed document state relevant to the gesture.
 2. **Preview:** derive the proposed result from the start state and the current pointer. The dragged object follows the pointer continuously; snapped placement and all resulting displacement are previews.
-3. **Commit or cancel:** pointer-up commits exactly the result currently shown as one history action. Escape or an interrupted gesture restores the start state and creates no history entry.
+3. **Commit or cancel:** pointer-up commits a valid result currently shown as one history action. An invalid pending overlapping move, Escape, or an interrupted gesture restores the start state and creates no history entry.
 
 Preview changes are reversible. If a resize pushes neighboring bars and the pointer returns to the earlier size, those bars flow back to their original positions. If a dragged bar enters an occupied row, that row previews its collision pushes; when the bar leaves, the row returns to its committed state. Intermediate rows crossed during a drag are not modified on commit.
 
@@ -82,7 +82,7 @@ The dragged object remains visibly attached to the pointer:
 - a section drag carries the section and all its visible rows and items;
 - surrounding bars, rows, and sections flow around the proposed destination;
 - returning the pointer across a structural boundary reverses that preview;
-- pointer-up must produce the arrangement that was visible immediately before release.
+- pointer-up must produce the valid arrangement that was visible immediately before release, or cancel a visibly invalid proposal.
 
 Releasing outside the visible chart may commit when the current proposal is valid. Escape cancels an active drag. A genuine interruption such as losing the active pointer/window cancels and restores the start state.
 
@@ -102,6 +102,12 @@ The context-menu command **Add bar here** follows the same collision rule for it
 
 Moving a bar preserves its duration. Horizontal movement pushes collisions in the movement direction. Dropping into another row pushes conflicting destination bars to the right.
 
+Same-row movement gates pushes on 300 ms of continuous snapped contact, as specified in UX section 9. Track contact start timestamps and approach direction by neighbor ID inside `Gesture`, using committed intervals. Its `update(pointer, time, speedPointer)` accepts a monotonic timestamp and a CSS pixel pointer coordinate explicitly; there are no timers or browser dependencies in the transaction or model rules. The pixel coordinate defaults to the week coordinate times the pickup scale for standalone sequences. The browser supplies client X so viewport motion cannot trigger the speed escape. The first matured current contact activates the complete `placeBar` cascade with a neighbor anchor and retained approach direction. The anchor keeps pushing beyond the neighbor's original interval; retraction recomputes displacement from the pointer-down document and releases the anchor when clear. Compare consecutive week proposals to capture a fresh approach. Total displacement from pointer-down gives the wrong direction after an overtake and reversal.
+
+The speed escape is strictly above 1,000 CSS px/second, measured from consecutive timed updates. Fast continuation in the active push direction releases the anchor and restores the neighbors to their original positions. Fast retraction retains the anchor and unwinds the displacement normally. Fast movement resets pending contact. Equal timestamps do not establish a velocity. Every preview derives from the immutable `before` document; no displaced arrangement accumulates across updates or overtakes. A valid commit includes the final displacement atomically; an invalid commit restores `before`.
+
+Keep `proposal` and `validDrop` separate from the always-valid `preview` document. During pending overlap, the proposal/painted tracking can overlap, while `preview` retains the committed arrangement. An invalid `commit()` returns the original document, creating no command and preserving redo. The browser adapter supplies `performance.now()`, schedules the pending deadline even without pointer movement, and clears/reschedules it after each proposal update. Native scroll and edge-scroll frames re-project the last pointer through the current viewport before updating contact; neither is a history action. End/cancel/unmount clear the deadline timer. Rendering marks pending bars and ghosts with an invalid outline and explanatory hover text.
+
 While moving across rows, each hovered row may show its proposed collision result. Leaving that row restores it. Only the row in which the bar is released is changed.
 
 ### Resizing and snapping
@@ -112,7 +118,7 @@ Pointer motion is continuous while the semantic result snaps to whole-week bound
 
 ### Collision invariants
 
-- Bars in a row never overlap; direct adjacency is valid.
+- Committed bars and document previews never overlap; direct adjacency is valid. Pending movement overlap exists only in separate presentation state.
 - A pushed bar keeps its duration and is never shortened, split, or clipped.
 - Pushes cascade through every bar needed to make the preview valid.
 - Creation collisions push to the right.
@@ -137,6 +143,14 @@ Dragging near a viewport edge auto-scrolls:
 - stopping immediately when the pointer leaves the edge zone or the gesture ends.
 
 Reduced-motion behavior is not a requirement for this milestone.
+
+Horizontal edge scrolling uses a fractional first-visible-week coordinate in viewport state and an animation-frame loop in the browser input adapter. Each frame re-projects the last client pointer into week coordinates before updating the transaction. Translate the timeline content as a whole so viewport motion cannot trigger bar settlement transitions; week headings and grid lines share the same view offset. Painted pickup geometry includes that offset. The committed document remains the history boundary. Undo/redo reveal adjusts this view coordinate to show the affected interval (aligning its start when it is wider than the visible timeline).
+
+Keep the label column horizontally sticky with opaque section/row backgrounds above timeline content. The visible timeline's left edge excludes the pinned column even after native horizontal scrolling changes the lane's border box. Share its width between layout and input geometry through `LABEL_WIDTH`. Native scroll events re-project an active pointer so the bar stays attached; vertical navigation still carries labels with their corresponding content.
+
+Browser edge-scroll tests advance an installed Playwright clock frame by frame while holding a real mouse pointer stationary. They verify both directions, drawing/movement/both handles, accelerating edge speed, pointer attachment without transitions, cancellation, preserved redo, and atomic commit. Ordinary first-slice motion tests continue to verify collision and settlement transitions.
+
+Delayed-push state tests cover exact activation boundaries, continuous movement, passing through, contact resets, different neighbors, invalid release/history preservation, and both cascade directions. Include sustained pushes beyond original intervals, strict speed boundaries, restoration on fast continuation, fast retraction, fresh contact after an escape, and stationary screen pointers during viewport motion. Real-browser tests use the installed clock for deadline activation without movement, directional speed escapes, timer cleanup on every gesture ending, and dwell while edge-scrolling. Motion tests inspect the existing 150 ms CSS transitions, including pushes after reversing an overtake, restoration on speed escape, and fast retraction. Include visual baselines for pending/activated overlap and horizontally scrolled pinned labels.
 
 ## 7. Rows, sections, and collapsed destinations
 
