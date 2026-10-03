@@ -16,7 +16,9 @@ test('production editor: entering above from the right pushes left after contact
   const neighbor = page.locator('.bar').first();
   await draw(page, 1, 2);
   const chain = page.locator('.bar').nth(1);
-  await page.getByRole('button', { name: '+ Add row', exact: true }).click();
+  await page
+    .getByRole('button', { name: 'Add row to Unnamed section', exact: true })
+    .click();
   await page.getByRole('textbox', { name: 'Row name' }).press('Escape');
   const source = await laneGeometry(page, 1),
     destination = await laneGeometry(page);
@@ -66,7 +68,9 @@ test('production editor: inserting the lower bar between two upper bars opens sp
   const left = page.locator('.bar').first();
   await draw(page, 4, 6);
   const right = page.locator('.bar').nth(1);
-  await page.getByRole('button', { name: '+ Add row', exact: true }).click();
+  await page
+    .getByRole('button', { name: 'Add row to Unnamed section', exact: true })
+    .click();
   await page.getByRole('textbox', { name: 'Row name' }).press('Escape');
   const source = await laneGeometry(page, 1),
     destination = await laneGeometry(page);
@@ -111,7 +115,9 @@ test('production editor: add and name a row, move a bar, create a milestone, and
   page.on('pageerror', (error) => errors.push(error.message));
   await page.goto('/');
   await draw(page, 0, 2, 'Discovery');
-  await page.getByRole('button', { name: '+ Add row', exact: true }).click();
+  await page
+    .getByRole('button', { name: 'Add row to Unnamed section', exact: true })
+    .click();
   await page.getByRole('textbox', { name: 'Row name' }).fill('Design');
   await page.getByRole('textbox', { name: 'Row name' }).press('Enter');
   const row = await laneGeometry(page, 1),

@@ -8,7 +8,11 @@ import { MilestoneGesture } from './milestone';
 
 const before = (): ChartDocument => ({
   ...emptyDocument(),
-  rows: ['row-1', 'row-2', 'row-3'].map((id) => ({ id, name: '' })),
+  rows: ['row-1', 'row-2', 'row-3'].map((id) => ({
+    id,
+    sectionId: 'section-1',
+    name: '',
+  })),
   bars: [
     { id: 'a', rowId: 'row-1', start: 0, end: 2, name: 'A' },
     { id: 'b', rowId: 'row-2', start: 0, end: 2, name: 'B' },
@@ -218,7 +222,11 @@ it.each(['left', 'right'] as const)(
 it('an early overlapping cross-row release cancels the whole move and preserves redo', () => {
   const document = before();
   const history = new History(document);
-  history.commit('name', { ...document, sectionName: 'Named' }, 'a');
+  history.commit(
+    'name',
+    { ...document, sections: [{ id: 'section-1', name: 'Named' }] },
+    'a',
+  );
   history.undo();
   const gesture = new Gesture(document, 'move', 'a', 1, 80);
   gesture.update(1, 0, 80, 'row-2', 44);
@@ -337,7 +345,11 @@ it('milestones coexist with bars, may share boundaries across rows, and reject d
 it('a duplicate milestone drop cancels the entire gesture and preserves redo', () => {
   const document = before();
   const history = new History(document);
-  history.commit('name', { ...document, sectionName: 'Named' }, 'm');
+  history.commit(
+    'name',
+    { ...document, sections: [{ id: 'section-1', name: 'Named' }] },
+    'm',
+  );
   history.undo();
   const gesture = new MilestoneGesture(document, 'm', 1, 80);
   gesture.update(3, 0, 240, 'row-2', 44);

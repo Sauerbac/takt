@@ -11,7 +11,10 @@ export interface Command {
     | 'delete'
     | 'milestone-move'
     | 'milestone'
-    | 'add-row';
+    | 'add-row'
+    | 'add-section'
+    | 'move-row'
+    | 'move-section';
   readonly before: ChartDocument;
   readonly after: ChartDocument;
   readonly revealId: string;

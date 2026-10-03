@@ -7,6 +7,59 @@ import {
   settled,
 } from '../helpers';
 
+test('Apricot structural controls, collapsed sections, insertion preview and scoped confirmation', async ({
+  page,
+}) => {
+  await page.goto('/tests/fixtures/index.html?state=Sections');
+  await expect(page.locator('main')).toHaveScreenshot('sections.png');
+  await page
+    .getByRole('button', { name: 'Collapse Delivery', exact: true })
+    .click();
+  await expect(page.locator('main')).toHaveScreenshot('collapsed-section.png');
+  const source = (await page
+    .getByRole('button', { name: 'Discovery', exact: true })
+    .boundingBox())!;
+  const destination = (await page
+    .getByRole('button', { name: 'Empty', exact: true })
+    .boundingBox())!;
+  await page.mouse.move(source.x + 10, source.y + source.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(source.x + 10, destination.y + 20);
+  await expect(page.locator('main')).toHaveScreenshot(
+    'row-insertion-preview.png',
+  );
+  await page.keyboard.press('Escape');
+  await page.mouse.up();
+  await page
+    .getByRole('button', { name: 'Research', exact: true })
+    .click({ button: 'right' });
+  await page
+    .getByRole('menuitem', { name: 'Delete section…', exact: true })
+    .click();
+  await expect(page.locator('main')).toHaveScreenshot(
+    'container-confirmation.png',
+  );
+});
+
+test('Apricot collapsed section drag keeps its hidden contents out of the carried group', async ({
+  page,
+}) => {
+  await page.goto('/tests/fixtures/index.html?state=Sections');
+  await page
+    .getByRole('button', { name: 'Collapse Research', exact: true })
+    .click();
+  await settled(page.getByTestId('section-section-2'));
+  const label = (await page
+    .getByRole('button', { name: 'Research', exact: true })
+    .boundingBox())!;
+  await page.mouse.move(label.x + 10, label.y + label.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(label.x + 10, label.y + label.height / 2 + 200);
+  await expect(page.locator('main')).toHaveScreenshot(
+    'collapsed-section-drag.png',
+  );
+});
+
 test('Apricot section naming uses the full name area without changing its style', async ({
   page,
 }) => {

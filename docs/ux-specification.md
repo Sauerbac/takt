@@ -2,7 +2,7 @@
 
 **Status:** Agreed UX direction, refined for the first implementation milestone.
 
-**Last updated:** October 3, 2026.
+**Last updated:** October 4, 2026.
 
 **Audience:** Product, design, and implementation collaborators.
 
@@ -346,6 +346,8 @@ Right-clicking a section provides actions to add a row and add a section. A cont
 Right-clicking a row provides insertion above or below. Rename, color-related actions, and deletion appear where applicable to the selected object.
 
 New rows and sections store an empty name, display **“Unnamed row”** or **“Unnamed section”** as a placeholder, and immediately enter inline naming.
+
+A newly added section starts empty. Its Add row control creates the first row when needed.
 
 ### 11.3 Collapse and expansion
 

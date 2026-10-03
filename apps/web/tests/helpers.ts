@@ -41,6 +41,21 @@ export async function readyToDrop(page: Page) {
   );
 }
 export async function pauseClock(page: Page) {
+  // Initial width measurement can start settlement transitions. Clock-based
+  // behavioral tests begin from a settled fixture; interrupted pickup is
+  // exercised separately by dedicated motion tests.
+  await page.locator('.chart').evaluate(async (element) => {
+    await new Promise<void>((resolve) =>
+      requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+    );
+    await Promise.all(
+      [element, ...element.querySelectorAll('*')].flatMap((element) =>
+        element
+          .getAnimations()
+          .map((animation) => animation.finished.catch(() => {})),
+      ),
+    );
+  });
   const time = new Date('2026-10-03T12:00:00Z');
   // Leave room for real time between installation and pausing, especially in Firefox.
   await page.clock.install({ time: new Date(time.getTime() - 60_000) });

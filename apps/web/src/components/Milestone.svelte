@@ -6,6 +6,8 @@
     weekWidth,
     top,
     tracking,
+    visible = true,
+    carried = false,
     selected,
     invalid,
     editing,
@@ -19,6 +21,8 @@
     weekWidth: number;
     top: number;
     tracking?: number;
+    visible?: boolean;
+    carried?: boolean;
     selected: boolean;
     invalid: boolean;
     editing: boolean;
@@ -42,6 +46,8 @@
 <div
   class="milestone"
   class:selected
+  class:carried
+  class:hidden={!visible}
   class:invalid
   class:tracking={tracking !== undefined}
   class:editing
@@ -79,6 +85,15 @@
 </div>
 
 <style>
+  .hidden {
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+  }
+  .carried {
+    transition: none !important;
+    z-index: 7;
+  }
   .milestone {
     position: absolute;
     height: 28px;

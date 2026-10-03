@@ -6,19 +6,54 @@ import '../../src/tokens.css';
 // Named, deterministic component states. This entry is never part of the production build.
 const states = {
   Empty: emptyDocument(),
+  TallSections: {
+    ...emptyDocument(),
+    sections: Array.from({ length: 12 }, (_, index) => ({
+      id: `section-${index + 1}`,
+      name: `Group ${index + 1}`,
+    })),
+    rows: Array.from({ length: 12 }, (_, index) => ({
+      id: `row-${index + 1}`,
+      sectionId: `section-${index + 1}`,
+      name: `Lane ${index + 1}`,
+    })),
+    bars: [{ id: 'a', rowId: 'row-1', start: 0, end: 2, name: 'Discovery' }],
+    milestones: [],
+  },
+  Sections: {
+    ...emptyDocument(),
+    sections: [
+      { id: 'section-1', name: 'Research' },
+      { id: 'section-2', name: 'Delivery' },
+      { id: 'section-3', name: 'Empty' },
+    ],
+    rows: [
+      { id: 'row-1', sectionId: 'section-1', name: 'Discovery' },
+      { id: 'row-2', sectionId: 'section-1', name: 'Review' },
+      { id: 'row-3', sectionId: 'section-2', name: 'Build' },
+      { id: 'row-4', sectionId: 'section-2', name: 'Release' },
+    ],
+    bars: [
+      { id: 'a', rowId: 'row-1', start: 0, end: 2, name: 'Explore' },
+      { id: 'b', rowId: 'row-2', start: 2, end: 3, name: 'Decide' },
+      { id: 'c', rowId: 'row-3', start: 3, end: 5, name: 'Implement' },
+    ],
+    milestones: [{ id: 'm', rowId: 'row-1', boundary: 5, name: 'Approved' }],
+  },
   TallEmpty: {
     ...emptyDocument(),
     rows: Array.from({ length: 30 }, (_, index) => ({
       id: `row-${index + 1}`,
+      sectionId: 'section-1',
       name: '',
     })),
   },
   CrossRows: {
     ...emptyDocument(),
     rows: [
-      { id: 'row-1', name: 'Research' },
-      { id: 'row-2', name: 'Design' },
-      { id: 'row-3', name: 'Delivery' },
+      { id: 'row-1', sectionId: 'section-1', name: 'Research' },
+      { id: 'row-2', sectionId: 'section-1', name: 'Design' },
+      { id: 'row-3', sectionId: 'section-1', name: 'Delivery' },
     ],
     bars: [
       { id: 'a', rowId: 'row-1', start: 0, end: 2, name: 'Discovery' },
@@ -35,6 +70,7 @@ const states = {
     ...emptyDocument(),
     rows: Array.from({ length: 30 }, (_, index) => ({
       id: `row-${index + 1}`,
+      sectionId: 'section-1',
       name: `Lane ${index + 1}`,
     })),
     bars: [{ id: 'a', rowId: 'row-1', start: 0, end: 2, name: 'Discovery' }],
@@ -43,8 +79,8 @@ const states = {
   RowEntry: {
     ...emptyDocument(),
     rows: [
-      { id: 'row-1', name: 'Destination' },
-      { id: 'row-2', name: 'Source' },
+      { id: 'row-1', sectionId: 'section-1', name: 'Destination' },
+      { id: 'row-2', sectionId: 'section-1', name: 'Source' },
     ],
     bars: [
       { id: 'a', rowId: 'row-2', start: 0, end: 1, name: 'Carried bar' },
@@ -56,8 +92,8 @@ const states = {
   BetweenBars: {
     ...emptyDocument(),
     rows: [
-      { id: 'row-1', name: 'Destination' },
-      { id: 'row-2', name: 'Source' },
+      { id: 'row-1', sectionId: 'section-1', name: 'Destination' },
+      { id: 'row-2', sectionId: 'section-1', name: 'Source' },
     ],
     bars: [
       { id: 'a', rowId: 'row-2', start: 2, end: 5, name: 'Insert between' },

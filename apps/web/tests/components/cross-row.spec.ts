@@ -516,7 +516,9 @@ test('Add row and naming have separate history, and the empty-document hint appe
   page,
 }) => {
   await page.goto('/tests/fixtures/index.html?state=Empty');
-  await page.getByRole('button', { name: '+ Add row', exact: true }).click();
+  await page
+    .getByRole('button', { name: 'Add row to Unnamed section', exact: true })
+    .click();
   const input = page.getByRole('textbox', { name: 'Row name' });
   await expect(input).toBeFocused();
   await input.fill('Design');

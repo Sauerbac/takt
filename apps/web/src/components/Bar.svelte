@@ -6,6 +6,8 @@
     bar,
     weekWidth,
     tracking,
+    visible = true,
+    carried = false,
     selected,
     invalid = false,
     editing,
@@ -19,6 +21,8 @@
     bar: Bar;
     weekWidth: number;
     tracking?: Interval;
+    visible?: boolean;
+    carried?: boolean;
     selected: boolean;
     invalid?: boolean;
     editing: boolean;
@@ -44,6 +48,8 @@
 <div
   class="bar"
   class:selected
+  class:carried
+  class:hidden={!visible}
   class:invalid
   class:tracking={!!tracking}
   class:editing
@@ -99,6 +105,15 @@
 </div>
 
 <style>
+  .hidden {
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+  }
+  .carried {
+    transition: none !important;
+    z-index: 7;
+  }
   .bar {
     position: absolute;
     top: 8px;

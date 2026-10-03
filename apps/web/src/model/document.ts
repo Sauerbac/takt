@@ -8,6 +8,12 @@ export interface Bar {
 
 export interface Row {
   readonly id: string;
+  readonly sectionId: string;
+  readonly name: string;
+}
+
+export interface Section {
+  readonly id: string;
   readonly name: string;
 }
 
@@ -19,22 +25,22 @@ export interface Milestone {
   readonly name: string;
 }
 
-// Structural section operations are the next slice; this document has one section.
 export interface ChartDocument {
-  readonly sectionName: string;
+  readonly sections: readonly Section[];
   readonly rows: readonly Row[];
   readonly bars: readonly Bar[];
   readonly milestones: readonly Milestone[];
 }
 
 export const emptyDocument = (): ChartDocument => ({
-  sectionName: '',
-  rows: [{ id: 'row-1', name: '' }],
+  sections: [{ id: 'section-1', name: '' }],
+  rows: [{ id: 'row-1', sectionId: 'section-1', name: '' }],
   bars: [],
   milestones: [],
 });
 export const copyDocument = (document: ChartDocument): ChartDocument => ({
   ...document,
+  sections: document.sections.map((section) => ({ ...section })),
   rows: document.rows.map((row) => ({ ...row })),
   bars: document.bars.map((bar) => ({ ...bar })),
   milestones: document.milestones.map((item) => ({ ...item })),
@@ -43,8 +49,15 @@ export const copyDocument = (document: ChartDocument): ChartDocument => ({
 export function assertDocument(document: ChartDocument): void {
   const ids = new Set<string>();
   const rowIds = new Set<string>();
+  const sectionIds = new Set<string>();
+  for (const section of document.sections) {
+    if (ids.has(section.id)) throw new Error('Duplicate section');
+    ids.add(section.id);
+    sectionIds.add(section.id);
+  }
   for (const row of document.rows) {
-    if (ids.has(row.id)) throw new Error('Duplicate row');
+    if (ids.has(row.id) || !sectionIds.has(row.sectionId))
+      throw new Error('Invalid row');
     ids.add(row.id);
     rowIds.add(row.id);
   }

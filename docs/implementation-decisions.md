@@ -2,7 +2,7 @@
 
 **Status:** Agreed direction for the first implementation milestone.
 
-**Last updated:** October 3, 2026.
+**Last updated:** October 4, 2026.
 
 **Related sources:** The [functional UX specification](ux-specification.md) is authoritative for product behavior. The [Apricot prototype](../ui-prototype/index.html) is the visual reference. This document records the technical direction, testing contract, implementation sequence, and interaction decisions made while preparing for implementation.
 
@@ -63,9 +63,19 @@ This separation is a testability requirement. Collision and history behavior mus
 
 The first slice places document invariants, collision rules, and atomic history commands in `apps/web/src/model`; pointer-independent transactions in `apps/web/src/interaction`; view-only state and coordinate conversion in `apps/web/src/viewport.ts`; and rendering/input adapters in `apps/web/src/components`. `Editor`'s initialization contract is documented near its history construction.
 
-The cross-row slice adds explicit row IDs, an ordered row collection, and a separate milestone collection. Milestone boundaries store the start of the following week. The document still has one section; section structure and reordering belong to the next slice. The visible Add row command and its separate inline naming action make cross-row operations available in the production editor.
+The cross-row slice adds explicit row IDs, an ordered row collection, and a separate milestone collection. Milestone boundaries store the start of the following week. The visible Add row command and its separate inline naming action make cross-row operations available in the production editor.
 
-Render items in a stable keyed overlay across all lanes, clipping it at the timeline column. Changing an item's row must not remount its captured pointer surface or interrupt its settlement animation. Lane geometry supplies destination hit testing; the adapter tracks the carried item's painted vertical offset separately from its snapped row. Empty-lane menus retain their row/week at opening. General item and structural menus remain later work.
+Render items in a stable keyed overlay across all lanes, clipping it at the timeline column. Changing an item's row must not remount its captured pointer surface or interrupt its settlement animation. Lane geometry supplies destination hit testing; the adapter tracks the carried item's painted vertical offset separately from its snapped row. Empty-lane menus retain their row/week at opening. Structural menus retain container identity for insertion, naming, and deletion. General item menus remain later work.
+
+The structural slice adds an ordered section collection and explicit section ownership on rows. Row order within a section comes from the ordered row collection; section movement preserves every row and item. `model/structure.ts` owns insertion, movement, and cascading container deletion. Empty sections and a document with no sections are valid; the bottom Add section control remains available. New sections start empty, as recorded in the UX specification.
+
+`interaction/structure.ts` owns pointer-independent structural layout and transactions. All positions are relative to the chart body. Row centers and section heading centers cross neighboring structural midpoints to select insertion positions, using semantic preview geometry rather than animated bounding boxes. Section heading centers make reversal work across groups of different heights. The transaction retains original collapse state and a 500 ms hover deadline; the browser adapter schedules that deadline and supplies monotonic time. No browser timers enter the transaction.
+
+Rows, section headings, and timeline items remain mounted in stable keyed overlays. Absolute positions animate for surrounding content and final settlement, while carried structures and their contents disable transitions. Stable DOM order prevents keyed reinsertion from interrupting CSS transitions. Structural pointer capture belongs to the stable viewport; the adapter preserves single-click section naming and double-click row naming. Painted pickup geometry preserves pointer attachment when an earlier layout transition is interrupted. Chart height and row heights animate collapse and expansion. Collapsed state stays outside history, including temporary hover expansion; history reveal uses destination layout coordinates while expansion is still animating.
+
+Structural drags reuse vertical edge scrolling across the full chart, including the label column. Automatic scrolling stops at the semantic chart extent, so a carried object's overflow cannot continuously enlarge the scroll limit. Native confirmation dialogs provide modal focus containment, Escape cancellation, and a scoped contents count before a single atomic container deletion.
+
+Structural coverage includes rule and transaction sequences, real pointer capture in all three browsers, midpoint reversal, collapsed hover deadlines, insertion and naming history, empty/populated confirmations, edge scrolling and reveal. Dedicated motion tests pause actual 150 ms transitions to inspect surrounding flow, reversal, settlement, expansion, and interrupted pickup. The production scenario combines these operations; visual baselines cover multiple sections, collapse, carried-row preview, and confirmation. Existing Apricot baselines gain the collapse and Add section controls.
 
 ## 4. Interaction transaction model
 
