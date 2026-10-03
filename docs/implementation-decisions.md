@@ -104,9 +104,9 @@ The context-menu command **Add bar here** follows the same collision rule for it
 
 ### Movement and cross-row preview
 
-Moving a bar preserves its duration. Horizontal movement pushes collisions in the movement direction. Dropping into another row pushes conflicting destination bars to the right.
+Moving a bar preserves its duration. Movement in every row pushes collisions in the current contact's approach direction, with row-entry behavior defined in UX section 8.1.
 
-Same-row movement gates pushes on 300 ms of continuous snapped contact, as specified in UX section 9. Track contact start timestamps and approach direction by neighbor ID inside `Gesture`, using committed intervals. Its `update(pointer, time, speedPointer)` accepts a monotonic timestamp and a CSS pixel pointer coordinate explicitly; there are no timers or browser dependencies in the transaction or model rules. The pixel coordinate defaults to the week coordinate times the pickup scale for standalone sequences. The browser supplies client X so viewport motion cannot trigger the speed escape. The first matured current contact activates the complete `placeBar` cascade with a neighbor anchor and retained approach direction. The anchor keeps pushing beyond the neighbor's original interval; retraction recomputes displacement from the pointer-down document and releases the anchor when clear. Compare consecutive week proposals to capture a fresh approach. Total displacement from pointer-down gives the wrong direction after an overtake and reversal.
+Bar movement gates pushes on 300 ms of continuous snapped contact in every row, as specified in UX section 9. Track contact start timestamps and approach direction by neighbor ID inside `Gesture`, using committed intervals. Its `update(pointer, time, speedPointer)` accepts a monotonic timestamp and a CSS pixel pointer coordinate explicitly; there are no timers or browser dependencies in the transaction or model rules. The pixel coordinate defaults to the week coordinate times the pickup scale for standalone sequences. The browser supplies client X so viewport motion cannot trigger the speed escape. The first matured current contact activates the complete `placeBar` cascade with a neighbor anchor and retained approach direction. When row-entry contacts mature on opposite sides, retain the innermost left and right anchors together. `placeBarBetween` partitions the committed row at the right anchor and resolves the two outward cascades independently. Keep both anchors until the push is released so clearing and returning to one side preserves the insertion order. Speed escape toward either anchored side releases both chains. The anchor keeps pushing beyond the neighbor's original interval; retraction recomputes displacement from the pointer-down document and releases the anchor when clear. Compare consecutive week proposals to capture a fresh approach. Total displacement from pointer-down gives the wrong direction after an overtake and reversal.
 
 The speed escape is strictly above 1,000 CSS px/second, measured from consecutive timed updates. Fast continuation in the active push direction releases the anchor and restores the neighbors to their original positions. Fast retraction retains the anchor and unwinds the displacement normally. Fast movement resets pending contact. Equal timestamps do not establish a velocity. Every preview derives from the immutable `before` document; no displaced arrangement accumulates across updates or overtakes. A valid commit includes the final displacement atomically; an invalid commit restores `before`.
 
@@ -114,7 +114,7 @@ Keep `proposal` and `validDrop` separate from the always-valid `preview` documen
 
 While moving across rows, each hovered row may show its proposed collision result. Leaving that row restores it. Only the row in which the bar is released is changed.
 
-Cross-row collisions push right immediately from the pointer-down document, independently of same-row contact delay and speed escape. Leaving or returning to the source row clears its prior contact state; a returning same-row overlap starts a fresh delay. Drawing and resizing remain in their pressed row. Purely vertical bar or milestone movement reaches the gesture threshold after 4 CSS pixels.
+Use the previous proposal row to detect row changes, including while a pending overlap leaves the preview at the pointer-down arrangement. A row change clears active pushes and pending contact and excludes prior-row velocity from overtaking. Filter contact neighbors by the current proposal row. Entry already overlapping a neighbor derives approach from the snapped interval centers (equal centers use right); later contact uses movement within that row. Leaving and re-entering any row starts fresh contact, retaining the same immutable pointer-down document as the history boundary. Drawing and resizing remain in their pressed row. Purely vertical bar or milestone movement reaches the gesture threshold after 4 CSS pixels.
 
 ### Resizing and snapping
 
@@ -130,7 +130,7 @@ Pointer motion is continuous while the semantic result snaps to whole-week bound
 - Creation collisions push to the right.
 - Moving right pushes right; moving left pushes left.
 - Extending the right edge pushes right; extending the left edge pushes left.
-- Cross-row drops push destination conflicts to the right.
+- Cross-row movement uses fresh row-entry contact and the same directional delay, cascade, and overtaking rules as movement in the original row.
 - Preview displacement reverses when the current pointer proposal no longer requires it.
 
 ## 6. Motion and auto-scrolling

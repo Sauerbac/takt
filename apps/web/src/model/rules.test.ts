@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { assertDocument, emptyDocument } from './document';
 import type { Bar, ChartDocument } from './document';
-import { placeBar, snapWeek } from './rules';
+import { placeBar, placeBarBetween, snapWeek } from './rules';
 import { History } from './history';
 import { Gesture } from '../interaction/gesture';
 
@@ -45,6 +45,34 @@ describe('whole-week rules', () => {
       ['b', 1, 3],
       ['c', 3, 5],
     ]);
+  });
+  it('two-sided insertion preserves row order, durations and unrelated items across many proposals', () => {
+    const before = doc(
+      bar('a', 8, 11),
+      bar('left', -4, 0),
+      bar('right', 0, 3),
+      bar('outer-left', -6, -4),
+      bar('outer-right', 3, 4),
+    );
+    for (let start = -8; start <= 8; start++) {
+      for (let duration = 1; duration <= 6; duration++) {
+        const proposal = bar('a', start, start + duration);
+        const result = placeBarBetween(before, proposal, 'left', 'right');
+        assertDocument(result);
+        const left = result.bars.find((item) => item.id === 'left')!,
+          right = result.bars.find((item) => item.id === 'right')!;
+        expect(left.end).toBeLessThanOrEqual(proposal.start);
+        expect(right.start).toBeGreaterThanOrEqual(proposal.end);
+        for (const original of before.bars) {
+          const resolved = result.bars.find((item) => item.id === original.id)!;
+          if (original.id !== 'a')
+            expect(resolved.end - resolved.start).toBe(
+              original.end - original.start,
+            );
+        }
+      }
+    }
+    expect(before.bars[1]).toEqual(bar('left', -4, 0));
   });
   it('pushes conflicting bars right during creation and leaves distant bars alone', () => {
     const before = doc(bar('b', 2, 4), bar('c', 4, 5), bar('far', 9, 10));

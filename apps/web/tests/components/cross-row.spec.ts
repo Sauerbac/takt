@@ -4,6 +4,7 @@ import {
   interval,
   laneGeometry,
   pauseClock,
+  readyToDrop,
   settled,
 } from '../helpers';
 import type { Page } from '@playwright/test';
@@ -71,6 +72,184 @@ async function beginMilestone(page: Page, id = 'm') {
   return { x, y };
 }
 
+test('inserting between two bars pushes both sides outward, restores the departed row and commits atomically', async ({
+  page,
+}) => {
+  await page.goto('/tests/fixtures/index.html?state=BetweenBars');
+  await pauseClock(page);
+  const destination = await laneGeometry(page),
+    source = await laneGeometry(page, 1);
+  const pickup = await beginBarDrag(page, 'a');
+  await page.mouse.move(pickup.x, destination.y);
+  await page.clock.runFor(299);
+  await interval(page.getByTestId('bar-b'), 0, 4);
+  await interval(page.getByTestId('bar-c'), 4, 6);
+  await expect(page.getByTestId('snap-preview')).toHaveAttribute(
+    'data-valid',
+    'false',
+  );
+  await page.clock.runFor(1);
+  await interval(page.getByTestId('bar-b'), -2, 2);
+  await interval(page.getByTestId('bar-c'), 5, 7);
+  await interval(page.getByTestId('bar-d'), -3, -2);
+  await interval(page.getByTestId('bar-e'), 7, 8);
+  await page.clock.runFor(500);
+  await page.mouse.move(pickup.x + 2 * destination.width, destination.y);
+  await interval(page.getByTestId('bar-b'), 0, 4);
+  await interval(page.getByTestId('bar-c'), 7, 9);
+  await page.clock.runFor(500);
+  await page.mouse.move(pickup.x, destination.y);
+  await interval(page.getByTestId('bar-b'), -2, 2);
+  await interval(page.getByTestId('bar-c'), 5, 7);
+  await page.mouse.move(pickup.x, source.y);
+  await interval(page.getByTestId('bar-b'), 0, 4);
+  await interval(page.getByTestId('bar-c'), 4, 6);
+  await page.mouse.move(pickup.x, destination.y);
+  await page.clock.runFor(300);
+  await page.mouse.up();
+  await expect(page.getByTestId('bar-a')).toHaveAttribute('data-row', 'row-1');
+  await interval(page.getByTestId('bar-b'), -2, 2);
+  await interval(page.getByTestId('bar-c'), 5, 7);
+  await page.keyboard.press('Control+z');
+  await interval(page.getByTestId('bar-b'), 0, 4);
+  await interval(page.getByTestId('bar-c'), 4, 6);
+  await expect(page.getByTestId('bar-a')).toHaveAttribute('data-row', 'row-2');
+  await expect(
+    page.getByRole('button', { name: 'Undo', exact: true }),
+  ).toBeDisabled();
+  await page.keyboard.press('Control+y');
+  await interval(page.getByTestId('bar-b'), -2, 2);
+  await interval(page.getByTestId('bar-c'), 5, 7);
+});
+
+for (const direction of ['left', 'right'] as const) {
+  test(`row entry establishes a fresh ${direction} approach with delayed pushing, pass-through and atomic history`, async ({
+    page,
+  }) => {
+    await page.goto('/tests/fixtures/index.html?state=RowEntry');
+    // Contact/history sequences use stable pickup geometry. Dedicated motion
+    // tests cover settlement and pickup while transitions are still running.
+    await page.addStyleTag({
+      content: '.bar { transition: none !important; }',
+    });
+    await pauseClock(page);
+    const destination = await laneGeometry(page),
+      source = await laneGeometry(page, 1),
+      left = direction === 'left';
+    const pickup = await beginBarDrag(page, 'a');
+    // Move in the opposite direction in the source row before entering.
+    await page.mouse.move(destination.x(left ? 4.5 : -0.5), source.y);
+    const entryX = destination.x(left ? 4.5 : 0.5);
+    await page.mouse.move(entryX, destination.y);
+    await page.clock.runFor(500);
+    await page.mouse.move(destination.x(2.5), destination.y);
+    await page.clock.runFor(299);
+    await expect(page.getByTestId('snap-preview')).toHaveAttribute(
+      'data-valid',
+      'false',
+    );
+    await interval(page.getByTestId('bar-b'), 2, 3);
+    await page.clock.runFor(1);
+    await expect(page.getByTestId('snap-preview')).toHaveAttribute(
+      'data-valid',
+      'true',
+    );
+    await interval(page.getByTestId('bar-b'), left ? 1 : 3, left ? 2 : 4);
+    await interval(
+      page.getByTestId(left ? 'bar-c' : 'bar-d'),
+      left ? 0 : 4,
+      left ? 1 : 5,
+    );
+    await page.mouse.up();
+    await expect(page.getByTestId('bar-a')).toHaveAttribute(
+      'data-row',
+      'row-1',
+    );
+    await page.keyboard.press('Control+z');
+    await interval(page.getByTestId('bar-b'), 2, 3);
+    await interval(page.getByTestId('bar-c'), 1, 2);
+    await interval(page.getByTestId('bar-d'), 3, 4);
+    await expect(
+      page.getByRole('button', { name: 'Undo', exact: true }),
+    ).toBeDisabled();
+    await page.keyboard.press('Control+y');
+    await interval(page.getByTestId('bar-b'), left ? 1 : 3, left ? 2 : 4);
+    await page.keyboard.press('Control+z');
+    await page.clock.runFor(200);
+    await expect(
+      page.getByRole('button', { name: 'Redo', exact: true }),
+    ).toBeEnabled();
+    await beginBarDrag(page, 'a');
+    await page.mouse.move(entryX, destination.y);
+    await page.clock.runFor(500);
+    await page.mouse.move(destination.x(2.5), destination.y);
+    await page.clock.runFor(299);
+    await expect(page.getByTestId('snap-preview')).toHaveAttribute(
+      'data-valid',
+      'false',
+    );
+    await page.mouse.up();
+    await expect(page.getByTestId('bar-a')).toHaveAttribute(
+      'data-row',
+      'row-2',
+    );
+    await interval(page.getByTestId('bar-b'), 2, 3);
+    await expect(
+      page.getByRole('button', { name: 'Redo', exact: true }),
+    ).toBeEnabled();
+    // Pass through before contact matures and drop in free space in the new row.
+    await page.clock.runFor(200);
+    await beginBarDrag(page, 'a');
+    await page.mouse.move(entryX, destination.y);
+    await page.clock.runFor(500);
+    await page.mouse.move(destination.x(2.5), destination.y);
+    await page.clock.runFor(100);
+    await page.mouse.move(destination.x(left ? 0.5 : 4.5), destination.y);
+    await expect(page.getByTestId('snap-preview')).toHaveAttribute(
+      'data-valid',
+      'true',
+    );
+    await page.mouse.up();
+    await expect(page.getByTestId('bar-a')).toHaveAttribute(
+      'data-row',
+      'row-1',
+    );
+    await interval(page.getByTestId('bar-b'), 2, 3);
+    await interval(page.getByTestId('bar-c'), 1, 2);
+    await interval(page.getByTestId('bar-d'), 3, 4);
+  });
+}
+
+test('leaving and re-entering a pending destination restarts its full contact delay', async ({
+  page,
+}) => {
+  await page.goto('/tests/fixtures/index.html?state=RowEntry');
+  await pauseClock(page);
+  const destination = await laneGeometry(page),
+    source = await laneGeometry(page, 1);
+  await beginBarDrag(page, 'a');
+  await page.mouse.move(destination.x(2.5), destination.y);
+  await page.clock.runFor(200);
+  await page.mouse.move(destination.x(2.5), source.y);
+  await page.clock.runFor(200);
+  await page.mouse.move(destination.x(2.5), destination.y);
+  await page.clock.runFor(299);
+  await interval(page.getByTestId('bar-b'), 2, 3);
+  await expect(page.getByTestId('snap-preview')).toHaveAttribute(
+    'data-valid',
+    'false',
+  );
+  await page.clock.runFor(1);
+  await interval(page.getByTestId('bar-b'), 3, 4);
+  await page.keyboard.press('Escape');
+  await page.mouse.up();
+  await page.clock.runFor(500);
+  await interval(page.getByTestId('bar-b'), 2, 3);
+  await expect(
+    page.getByRole('button', { name: 'Undo', exact: true }),
+  ).toBeDisabled();
+});
+
 test('vertical-only bar movement restores each departed row and commits only the final cascade', async ({
   page,
 }) => {
@@ -79,6 +258,7 @@ test('vertical-only bar movement restores each departed row and commits only the
     third = await laneGeometry(page, 2);
   const pickup = await beginBarDrag(page, 'a');
   await page.mouse.move(pickup.x, second.y);
+  await readyToDrop(page);
   await interval(page.getByTestId('bar-b'), 2, 4);
   await interval(page.getByTestId('bar-c'), 4, 5);
   await expect(page.getByTestId('snap-preview')).toHaveAttribute(
@@ -92,9 +272,10 @@ test('vertical-only bar movement restores each departed row and commits only the
   const carried = (await page.getByTestId('bar-a').boundingBox())!;
   expect(carried.y + carried.height / 2).toBeCloseTo(second.y, 0);
   await page.mouse.move(pickup.x, third.y);
+  await readyToDrop(page);
   await interval(page.getByTestId('bar-b'), 0, 2);
   await interval(page.getByTestId('bar-c'), 2, 3);
-  await interval(page.getByTestId('bar-d'), 2, 3);
+  await interval(page.getByTestId('bar-d'), -1, 0);
   await page.mouse.up();
   await expect(page.getByTestId('bar-a')).toHaveAttribute('data-row', 'row-3');
   await page.keyboard.press('Control+z');
@@ -102,7 +283,7 @@ test('vertical-only bar movement restores each departed row and commits only the
   await interval(page.getByTestId('bar-d'), 0, 1);
   await page.keyboard.press('Control+y');
   await expect(page.getByTestId('bar-a')).toHaveAttribute('data-row', 'row-3');
-  await interval(page.getByTestId('bar-d'), 2, 3);
+  await interval(page.getByTestId('bar-d'), -1, 0);
   await expect(page.getByTestId('milestone-n')).toHaveAttribute(
     'data-boundary',
     '3',
@@ -116,12 +297,14 @@ test('cross-row previews cancel on Escape, pointer interruption and window blur 
   const row = await laneGeometry(page, 1);
   let pickup = await beginBarDrag(page, 'a');
   await page.mouse.move(pickup.x, row.y);
+  await readyToDrop(page);
   await page.mouse.up();
   await page.keyboard.press('Control+z');
   for (const reason of ['Escape', 'pointercancel', 'blur', 'capture']) {
     await settled(page.getByTestId('bar-a'));
     pickup = await beginBarDrag(page, 'a');
     await page.mouse.move(pickup.x, row.y);
+    await readyToDrop(page);
     await interval(page.getByTestId('bar-c'), 4, 5);
     if (reason === 'Escape') await page.keyboard.press('Escape');
     else if (reason === 'pointercancel')

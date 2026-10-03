@@ -213,6 +213,8 @@ The dragged bar follows the pointer continuously. A subtle preview indicates the
 
 When the pointer crosses rows, each hovered row previews the collision result that would follow a drop there. Leaving the row restores its committed arrangement. Only the destination row at pointer-up changes.
 
+Entering a row establishes a fresh approach reference at the bar's entry interval. Movement within that row uses the same contact delay, directional pushing, and pass-through reordering as movement within the original row. If entry already overlaps a neighbor, entering on the neighbor's right pushes it left; entering on its left pushes it right. Compare the centers of the whole-week intervals to determine that side, with equal centers pushing right. When entry overlaps bars on both sides, each side pushes outward independently: the left neighbor and its chain move left, and the right neighbor and its chain move right. The inserted bar opens a gap between them, preserving their order. Those sides remain fixed during the activated push; moving away restores a cleared side, and moving back displaces it outward again. Speeding up to overtake either side releases the two-sided push and restores both chains. Subsequent contacts follow horizontal approach within the new row. Motion and contact in the departed row do not determine the new row's push direction.
+
 ### 8.2 Bar resizing
 
 Dragging the left or right end handle changes the corresponding boundary. The result settles onto the nearest whole-week boundary.
@@ -246,7 +248,7 @@ If moving or extending a bar would overlap another, an activated push moves the 
 
 If that displacement reaches another bar, the push cascades through the affected chain.
 
-### Delayed pushing during same-row movement
+### Delayed pushing during bar movement
 
 Moving a bar can pass through other bars and change their order. A push activates only after the whole-week drop proposal has continuously overlapped the same neighbor's committed interval for **300 ms**. The pointer may keep moving; it does not have to pause. Painted overlap alone does not start the delay. The duration is initially tunable around this agreed value.
 
@@ -262,7 +264,7 @@ Contact always uses the pre-gesture arrangement, including after overtaking. Spe
 
 Releasing on a still-invalid overlapping proposal cancels the **entire move**, restores the pre-gesture arrangement, and creates no history entry. It does not silently push on release. A valid drop commits the displayed whole-week arrangement and every final displacement as one action. Release, Escape, pointer loss, and window interruption clear pending contact timers. Edge auto-scroll continues independently and can advance contact while the pointer stays still.
 
-Drawing, resizing, menu creation, and cross-row destination previews use immediate collision handling. Cross-row drops push destination conflicts right under section 8.1; the contact delay and speed escape apply only while moving within the source row. Leaving that row resets its contact state, so returning to an overlapping source-row proposal starts a fresh delay.
+Drawing, resizing, and menu creation use immediate collision handling. Bar movement uses the contact delay and speed escape in every row. Changing rows clears active pushes and pending contact; entering or returning to an overlapping row starts a fresh 300 ms delay, using the entry-side rule under section 8.1. Speed in the departed row does not release or postpone this new contact.
 
 ### 9.2 Direction
 
@@ -270,7 +272,7 @@ Drawing, resizing, menu creation, and cross-row destination previews use immedia
 - Moving horizontally to the left pushes conflicting bars left.
 - Extending the right boundary pushes bars on the right farther right.
 - Extending the left boundary pushes bars on the left farther left.
-- Dropping a bar into another row pushes conflicting bars in the destination row to the right.
+- Moving into another row pushes conflicting destination bars in the approach direction after the contact delay, using the entry position as a fresh reference.
 
 Pushing has no dependency or scheduling meaning. It is the editor's way of keeping bars accessible without overlap.
 
@@ -399,41 +401,42 @@ Undo and redo must reveal their result. If the affected content is inside a coll
 
 These are behavioral checks for the implementation. Every agreed interaction requires automated coverage before it is considered complete, using rule/state tests and scripted real-browser tests at the appropriate levels.
 
-| Scenario                                                        | Expected result                                                                                                    |
-| --------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
-| Open a new document                                             | One unnamed section, one empty row, relative weeks, fixed Week 0, and a creation hint are visible.                 |
-| Draw the first bar at Week 3                                    | It stays at Week 3; the origin is not reassigned.                                                                  |
-| Add content before Week 0                                       | Negative weeks are available; existing items retain their relative positions.                                      |
-| Drag across empty row space                                     | A whole-week bar is created and its label becomes editable inline.                                                 |
-| Use “Add bar here”                                              | A one-week bar is created at the context-menu location.                                                            |
-| Double-click empty space in Week 2                              | A milestone is created at the end of Week 2.                                                                       |
-| Drag a bar by its label                                         | The bar moves; text does not block dragging.                                                                       |
-| Pass a bar through neighbors before their contact delay expires | Dropping into free space changes bar order without moving crossed neighbors.                                       |
-| Maintain snapped overlap with a neighbor for 300 ms             | The full collision cascade activates, including with a stationary pointer.                                         |
-| Release a pending overlapping move                              | The entire move cancels, restoring the original arrangement and preserving history/redo.                           |
-| Clear and return to a neighbor                                  | Its push reverses, and returning starts a fresh 300 ms contact delay.                                              |
-| Continue an activated push beyond original neighbor positions   | The neighbor and its chain keep moving ahead for any distance.                                                     |
-| Speed up forward above 1,000 CSS px/second after activation     | Pushed bars animate back to their original positions while the dragged bar overtakes.                              |
-| Retract an activated push above 1,000 CSS px/second             | The chain moves back with the dragged bar; speed does not release the push.                                        |
-| Overtake a neighbor, reverse, and hold over it                  | After a fresh delay, the neighbor pushes from the new approach side; holding still does not change that direction. |
-| Double-click the same label                                     | The label becomes editable in place.                                                                               |
-| Resize into an adjacent bar                                     | The other bar moves without changing duration.                                                                     |
-| Push into a chain of bars                                       | All necessary bars move smoothly; no final overlap remains.                                                        |
-| Reverse a drag after pushing other bars                         | Pushed bars flow back when the current snapped proposal no longer conflicts with them.                             |
-| Cancel a drag after previewing pushes                           | Every affected item returns to its pre-gesture state and no history entry is created.                              |
-| Undo that completed drag                                        | All affected items return to their pre-gesture state in one undo.                                                  |
-| Drop a bar into an occupied row                                 | Conflicting destination bars are pushed right with durations preserved.                                            |
-| Drag a bar across several rows                                  | Each hovered row previews and reverses its pushes; only the row used at release is committed.                      |
-| Move a row between sections                                     | Its items preserve their time positions and follow the color-inheritance rules.                                    |
-| Reorder a section                                               | Its rows and items move together without changing time positions.                                                  |
-| Hover a row over a collapsed section                            | The section opens after a short delay, closes again on leave, and remains open after a successful drop.            |
-| Delete a populated section                                      | Confirmation explains the contents affected; cancellation changes nothing; confirmed deletion is undoable.         |
-| Assign a calendar date to Week 3                                | All calendar labels follow that week-start reference at seven-day intervals.                                       |
-| Switch back to relative weeks                                   | Positions and the calendar reference are preserved.                                                                |
-| Undo a hidden-content change                                    | The containing section expands and the changed content is revealed.                                                |
-| Delete every item                                               | The creation hint returns once in the first visible empty row.                                                     |
-| Zoom or pan                                                     | Only the view changes; editing precision remains whole weeks.                                                      |
-| Scroll horizontally                                             | Weeks and timeline items move; section/row names and controls stay pinned on the left.                             |
+| Scenario                                                        | Expected result                                                                                                     |
+| --------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| Open a new document                                             | One unnamed section, one empty row, relative weeks, fixed Week 0, and a creation hint are visible.                  |
+| Draw the first bar at Week 3                                    | It stays at Week 3; the origin is not reassigned.                                                                   |
+| Add content before Week 0                                       | Negative weeks are available; existing items retain their relative positions.                                       |
+| Drag across empty row space                                     | A whole-week bar is created and its label becomes editable inline.                                                  |
+| Use “Add bar here”                                              | A one-week bar is created at the context-menu location.                                                             |
+| Double-click empty space in Week 2                              | A milestone is created at the end of Week 2.                                                                        |
+| Drag a bar by its label                                         | The bar moves; text does not block dragging.                                                                        |
+| Pass a bar through neighbors before their contact delay expires | Dropping into free space changes bar order without moving crossed neighbors.                                        |
+| Maintain snapped overlap with a neighbor for 300 ms             | The full collision cascade activates, including with a stationary pointer.                                          |
+| Release a pending overlapping move                              | The entire move cancels, restoring the original arrangement and preserving history/redo.                            |
+| Clear and return to a neighbor                                  | Its push reverses, and returning starts a fresh 300 ms contact delay.                                               |
+| Continue an activated push beyond original neighbor positions   | The neighbor and its chain keep moving ahead for any distance.                                                      |
+| Speed up forward above 1,000 CSS px/second after activation     | Pushed bars animate back to their original positions while the dragged bar overtakes.                               |
+| Retract an activated push above 1,000 CSS px/second             | The chain moves back with the dragged bar; speed does not release the push.                                         |
+| Overtake a neighbor, reverse, and hold over it                  | After a fresh delay, the neighbor pushes from the new approach side; holding still does not change that direction.  |
+| Double-click the same label                                     | The label becomes editable in place.                                                                                |
+| Resize into an adjacent bar                                     | The other bar moves without changing duration.                                                                      |
+| Push into a chain of bars                                       | All necessary bars move smoothly; no final overlap remains.                                                         |
+| Reverse a drag after pushing other bars                         | Pushed bars flow back when the current snapped proposal no longer conflicts with them.                              |
+| Cancel a drag after previewing pushes                           | Every affected item returns to its pre-gesture state and no history entry is created.                               |
+| Undo that completed drag                                        | All affected items return to their pre-gesture state in one undo.                                                   |
+| Move a bar into an occupied row                                 | Fresh 300 ms contact pushes destination bars from the entry/approach side with durations preserved.                 |
+| Enter a row, approach a neighbor from either side               | Pushing and pass-through reordering follow the approach in that row, independently of the original pickup position. |
+| Drag a bar across several rows                                  | Each hovered row previews and reverses its pushes; only the row used at release is committed.                       |
+| Move a row between sections                                     | Its items preserve their time positions and follow the color-inheritance rules.                                     |
+| Reorder a section                                               | Its rows and items move together without changing time positions.                                                   |
+| Hover a row over a collapsed section                            | The section opens after a short delay, closes again on leave, and remains open after a successful drop.             |
+| Delete a populated section                                      | Confirmation explains the contents affected; cancellation changes nothing; confirmed deletion is undoable.          |
+| Assign a calendar date to Week 3                                | All calendar labels follow that week-start reference at seven-day intervals.                                        |
+| Switch back to relative weeks                                   | Positions and the calendar reference are preserved.                                                                 |
+| Undo a hidden-content change                                    | The containing section expands and the changed content is revealed.                                                 |
+| Delete every item                                               | The creation hint returns once in the first visible empty row.                                                      |
+| Zoom or pan                                                     | Only the view changes; editing precision remains whole weeks.                                                       |
+| Scroll horizontally                                             | Weeks and timeline items move; section/row names and controls stay pinned on the left.                              |
 
 ## 15. Keyboard scope for the first milestone
 

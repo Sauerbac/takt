@@ -50,6 +50,33 @@ export function placeBar(
   return { ...document, bars };
 }
 
+// Open space between two anchored neighbors without sending either chain
+// across the held bar. The committed row order fixes the two sides throughout
+// this push; painted geometry and subsequent pointer motion do not repartition it.
+export function placeBarBetween(
+  document: ChartDocument,
+  proposal: Bar,
+  leftAnchor: string,
+  rightAnchor: string,
+): ChartDocument {
+  const split = document.bars.find((bar) => bar.id === rightAnchor)!.start;
+  const sides = (left: boolean) => ({
+    ...document,
+    bars: document.bars.filter(
+      (bar) => bar.rowId === proposal.rowId && bar.start < split === left,
+    ),
+  });
+  const left = placeBar(sides(true), proposal, 'left', leftAnchor);
+  const right = placeBar(sides(false), proposal, 'right', rightAnchor);
+  const resolved = new Map(
+    [...left.bars, ...right.bars].map((bar) => [bar.id, bar]),
+  );
+  return {
+    ...document,
+    bars: document.bars.map((bar) => resolved.get(bar.id) ?? bar),
+  };
+}
+
 export function placeMilestone(
   document: ChartDocument,
   proposal: Milestone,

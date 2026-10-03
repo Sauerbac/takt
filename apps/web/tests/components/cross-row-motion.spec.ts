@@ -1,5 +1,11 @@
 import { test, expect } from '@playwright/test';
-import { beginBarDrag, laneGeometry, settled } from '../helpers';
+import {
+  beginBarDrag,
+  interval,
+  laneGeometry,
+  readyToDrop,
+  settled,
+} from '../helpers';
 import type { Locator, Page } from '@playwright/test';
 
 async function freeze(page: Page) {
@@ -58,6 +64,7 @@ test('cross-row pushes and restoration animate while the carried bar tracks both
       (element) => getComputedStyle(element).transitionDuration,
     ),
   ).toBe('0s');
+  await readyToDrop(page);
   const push = await halfway(neighbor, 'left');
   expect(push.duration).toBe(150);
   expect(push.x).toBeGreaterThan(original.x + 1);
@@ -72,12 +79,101 @@ test('cross-row pushes and restoration animate while the carried bar tracks both
   expect(restore.x).toBeGreaterThan(original.x + 1);
   expect(restore.x).toBeLessThan(displaced.x - 1);
   // Release at a non-centered vertical offset and verify the actual settlement.
-  await page.mouse.move(pickup.x, third.y + 6);
+  await page.mouse.move(pickup.x + third.width * 2.3, third.y + 6);
   await page.mouse.up();
   const settle = await halfway(bar, 'top');
   expect(settle.duration).toBe(150);
   expect(settle.y).toBeGreaterThan(third.y - 14);
   expect(settle.y).toBeLessThan(third.y - 8);
+});
+
+for (const direction of ['left', 'right'] as const) {
+  test(`a ${direction} destination push and restoration animate after fresh row contact`, async ({
+    page,
+  }) => {
+    await page.goto('/tests/fixtures/index.html?state=RowEntry');
+    const destination = await laneGeometry(page),
+      source = await laneGeometry(page, 1);
+    const neighbor = page.getByTestId('bar-b'),
+      bar = page.getByTestId('bar-a');
+    await settled(neighbor);
+    await freeze(page);
+    const original = (await neighbor.boundingBox())!;
+    await beginBarDrag(page, 'a');
+    await page.mouse.move(
+      destination.x(direction === 'left' ? 4.5 : 0.5),
+      destination.y,
+    );
+    // Separate the two moves so velocity cannot trigger the speed escape.
+    await page.waitForTimeout(300);
+    await page.mouse.move(destination.x(2.5), destination.y);
+    await expect(page.getByTestId('snap-preview')).toHaveAttribute(
+      'data-valid',
+      'false',
+    );
+    await interval(neighbor, 2, 3);
+    const held = (await bar.boundingBox())!;
+    expect(held.x + held.width / 2).toBeCloseTo(destination.x(2.5), 0);
+    expect(held.y + held.height / 2).toBeCloseTo(destination.y, 0);
+    await readyToDrop(page);
+    const push = await halfway(neighbor, 'left');
+    expect(push.duration).toBe(150);
+    const finalX = destination.x(direction === 'left' ? 1 : 3) + 5;
+    expect(push.x).toBeGreaterThan(Math.min(original.x, finalX) + 1);
+    expect(push.x).toBeLessThan(Math.max(original.x, finalX) - 1);
+    await neighbor.evaluate((element) =>
+      element.getAnimations().forEach((animation) => animation.finish()),
+    );
+    const displaced = (await neighbor.boundingBox())!;
+    await page.mouse.move(destination.x(2.5), source.y);
+    const restore = await halfway(neighbor, 'left');
+    expect(restore.duration).toBe(150);
+    expect(restore.x).toBeGreaterThan(Math.min(original.x, displaced.x) + 1);
+    expect(restore.x).toBeLessThan(Math.max(original.x, displaced.x) - 1);
+    await page.mouse.up();
+  });
+}
+
+test('both destination chains animate outward and back when inserting between bars', async ({
+  page,
+}) => {
+  await page.goto('/tests/fixtures/index.html?state=BetweenBars');
+  const destination = await laneGeometry(page),
+    source = await laneGeometry(page, 1);
+  const left = page.getByTestId('bar-b'),
+    right = page.getByTestId('bar-c');
+  await settled(left);
+  await settled(right);
+  await freeze(page);
+  const leftOriginal = (await left.boundingBox())!,
+    rightOriginal = (await right.boundingBox())!;
+  const pickup = await beginBarDrag(page, 'a');
+  await page.mouse.move(pickup.x, destination.y);
+  await readyToDrop(page);
+  const leftPush = await halfway(left, 'left'),
+    rightPush = await halfway(right, 'left');
+  expect(leftPush.duration).toBe(150);
+  expect(rightPush.duration).toBe(150);
+  expect(leftPush.x).toBeLessThan(leftOriginal.x - 1);
+  expect(leftPush.x).toBeGreaterThan(destination.x(-2) + 5);
+  expect(rightPush.x).toBeGreaterThan(rightOriginal.x + 1);
+  expect(rightPush.x).toBeLessThan(destination.x(5) + 5);
+  for (const item of [left, right])
+    await item.evaluate((element) =>
+      element.getAnimations().forEach((animation) => animation.finish()),
+    );
+  const leftDisplaced = (await left.boundingBox())!,
+    rightDisplaced = (await right.boundingBox())!;
+  await page.mouse.move(pickup.x, source.y);
+  const leftRestore = await halfway(left, 'left'),
+    rightRestore = await halfway(right, 'left');
+  expect(leftRestore.duration).toBe(150);
+  expect(rightRestore.duration).toBe(150);
+  expect(leftRestore.x).toBeGreaterThan(leftDisplaced.x + 1);
+  expect(leftRestore.x).toBeLessThan(leftOriginal.x - 1);
+  expect(rightRestore.x).toBeLessThan(rightDisplaced.x - 1);
+  expect(rightRestore.x).toBeGreaterThan(rightOriginal.x + 1);
+  await page.mouse.up();
 });
 
 test('milestone movement tracks immediately and its snapped horizontal and vertical settlement animates', async ({

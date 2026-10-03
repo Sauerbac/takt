@@ -1,6 +1,6 @@
 import { copyDocument } from '../model/document';
 import type { Bar, ChartDocument } from '../model/document';
-import { placeBar, snapWeek } from '../model/rules';
+import { placeBar, placeBarBetween, snapWeek } from '../model/rules';
 import type { PushDirection } from '../model/rules';
 
 export type GestureKind = 'draw' | 'move' | 'resize-left' | 'resize-right';
@@ -27,7 +27,7 @@ export class Gesture {
   private lastPointer: number;
   private lastTime: number | null = null;
   private lastSpeedPointer: number | null = null;
-  private activePush: { neighbor: Bar; direction: PushDirection } | null = null;
+  private activePushes: { neighbor: Bar; direction: PushDirection }[] = [];
   private movementDirection: PushDirection = 'right';
   meaningful = false;
   constructor(
@@ -60,16 +60,21 @@ export class Gesture {
     rowId = this.original.rowId,
     verticalPixels = 0,
   ): void {
+    const enteredRow =
+      this.kind === 'move' &&
+      rowId !== (this.proposal?.rowId ?? this.original.rowId);
     const elapsed = this.lastTime === null ? 0 : time - this.lastTime;
     const pixelDelta =
       this.lastSpeedPointer === null ? 0 : speedPointer - this.lastSpeedPointer;
     const overtaking =
+      !enteredRow &&
       elapsed > 0 &&
       (Math.abs(pixelDelta) * 1000) / elapsed > MOVE_OVERTAKE_SPEED;
     this.lastTime = time;
     this.lastSpeedPointer = speedPointer;
     if (pointer > this.lastPointer) this.movementDirection = 'right';
     else if (pointer < this.lastPointer) this.movementDirection = 'left';
+    if (enteredRow) this.movementDirection = 'right';
     this.lastPointer = pointer;
     const delta = pointer - this.pointerStart;
     this.meaningful ||=
@@ -112,18 +117,9 @@ export class Gesture {
     this.proposal = proposal;
     this.validDrop = true;
     this.pushAt = null;
-    if (
-      this.kind === 'move' &&
-      (proposal.rowId !== this.original.rowId ||
-        this.preview.bars.find((bar) => bar.id === this.id)?.rowId !==
-          this.original.rowId)
-    ) {
-      this.activePush = null;
+    if (enteredRow) {
+      this.activePushes = [];
       this.contacts.clear();
-    }
-    if (this.kind === 'move' && proposal.rowId !== this.original.rowId) {
-      this.preview = placeBar(this.before, proposal, 'right');
-      return;
     }
     let direction: PushDirection =
       this.kind === 'resize-left' ? 'left' : 'right';
@@ -132,28 +128,29 @@ export class Gesture {
       // Fast retraction keeps its anchor and unwinds the push normally.
       if (
         overtaking &&
-        (!this.activePush ||
-          (pixelDelta > 0 ? 'right' : 'left') === this.activePush.direction)
+        (!this.activePushes.length ||
+          this.activePushes.some(
+            ({ neighbor, direction }) =>
+              (pixelDelta > 0 ? 'right' : 'left') === direction &&
+              (direction === 'right'
+                ? proposal.end > neighbor.start
+                : proposal.start < neighbor.end),
+          ))
       ) {
-        this.activePush = null;
+        this.activePushes = [];
         this.contacts.clear();
       }
-      if (this.activePush) {
-        const { neighbor, direction } = this.activePush;
-        const released =
+      if (this.activePushes.length) {
+        const pushing = this.activePushes.some(({ neighbor, direction }) =>
           direction === 'right'
-            ? proposal.end <= neighbor.start
-            : proposal.start >= neighbor.end;
-        if (!released) {
-          this.preview = placeBar(
-            this.before,
-            proposal,
-            direction,
-            neighbor.id,
-          );
+            ? proposal.end > neighbor.start
+            : proposal.start < neighbor.end,
+        );
+        if (pushing) {
+          this.preview = this.resolvePushes(proposal);
           return;
         }
-        this.activePush = null;
+        this.activePushes = [];
         this.contacts.clear();
       }
       // Pending contact uses committed intervals; every preview and cancellation
@@ -161,7 +158,7 @@ export class Gesture {
       const colliding = this.before.bars.filter(
         (bar) =>
           bar.id !== this.id &&
-          bar.rowId === this.original.rowId &&
+          bar.rowId === proposal.rowId &&
           bar.start < proposal.end &&
           bar.end > proposal.start,
       );
@@ -172,7 +169,14 @@ export class Gesture {
         if (!this.contacts.has(bar.id))
           this.contacts.set(bar.id, {
             since: time,
-            direction: this.movementDirection,
+            // A row entry is a fresh approach. If already overlapping, use
+            // the entry interval's side of this neighbor, not motion in the
+            // departed row. Equal centers retain the rightward fallback.
+            direction: enteredRow
+              ? proposal.start + proposal.end > bar.start + bar.end
+                ? 'left'
+                : 'right'
+              : this.movementDirection,
           });
       if (colliding.length) {
         const [id, contact] = [...this.contacts.entries()].reduce(
@@ -190,13 +194,48 @@ export class Gesture {
           return;
         }
         const neighbor = colliding.find((bar) => bar.id === id)!;
-        this.activePush = { neighbor, direction };
+        const opposite = colliding.filter(
+          (bar) =>
+            this.contacts.get(bar.id)!.direction !== direction &&
+            time >= this.contacts.get(bar.id)!.since + MOVE_PUSH_DELAY,
+        );
+        if (opposite.length) {
+          const left = colliding.filter(
+            (bar) => this.contacts.get(bar.id)!.direction === 'left',
+          );
+          const right = colliding.filter(
+            (bar) => this.contacts.get(bar.id)!.direction === 'right',
+          );
+          this.activePushes = [
+            {
+              neighbor: left.reduce((a, b) => (a.start > b.start ? a : b)),
+              direction: 'left',
+            },
+            {
+              neighbor: right.reduce((a, b) => (a.start < b.start ? a : b)),
+              direction: 'right',
+            },
+          ];
+        } else this.activePushes = [{ neighbor, direction }];
         this.contacts.clear();
-        this.preview = placeBar(this.before, proposal, direction, id);
+        this.preview = this.resolvePushes(proposal);
         return;
       }
     }
     this.preview = placeBar(this.before, proposal, direction);
+  }
+  private resolvePushes(proposal: Bar): ChartDocument {
+    const left = this.activePushes.find((push) => push.direction === 'left');
+    const right = this.activePushes.find((push) => push.direction === 'right');
+    if (left && right)
+      return placeBarBetween(
+        this.before,
+        proposal,
+        left.neighbor.id,
+        right.neighbor.id,
+      );
+    const push = this.activePushes[0];
+    return placeBar(this.before, proposal, push.direction, push.neighbor.id);
   }
   cancel(): ChartDocument {
     return copyDocument(this.before);

@@ -1,5 +1,11 @@
 import { test, expect } from '@playwright/test';
-import { beginBarDrag, laneGeometry, pauseClock, settled } from '../helpers';
+import {
+  beginBarDrag,
+  laneGeometry,
+  pauseClock,
+  readyToDrop,
+  settled,
+} from '../helpers';
 
 test('Apricot section naming uses the full name area without changing its style', async ({
   page,
@@ -79,6 +85,7 @@ test('Apricot cross-row cascade and milestones', async ({ page }) => {
   const lane = await laneGeometry(page, 1),
     pickup = await beginBarDrag(page, 'a');
   await page.mouse.move(pickup.x, lane.y);
+  await readyToDrop(page);
   await expect(page.locator('main')).toHaveScreenshot('cross-row-preview.png');
 });
 

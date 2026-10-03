@@ -40,6 +40,33 @@ const states = {
     bars: [{ id: 'a', rowId: 'row-1', start: 0, end: 2, name: 'Discovery' }],
     milestones: [{ id: 'm', rowId: 'row-1', boundary: 5, name: 'Kickoff' }],
   },
+  RowEntry: {
+    ...emptyDocument(),
+    rows: [
+      { id: 'row-1', name: 'Destination' },
+      { id: 'row-2', name: 'Source' },
+    ],
+    bars: [
+      { id: 'a', rowId: 'row-2', start: 0, end: 1, name: 'Carried bar' },
+      { id: 'b', rowId: 'row-1', start: 2, end: 3, name: 'Neighbor' },
+      { id: 'c', rowId: 'row-1', start: 1, end: 2, name: 'Left chain' },
+      { id: 'd', rowId: 'row-1', start: 3, end: 4, name: 'Right chain' },
+    ],
+  },
+  BetweenBars: {
+    ...emptyDocument(),
+    rows: [
+      { id: 'row-1', name: 'Destination' },
+      { id: 'row-2', name: 'Source' },
+    ],
+    bars: [
+      { id: 'a', rowId: 'row-2', start: 2, end: 5, name: 'Insert between' },
+      { id: 'b', rowId: 'row-1', start: 0, end: 4, name: 'Left bar' },
+      { id: 'c', rowId: 'row-1', start: 4, end: 6, name: 'Right bar' },
+      { id: 'd', rowId: 'row-1', start: -1, end: 0, name: 'Left chain' },
+      { id: 'e', rowId: 'row-1', start: 6, end: 7, name: 'Right chain' },
+    ],
+  },
   Chain: {
     ...emptyDocument(),
     bars: [
