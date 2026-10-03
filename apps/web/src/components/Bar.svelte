@@ -14,6 +14,7 @@
     onrename,
     ondraft,
     onfinish,
+    top = 8,
   }: {
     bar: Bar;
     weekWidth: number;
@@ -26,13 +27,14 @@
     onrename: (id: string) => void;
     ondraft: (value: string) => void;
     onfinish: (commit: boolean) => void;
+    top?: number;
   } = $props();
   const position = $derived(tracking ?? bar);
   let input = $state<HTMLInputElement>();
   $effect(() => {
     if (editing && input) {
       input.focus();
-      input.select();
+      input.setSelectionRange(input.value.length, input.value.length);
     }
   });
 </script>
@@ -48,6 +50,8 @@
   data-testid={`bar-${bar.id}`}
   data-start={bar.start}
   data-end={bar.end}
+  data-row={bar.rowId}
+  style:top={`${top}px`}
   style:left={`${(position.start - FIRST_WEEK) * weekWidth + BAR_INSET}px`}
   style:width={`${Math.max(1, (position.end - position.start) * weekWidth - BAR_INSET * 2)}px`}
   title={`${invalid ? 'Cannot drop here · Move clear or hold to push · ' : ''}${bar.name || 'Unnamed bar'} · Weeks ${bar.start}–${bar.end - 1}`}
@@ -104,19 +108,20 @@
     background: var(--bar-fill);
     color: var(--bar-ink);
     font-size: 13px;
+    line-height: 14px;
     font-weight: 600;
     display: flex;
     align-items: center;
     padding: 0 12px;
     transition:
       left var(--settlement) ease-out,
-      width var(--settlement) ease-out;
+      width var(--settlement) ease-out,
+      top var(--settlement) ease-out;
     cursor: grab;
     z-index: 1;
     white-space: nowrap;
   }
   .bar.selected {
-    border-color: var(--bar-ink);
     z-index: 2;
   }
   .bar.tracking {
@@ -132,6 +137,7 @@
     overflow: hidden;
     text-overflow: ellipsis;
     pointer-events: none;
+    transform: translateY(-1px);
   }
   .bar.editing {
     z-index: 4;
@@ -145,6 +151,7 @@
     outline: 0;
     padding: 2px 0;
     font-weight: inherit;
+    transform: translateY(-1px);
   }
   .handle {
     position: absolute;
@@ -155,6 +162,9 @@
     padding: 0;
     background: transparent;
     cursor: ew-resize;
+  }
+  .handle:focus-visible {
+    outline: none;
   }
   .left {
     left: 0;
@@ -169,11 +179,7 @@
     width: 2px;
     margin: auto;
     background: currentColor;
-    opacity: 0;
-    border-radius: 1px;
-  }
-  .bar:hover .handle::after,
-  .selected .handle::after {
     opacity: 0.6;
+    border-radius: 1px;
   }
 </style>

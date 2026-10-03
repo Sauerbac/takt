@@ -191,7 +191,9 @@ The context menu also provides **“Add milestone here.”** It uses the same pl
 
 ### 7.4 Inline editing
 
-Double-clicking a section heading, row name, bar label, or milestone label edits that text in place. A **“Rename”** context-menu action offers another route to the same editor.
+Clicking anywhere in a section's name area edits its name in place. Double-clicking a row name, bar label, or milestone label edits that text in place. A **“Rename”** context-menu action offers another route to the same editor. Opening any name editor places the caret at the end of the existing text without selecting it.
+
+Inline naming retains the label's typography, color, background, and position. Section, row, and milestone editors have no visible input box, border, or focus outline. Bar text is vertically centered in both display and editing modes. Bars and milestones gain no selection border or outline, and focusing the chart does not add an outline around it. Both bar resize handles remain visible regardless of selection or hover. Selection still determines keyboard deletion; invalid-drop feedback remains visible during gestures.
 
 Dragging a label still moves its item; the label is not an area that blocks direct manipulation. Dedicated bar end handles remain resize targets.
 
@@ -260,7 +262,7 @@ Contact always uses the pre-gesture arrangement, including after overtaking. Spe
 
 Releasing on a still-invalid overlapping proposal cancels the **entire move**, restores the pre-gesture arrangement, and creates no history entry. It does not silently push on release. A valid drop commits the displayed whole-week arrangement and every final displacement as one action. Release, Escape, pointer loss, and window interruption clear pending contact timers. Edge auto-scroll continues independently and can advance contact while the pointer stays still.
 
-Drawing, resizing, and menu creation retain their immediate collision handling. Cross-row movement and its destination previews remain a later focused slice under section 8.1.
+Drawing, resizing, menu creation, and cross-row destination previews use immediate collision handling. Cross-row drops push destination conflicts right under section 8.1; the contact delay and speed escape apply only while moving within the source row. Leaving that row resets its contact state, so returning to an overlapping source-row proposal starts a fresh delay.
 
 ### 9.2 Direction
 

@@ -37,6 +37,7 @@ export class Gesture {
     readonly pointerStart: number,
     readonly weekWidth: number,
     displayed?: Interval,
+    rowId = document.rows[0].id,
   ) {
     this.before = copyDocument(document);
     this.preview = this.before;
@@ -44,7 +45,7 @@ export class Gesture {
     if (kind !== 'draw' && !original) throw new Error('Missing gesture bar');
     this.original = original
       ? { ...original }
-      : { id, start: pointerStart, end: pointerStart, name: '' };
+      : { id, rowId, start: pointerStart, end: pointerStart, name: '' };
     // Painted coordinates can differ from committed coordinates during settlement.
     // They seed pointer attachment only; the document snapshot remains the history boundary.
     this.displayed = { ...(displayed ?? this.original) };
@@ -56,6 +57,8 @@ export class Gesture {
     pointer: number,
     time = 0,
     speedPointer = pointer * this.weekWidth,
+    rowId = this.original.rowId,
+    verticalPixels = 0,
   ): void {
     const elapsed = this.lastTime === null ? 0 : time - this.lastTime;
     const pixelDelta =
@@ -69,7 +72,9 @@ export class Gesture {
     else if (pointer < this.lastPointer) this.movementDirection = 'left';
     this.lastPointer = pointer;
     const delta = pointer - this.pointerStart;
-    this.meaningful ||= Math.abs(delta * this.weekWidth) >= 4 - 1e-9;
+    this.meaningful ||=
+      Math.abs(delta * this.weekWidth) >= 4 - 1e-9 ||
+      (this.kind === 'move' && Math.abs(verticalPixels) >= 4);
     if (!this.meaningful) return;
     let start = this.displayed.start;
     let end = this.displayed.end;
@@ -100,12 +105,26 @@ export class Gesture {
           : Math.max(snappedStart + 1, snapWeek(end));
     const proposal = {
       ...this.original,
+      rowId: this.kind === 'move' ? rowId : this.original.rowId,
       start: snappedStart,
       end: snappedEnd,
     };
     this.proposal = proposal;
     this.validDrop = true;
     this.pushAt = null;
+    if (
+      this.kind === 'move' &&
+      (proposal.rowId !== this.original.rowId ||
+        this.preview.bars.find((bar) => bar.id === this.id)?.rowId !==
+          this.original.rowId)
+    ) {
+      this.activePush = null;
+      this.contacts.clear();
+    }
+    if (this.kind === 'move' && proposal.rowId !== this.original.rowId) {
+      this.preview = placeBar(this.before, proposal, 'right');
+      return;
+    }
     let direction: PushDirection =
       this.kind === 'resize-left' ? 'left' : 'right';
     if (this.kind === 'move') {
@@ -142,6 +161,7 @@ export class Gesture {
       const colliding = this.before.bars.filter(
         (bar) =>
           bar.id !== this.id &&
+          bar.rowId === this.original.rowId &&
           bar.start < proposal.end &&
           bar.end > proposal.start,
       );

@@ -63,4 +63,8 @@ Screenshot baselines are Chromium/Windows-specific. Keep their browser version c
 
 Component fixtures are available through the development server at `/tests/fixtures/index.html?state=Empty`, `?state=Chain`, `?state=Narrow`, `?state=Separated`, and `?state=EdgeContact`. The last two expose separated collision destinations and sustained contact during edge scrolling. They render the same production components with deterministic initial data, and are excluded from the static production entry.
 
-The implementation follows the staged sequence in the implementation decisions. Additional rows and sections, milestones, general scrolling/panning/zoom, calendar mode, context menus, persistence, export, and desktop packaging remain future work.
+The cross-row slice adds an undoable Add row control with inline naming, bar movement between rows with reversible destination cascades, and milestones. Double-click empty lane space to create a milestone at the end of that week, or right-click empty lane space for Add bar here / Add milestone here. Milestones move horizontally and between rows without pushing bars. Duplicate milestone placements show invalid feedback and leave history unchanged. Bar and milestone drags scroll vertically at chart edges; undo/redo reveal the affected row and interval.
+
+The additional `?state=CrossRows` and `?state=Tall` fixtures expose cross-row cascades, milestone conflicts, and vertical edge scrolling. Automated coverage includes rule/state sequences, all three browsers, actual motion transitions, production integration, and screenshot comparisons.
+
+The implementation follows the staged sequence in the implementation decisions. Structural row/section reordering, additional sections, collapse behavior, destructive container confirmations, panning/zoom, calendar mode, colors, remaining menus, persistence, export, and desktop packaging remain future work.

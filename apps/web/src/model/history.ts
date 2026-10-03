@@ -3,7 +3,15 @@ import type { ChartDocument } from './document';
 
 export interface Command {
   readonly kind:
-    'draw' | 'move' | 'resize-left' | 'resize-right' | 'name' | 'delete';
+    | 'draw'
+    | 'move'
+    | 'resize-left'
+    | 'resize-right'
+    | 'name'
+    | 'delete'
+    | 'milestone-move'
+    | 'milestone'
+    | 'add-row';
   readonly before: ChartDocument;
   readonly after: ChartDocument;
   readonly revealId: string;

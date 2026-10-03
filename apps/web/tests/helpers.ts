@@ -1,12 +1,11 @@
 import { expect } from '@playwright/test';
 import type { Page, Locator } from '@playwright/test';
 
-export async function laneGeometry(page: Page) {
-  const bounds = await page.getByTestId('lane').boundingBox();
+export async function laneGeometry(page: Page, row = 0) {
+  const element = page.getByTestId('lane').nth(row);
+  const bounds = await element.boundingBox();
   if (!bounds) throw new Error('Timeline is not visible');
-  const firstWeek = Number(
-    await page.getByTestId('lane').getAttribute('data-first-week'),
-  );
+  const firstWeek = Number(await element.getAttribute('data-first-week'));
   return {
     x: (week: number) => bounds.x + ((week - firstWeek) * bounds.width) / 12,
     y: bounds.y + 22,

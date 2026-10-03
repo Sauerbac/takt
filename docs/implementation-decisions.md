@@ -63,6 +63,10 @@ This separation is a testability requirement. Collision and history behavior mus
 
 The first slice places document invariants, collision rules, and atomic history commands in `apps/web/src/model`; pointer-independent transactions in `apps/web/src/interaction`; view-only state and coordinate conversion in `apps/web/src/viewport.ts`; and rendering/input adapters in `apps/web/src/components`. `Editor`'s initialization contract is documented near its history construction.
 
+The cross-row slice adds explicit row IDs, an ordered row collection, and a separate milestone collection. Milestone boundaries store the start of the following week. The document still has one section; section structure and reordering belong to the next slice. The visible Add row command and its separate inline naming action make cross-row operations available in the production editor.
+
+Render items in a stable keyed overlay across all lanes, clipping it at the timeline column. Changing an item's row must not remount its captured pointer surface or interrupt its settlement animation. Lane geometry supplies destination hit testing; the adapter tracks the carried item's painted vertical offset separately from its snapped row. Empty-lane menus retain their row/week at opening. General item and structural menus remain later work.
+
 ## 4. Interaction transaction model
 
 Every drag gesture has three conceptual states:
@@ -110,6 +114,8 @@ Keep `proposal` and `validDrop` separate from the always-valid `preview` documen
 
 While moving across rows, each hovered row may show its proposed collision result. Leaving that row restores it. Only the row in which the bar is released is changed.
 
+Cross-row collisions push right immediately from the pointer-down document, independently of same-row contact delay and speed escape. Leaving or returning to the source row clears its prior contact state; a returning same-row overlap starts a fresh delay. Drawing and resizing remain in their pressed row. Purely vertical bar or milestone movement reaches the gesture threshold after 4 CSS pixels.
+
 ### Resizing and snapping
 
 The opposite boundary remains fixed during a resize. A bar has a minimum duration of one week; handles stop at that minimum and do not cross or exchange roles.
@@ -149,6 +155,8 @@ Horizontal edge scrolling uses a fractional first-visible-week coordinate in vie
 Keep the label column horizontally sticky with opaque section/row backgrounds above timeline content. The visible timeline's left edge excludes the pinned column even after native horizontal scrolling changes the lane's border box. Share its width between layout and input geometry through `LABEL_WIDTH`. Native scroll events re-project an active pointer so the bar stays attached; vertical navigation still carries labels with their corresponding content.
 
 Browser edge-scroll tests advance an installed Playwright clock frame by frame while holding a real mouse pointer stationary. They verify both directions, drawing/movement/both handles, accelerating edge speed, pointer attachment without transitions, cancellation, preserved redo, and atomic commit. Ordinary first-slice motion tests continue to verify collision and settlement transitions.
+
+Bar and milestone movement also uses a vertical edge velocity within the scrollable chart, initially using the horizontal 40 px/240 px-per-second tuning. Native and automatic vertical scrolling re-project the row under the pointer and compensate the carried item's vertical offset. Stop at scroll limits and on leaving the viewport or ending the gesture. Undo/redo reveal the affected row vertically as well as its time interval. Cross-row component tests cover intermediate-row restoration, duplicate milestone cancellation, both scroll directions, acceleration, pointer attachment, and reveal; focused motion tests inspect actual 150 ms push, restoration, and two-axis settlement transitions in all three browsers.
 
 Delayed-push state tests cover exact activation boundaries, continuous movement, passing through, contact resets, different neighbors, invalid release/history preservation, and both cascade directions. Include sustained pushes beyond original intervals, strict speed boundaries, restoration on fast continuation, fast retraction, fresh contact after an escape, and stationary screen pointers during viewport motion. Real-browser tests use the installed clock for deadline activation without movement, directional speed escapes, timer cleanup on every gesture ending, and dwell while edge-scrolling. Motion tests inspect the existing 150 ms CSS transitions, including pushes after reversing an overtake, restoration on speed escape, and fast retraction. Include visual baselines for pending/activated overlap and horizontally scrolled pinned labels.
 

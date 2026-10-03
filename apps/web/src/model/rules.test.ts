@@ -7,6 +7,7 @@ import { Gesture } from '../interaction/gesture';
 
 const bar = (id: string, start: number, end: number): Bar => ({
   id,
+  rowId: 'row-1',
   start,
   end,
   name: '',

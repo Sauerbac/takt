@@ -15,7 +15,7 @@ it('maps painted pickup geometry through a fractional viewport without shifting 
 it('re-projects a stationary pointer through scrolling while retaining the gesture history boundary', () => {
   const before = {
     ...emptyDocument(),
-    bars: [{ id: 'a', start: 0, end: 2, name: '' }],
+    bars: [{ id: 'a', rowId: 'row-1', start: 0, end: 2, name: '' }],
   };
   const history = new History(before);
   const gesture = new Gesture(

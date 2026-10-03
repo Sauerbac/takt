@@ -1,4 +1,4 @@
-import type { Bar, ChartDocument } from './document';
+import type { Bar, ChartDocument, Milestone } from './document';
 
 export const snapWeek = (week: number): number => Math.floor(week + 0.5);
 export type PushDirection = 'left' | 'right';
@@ -13,7 +13,7 @@ export function placeBar(
   pushFrom?: string,
 ): ChartDocument {
   const others = document.bars
-    .filter((bar) => bar.id !== proposal.id)
+    .filter((bar) => bar.id !== proposal.id && bar.rowId === proposal.rowId)
     .map((bar) => ({ ...bar }));
   if (direction === 'right') {
     others.sort((a, b) => a.start - b.start);
@@ -44,8 +44,32 @@ export function placeBar(
   }
   const byId = new Map(others.map((bar) => [bar.id, bar]));
   const bars = document.bars.map((bar) =>
-    bar.id === proposal.id ? proposal : byId.get(bar.id)!,
+    bar.id === proposal.id ? proposal : (byId.get(bar.id) ?? bar),
   );
   if (!document.bars.some((bar) => bar.id === proposal.id)) bars.push(proposal);
   return { ...document, bars };
+}
+
+export function placeMilestone(
+  document: ChartDocument,
+  proposal: Milestone,
+): ChartDocument {
+  if (
+    document.milestones.some(
+      (item) =>
+        item.id !== proposal.id &&
+        item.rowId === proposal.rowId &&
+        item.boundary === proposal.boundary,
+    )
+  )
+    return document;
+  const exists = document.milestones.some((item) => item.id === proposal.id);
+  return {
+    ...document,
+    milestones: exists
+      ? document.milestones.map((item) =>
+          item.id === proposal.id ? proposal : item,
+        )
+      : [...document.milestones, proposal],
+  };
 }

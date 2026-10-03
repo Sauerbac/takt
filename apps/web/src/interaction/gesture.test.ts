@@ -6,9 +6,9 @@ import { History } from '../model/history';
 const before = () => ({
   ...emptyDocument(),
   bars: [
-    { id: 'a', start: 0, end: 2, name: 'A' },
-    { id: 'b', start: 2, end: 4, name: 'B' },
-    { id: 'c', start: 4, end: 5, name: 'C' },
+    { id: 'a', rowId: 'row-1', start: 0, end: 2, name: 'A' },
+    { id: 'b', rowId: 'row-1', start: 2, end: 4, name: 'B' },
+    { id: 'c', rowId: 'row-1', start: 4, end: 5, name: 'C' },
   ],
 });
 
@@ -301,10 +301,17 @@ it.each(['right', 'left'] as const)(
     const document = {
       ...emptyDocument(),
       bars: [
-        { id: 'a', start: right ? 0 : 4, end: right ? 1 : 5, name: 'A' },
-        { id: 'b', start: 2, end: 3, name: 'B' },
+        {
+          id: 'a',
+          rowId: 'row-1',
+          start: right ? 0 : 4,
+          end: right ? 1 : 5,
+          name: 'A',
+        },
+        { id: 'b', rowId: 'row-1', start: 2, end: 3, name: 'B' },
         {
           id: 'near',
+          rowId: 'row-1',
           start: right ? 1 : 3,
           end: right ? 2 : 4,
           name: 'Neighbor',

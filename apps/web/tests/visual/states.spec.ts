@@ -1,5 +1,102 @@
 import { test, expect } from '@playwright/test';
-import { beginBarDrag, laneGeometry, pauseClock } from '../helpers';
+import { beginBarDrag, laneGeometry, pauseClock, settled } from '../helpers';
+
+test('Apricot section naming uses the full name area without changing its style', async ({
+  page,
+}) => {
+  await page.goto('/tests/fixtures/index.html?state=CrossRows');
+  await page.locator('.section-name').click();
+  const input = page.getByRole('textbox', { name: 'Section name' });
+  await expect(input).toBeFocused();
+  await input.fill('Product planning');
+  await expect(page.locator('main')).toHaveScreenshot(
+    'section-inline-name.png',
+  );
+});
+
+test('Apricot milestone naming preserves the inline label style', async ({
+  page,
+}) => {
+  await page.goto('/tests/fixtures/index.html?state=CrossRows');
+  const item = page.getByTestId('milestone-m');
+  await settled(item);
+  const before = (await item.locator('span').boundingBox())!;
+  const label = (await item.locator('span').boundingBox())!;
+  await page.mouse.dblclick(
+    label.x + label.width / 2,
+    label.y + label.height / 2,
+  );
+  const input = page.getByRole('textbox', { name: 'Milestone name' });
+  await expect(input).toBeFocused();
+  await input.press('ArrowRight');
+  const editing = (await input.boundingBox())!;
+  expect(editing.x).toBeCloseTo(before.x, 0);
+  expect(editing.y).toBeCloseTo(before.y, 0);
+  await expect(page.locator('main')).toHaveScreenshot(
+    'milestone-inline-name.png',
+  );
+});
+
+test('Apricot row naming preserves the inline label style', async ({
+  page,
+}) => {
+  await page.goto('/tests/fixtures/index.html?state=CrossRows');
+  const label = page.getByRole('button', { name: 'Research', exact: true });
+  const before = (await label.boundingBox())!;
+  await label.dblclick();
+  const input = page.getByRole('textbox', { name: 'Row name' });
+  await expect(input).toBeFocused();
+  await input.press('ArrowRight');
+  const editing = (await input.boundingBox())!;
+  expect(editing.x).toBeCloseTo(before.x, 0);
+  expect(editing.y).toBeCloseTo(before.y, 0);
+  await expect(page.locator('main')).toHaveScreenshot('row-inline-name.png');
+});
+
+test('Apricot chart selection and hover keep the same appearance and every bar shows both handles', async ({
+  page,
+}) => {
+  await page.goto('/tests/fixtures/index.html?state=CrossRows');
+  const main = page.locator('main');
+  await page.mouse.move(10, 10);
+  await expect(main).toHaveScreenshot('quiet-selection.png');
+  await page.getByTestId('bar-a').hover();
+  await expect(main).toHaveScreenshot('quiet-selection.png');
+  await page.getByTestId('bar-a').click();
+  await expect(main).toHaveScreenshot('quiet-selection.png');
+  const box = (await page.getByTestId('milestone-m').boundingBox())!;
+  await page.mouse.click(box.x + 2, box.y + 14);
+  await expect(main).toHaveScreenshot('quiet-selection.png');
+  await page.getByRole('button', { name: 'Research', exact: true }).focus();
+  await expect(main).toHaveScreenshot('quiet-selection.png');
+  await page.locator('.viewport').focus();
+  await expect(main).toHaveScreenshot('quiet-selection.png');
+});
+
+test('Apricot cross-row cascade and milestones', async ({ page }) => {
+  await page.goto('/tests/fixtures/index.html?state=CrossRows');
+  await expect(page.locator('main')).toHaveScreenshot('cross-rows.png');
+  const lane = await laneGeometry(page, 1),
+    pickup = await beginBarDrag(page, 'a');
+  await page.mouse.move(pickup.x, lane.y);
+  await expect(page.locator('main')).toHaveScreenshot('cross-row-preview.png');
+});
+
+test('Apricot invalid duplicate milestone drop', async ({ page }) => {
+  await page.goto('/tests/fixtures/index.html?state=CrossRows');
+  const lane = await laneGeometry(page, 1),
+    box = (await page.getByTestId('milestone-m').boundingBox())!;
+  await page.mouse.move(Math.round(box.x + 2), Math.round(box.y + 14));
+  await page.mouse.down();
+  await page.mouse.move(Math.round(box.x + 2 - 2 * lane.width), lane.y);
+  await expect(page.getByTestId('snap-preview')).toHaveAttribute(
+    'data-valid',
+    'false',
+  );
+  await expect(page.locator('main')).toHaveScreenshot(
+    'duplicate-milestone.png',
+  );
+});
 
 test('Apricot empty editor', async ({ page }) => {
   await page.goto('/tests/fixtures/index.html?state=Empty');
