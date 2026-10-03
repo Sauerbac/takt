@@ -53,16 +53,16 @@ Small overlays are acceptable when they serve a specific interaction: choosing a
 
 ## 3. Vocabulary and chart structure
 
-| Term | Meaning |
-| --- | --- |
-| Document | The chart currently being edited. Persistence and document-management behavior are deferred. |
-| Section | A named group of rows. It supplies an inherited color and can be collapsed or reordered as a unit. |
-| Row | A named horizontal lane containing bars and milestones. It belongs to one section. |
-| Bar | A period occupying one or more whole weeks. It has an optional label and may have a custom color. |
-| Milestone | A point marking the end of a particular week. It has an optional label and may have a custom color. |
-| Relative week | An integer position on the timeline, such as Week −2, Week 0, or Week 3. |
+| Term               | Meaning                                                                                                |
+| ------------------ | ------------------------------------------------------------------------------------------------------ |
+| Document           | The chart currently being edited. Persistence and document-management behavior are deferred.           |
+| Section            | A named group of rows. It supplies an inherited color and can be collapsed or reordered as a unit.     |
+| Row                | A named horizontal lane containing bars and milestones. It belongs to one section.                     |
+| Bar                | A period occupying one or more whole weeks. It has an optional label and may have a custom color.      |
+| Milestone          | A point marking the end of a particular week. It has an optional label and may have a custom color.    |
+| Relative week      | An integer position on the timeline, such as Week −2, Week 0, or Week 3.                               |
 | Calendar reference | A real date assigned to the beginning of one relative week. Other calendar labels are derived from it. |
-| Color override | An explicit item color that takes precedence over the section's inherited color. |
+| Color override     | An explicit item color that takes precedence over the section's inherited color.                       |
 
 Sections and categories are the same concept for this version. There is no separate tagging or category system crossing section boundaries.
 
@@ -107,12 +107,12 @@ The user can select a timeline label and choose a real date representing the **s
 
 For example, assigning October 5, 2026 to the start of Week 3 makes:
 
-| Relative position | Starting date |
-| --- | --- |
-| Week 0 | September 14, 2026 |
-| Week 2 | September 28, 2026 |
-| Week 3 | October 5, 2026 |
-| Week 4 | October 12, 2026 |
+| Relative position | Starting date      |
+| ----------------- | ------------------ |
+| Week 0            | September 14, 2026 |
+| Week 2            | September 28, 2026 |
+| Week 3            | October 5, 2026    |
+| Week 4            | October 12, 2026   |
 
 The chosen date does not have to be a Monday. Each week is a seven-day period starting from the selected reference.
 
@@ -143,13 +143,13 @@ The document name is omitted. Item properties do not accumulate in this toolbar.
 
 ### 6.2 Navigation
 
-| Input | Result |
-| --- | --- |
-| Normal vertical scrolling | Move through rows and sections. |
-| Horizontal scrolling | Move through time. |
-| Space-drag | Pan the chart. |
-| Zoom control | Change the amount of timeline visible. |
-| Ctrl/Cmd + mouse wheel | Zoom shortcut. |
+| Input                     | Result                                 |
+| ------------------------- | -------------------------------------- |
+| Normal vertical scrolling | Move through rows and sections.        |
+| Horizontal scrolling      | Move through time.                     |
+| Space-drag                | Pan the chart.                         |
+| Zoom control              | Change the amount of timeline visible. |
+| Ctrl/Cmd + mouse wheel    | Zoom shortcut.                         |
 
 Zoom changes the viewing scale, not the time precision: editing remains in whole weeks at every zoom level.
 
@@ -171,6 +171,8 @@ Enter finishes naming. Escape skips naming while retaining the newly created bar
 
 Dragging leftward across an interval creates the same bar as dragging rightward across it. A press and release without a meaningful drag creates nothing, preserving double-click as the milestone gesture.
 
+For the first slice, meaningful dragging begins at 4 CSS pixels of horizontal movement from the press position. Both drawing endpoints snap to the nearest week boundary, with exact halfway ties toward the later boundary. Once the threshold is reached, the result has a minimum duration of one week.
+
 If the new interval conflicts with existing bars, they preview a cascading push to the right. Release commits the creation and the complete final push as one action. Escape during the unfinished drag, or an interrupted gesture such as loss of the active pointer, restores the pre-gesture state and creates no history entry.
 
 ### 7.2 Creating a bar through the context menu
@@ -191,7 +193,7 @@ Double-clicking a section heading, row name, bar label, or milestone label edits
 
 Dragging a label still moves its item; the label is not an area that blocks direct manipulation. Dedicated bar end handles remain resize targets.
 
-Display labels are clipped to the available item width and expose the complete name on hover. During inline editing, the input may extend beyond a narrow bar. One-week bars retain usable resize targets, and a visible label remains part of the bar's drag target.
+Display labels are clipped to the available item width and expose the complete name on hover. During inline editing, the input stays within the bar; long text scrolls inside the field. One-week bars retain usable resize targets, and a visible label remains part of the bar's drag target.
 
 ## 8. Selection, movement, and resizing
 
@@ -255,18 +257,18 @@ Pushing has no dependency or scheduling meaning. It is the editor's way of keepi
 Start with three adjacent bars:
 
 | Bar | Occupied weeks | Duration |
-| --- | --- | --- |
-| A | 0–1 | 2 weeks |
-| B | 2–3 | 2 weeks |
-| C | 4 | 1 week |
+| --- | -------------- | -------- |
+| A   | 0–1            | 2 weeks  |
+| B   | 2–3            | 2 weeks  |
+| C   | 4              | 1 week   |
 
 Extend A by one week:
 
 | Bar | New occupied weeks | Duration |
-| --- | --- | --- |
-| A | 0–2 | 3 weeks |
-| B | 3–4 | 2 weeks |
-| C | 5 | 1 week |
+| --- | ------------------ | -------- |
+| A   | 0–2                | 3 weeks  |
+| B   | 3–4                | 2 weeks  |
+| C   | 5                  | 1 week   |
 
 B moves one week right and pushes C one week right. Both preserve their original durations.
 
@@ -371,32 +373,32 @@ Undo and redo must reveal their result. If the affected content is inside a coll
 
 These are behavioral checks for the implementation. Every agreed interaction requires automated coverage before it is considered complete, using rule/state tests and scripted real-browser tests at the appropriate levels.
 
-| Scenario | Expected result |
-| --- | --- |
-| Open a new document | One unnamed section, one empty row, relative weeks, fixed Week 0, and a creation hint are visible. |
-| Draw the first bar at Week 3 | It stays at Week 3; the origin is not reassigned. |
-| Add content before Week 0 | Negative weeks are available; existing items retain their relative positions. |
-| Drag across empty row space | A whole-week bar is created and its label becomes editable inline. |
-| Use “Add bar here” | A one-week bar is created at the context-menu location. |
-| Double-click empty space in Week 2 | A milestone is created at the end of Week 2. |
-| Drag a bar by its label | The bar moves; text does not block dragging. |
-| Double-click the same label | The label becomes editable in place. |
-| Resize into an adjacent bar | The other bar moves without changing duration. |
-| Push into a chain of bars | All necessary bars move smoothly; no final overlap remains. |
-| Reverse a drag after pushing other bars | Pushed bars flow back when the current snapped proposal no longer conflicts with them. |
-| Cancel a drag after previewing pushes | Every affected item returns to its pre-gesture state and no history entry is created. |
-| Undo that completed drag | All affected items return to their pre-gesture state in one undo. |
-| Drop a bar into an occupied row | Conflicting destination bars are pushed right with durations preserved. |
-| Drag a bar across several rows | Each hovered row previews and reverses its pushes; only the row used at release is committed. |
-| Move a row between sections | Its items preserve their time positions and follow the color-inheritance rules. |
-| Reorder a section | Its rows and items move together without changing time positions. |
-| Hover a row over a collapsed section | The section opens after a short delay, closes again on leave, and remains open after a successful drop. |
-| Delete a populated section | Confirmation explains the contents affected; cancellation changes nothing; confirmed deletion is undoable. |
-| Assign a calendar date to Week 3 | All calendar labels follow that week-start reference at seven-day intervals. |
-| Switch back to relative weeks | Positions and the calendar reference are preserved. |
-| Undo a hidden-content change | The containing section expands and the changed content is revealed. |
-| Delete every item | The creation hint returns once in the first visible empty row. |
-| Zoom or pan | Only the view changes; editing precision remains whole weeks. |
+| Scenario                                | Expected result                                                                                            |
+| --------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| Open a new document                     | One unnamed section, one empty row, relative weeks, fixed Week 0, and a creation hint are visible.         |
+| Draw the first bar at Week 3            | It stays at Week 3; the origin is not reassigned.                                                          |
+| Add content before Week 0               | Negative weeks are available; existing items retain their relative positions.                              |
+| Drag across empty row space             | A whole-week bar is created and its label becomes editable inline.                                         |
+| Use “Add bar here”                      | A one-week bar is created at the context-menu location.                                                    |
+| Double-click empty space in Week 2      | A milestone is created at the end of Week 2.                                                               |
+| Drag a bar by its label                 | The bar moves; text does not block dragging.                                                               |
+| Double-click the same label             | The label becomes editable in place.                                                                       |
+| Resize into an adjacent bar             | The other bar moves without changing duration.                                                             |
+| Push into a chain of bars               | All necessary bars move smoothly; no final overlap remains.                                                |
+| Reverse a drag after pushing other bars | Pushed bars flow back when the current snapped proposal no longer conflicts with them.                     |
+| Cancel a drag after previewing pushes   | Every affected item returns to its pre-gesture state and no history entry is created.                      |
+| Undo that completed drag                | All affected items return to their pre-gesture state in one undo.                                          |
+| Drop a bar into an occupied row         | Conflicting destination bars are pushed right with durations preserved.                                    |
+| Drag a bar across several rows          | Each hovered row previews and reverses its pushes; only the row used at release is committed.              |
+| Move a row between sections             | Its items preserve their time positions and follow the color-inheritance rules.                            |
+| Reorder a section                       | Its rows and items move together without changing time positions.                                          |
+| Hover a row over a collapsed section    | The section opens after a short delay, closes again on leave, and remains open after a successful drop.    |
+| Delete a populated section              | Confirmation explains the contents affected; cancellation changes nothing; confirmed deletion is undoable. |
+| Assign a calendar date to Week 3        | All calendar labels follow that week-start reference at seven-day intervals.                               |
+| Switch back to relative weeks           | Positions and the calendar reference are preserved.                                                        |
+| Undo a hidden-content change            | The containing section expands and the changed content is revealed.                                        |
+| Delete every item                       | The creation hint returns once in the first visible empty row.                                             |
+| Zoom or pan                             | Only the view changes; editing precision remains whole weeks.                                              |
 
 ## 15. Keyboard scope for the first milestone
 

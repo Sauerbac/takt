@@ -20,4 +20,47 @@ Open the prototype directly in a browser; no installation or JavaScript is requi
 
 The complete design exploration is preserved in [archive/ui-prototypes](archive/ui-prototypes/README.md), including all earlier directions, palette galleries, comparisons, research, and authoring scripts. There is one active design in `ui-prototype/`.
 
-This is a visual prototype. Chart behavior, persistence, and export remain outside the prototype work.
+## Browser application
+
+The first vertical slice lives in `apps/web`, built with Svelte 5, Vite, and TypeScript. It supports drawing, inline naming, moving and resizing bars in one row, reversible collision previews, cancellation, and atomic undo/redo. Contents reset on refresh.
+
+Use Node.js 22.12+ and npm. From the repository root:
+
+```sh
+npm ci
+npx playwright install chromium firefox webkit
+npm run dev
+```
+
+Validate with `npm run format:check`, `npm run check`, `npm run build`, then `npm test`.
+
+### Development commands
+
+Run these commands from the repository root; `apps/web` is the `@takt/web` npm workspace. Commit the root `package-lock.json`.
+
+| Command                                                                                 | Purpose                                                                      |
+| --------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| `npm ci`                                                                                | Install the locked dependencies.                                             |
+| `npx playwright install chromium firefox webkit`                                        | Install browser binaries after dependency installation.                      |
+| `npm run dev`                                                                           | Start the browser app at Vite's printed local URL.                           |
+| `npm run build`                                                                         | Generate the static application in `apps/web/dist`.                          |
+| `npm run preview`                                                                       | Serve the production build locally.                                          |
+| `npm run format`                                                                        | Format maintained source and documentation with Prettier.                    |
+| `npm run format:check`                                                                  | Check formatting; archived and prototype files are excluded.                 |
+| `npm run check`                                                                         | Run Svelte diagnostics and strict TypeScript checks.                         |
+| `npm run test:rules`                                                                    | Run deterministic document, gesture, and history tests in Vitest.            |
+| `npm run test:components`                                                               | Run component interaction and motion tests in Chromium, Firefox, and WebKit. |
+| `npm run test:e2e`                                                                      | Run the integrated pointer scenario against the production build.            |
+| `npm run test:visual`                                                                   | Compare Apricot component screenshots in Chromium.                           |
+| `npm test`                                                                              | Run all four test layers; build first.                                       |
+| `npm exec --workspace @takt/web -- playwright test --project=visual --update-snapshots` | Deliberately regenerate visual baselines after a reviewed appearance change. |
+
+Build before running browser tests: Playwright starts the development server on port 5173 and the production preview on port 4173. Both ports must be available, or already serve this checkout. Browser installation and test execution may need sandbox escalation on Windows; Vite's config loader reads ancestor directories outside the checkout.
+
+Screenshot baselines are Chromium/Windows-specific. Keep their browser version consistent with `package-lock.json`. Baseline updates require deliberate design review; screenshot assertions are the recurring acceptance mechanism.
+
+### Component fixtures
+
+Component fixtures are available through the development server at `/tests/fixtures/index.html?state=Empty`, `?state=Chain`, and `?state=Narrow`. They expose the same production components with deterministic initial data, and are excluded from the static production entry.
+
+The implementation follows the staged sequence in the implementation decisions. Additional rows and sections, milestones, timeline navigation, calendar mode, context menus, persistence, export, and desktop packaging remain future work.

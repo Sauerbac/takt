@@ -61,6 +61,8 @@ Keep these concerns separate:
 
 This separation is a testability requirement. Collision and history behavior must be exercisable without synthesizing browser pointer input, while browser tests must still prove that real pointer events drive those rules correctly.
 
+The first slice places document invariants, collision rules, and atomic history commands in `apps/web/src/model`; pointer-independent transactions in `apps/web/src/interaction`; view-only state and coordinate conversion in `apps/web/src/viewport.ts`; and rendering/input adapters in `apps/web/src/components`. `Editor`'s initialization contract is documented near its history construction.
+
 ## 4. Interaction transaction model
 
 Every drag gesture has three conceptual states:
@@ -83,6 +85,8 @@ The dragged object remains visibly attached to the pointer:
 - pointer-up must produce the arrangement that was visible immediately before release.
 
 Releasing outside the visible chart may commit when the current proposal is valid. Escape cancels an active drag. A genuine interruption such as losing the active pointer/window cancels and restores the start state.
+
+When a bar is picked up during settlement or collision displacement, capture its displayed geometry for immediate pointer attachment. Keep the committed document as the transaction's history boundary. Movement preserves the committed duration, and resizing preserves the committed opposite boundary; displayed geometry never becomes fractional document data. Clip bars and snapped previews to the timeline lane so they cannot paint over the row-name column.
 
 ## 5. Bar creation, movement, resizing, and collisions
 
@@ -150,7 +154,7 @@ Milestones may occupy a boundary that falls visually within a bar and do not par
 
 Initially, only one milestone may occupy a given week-ending boundary in a given row. A move or creation that would duplicate that row/boundary is invalid. The preview must make that invalid result clear; release does not create a duplicate or displace the existing milestone.
 
-Long display labels are clipped to the available item width, with the full label available on hover. During inline editing, the input may extend beyond a narrow bar. One-week bars must retain usable resize targets, and dragging by the visible label still moves the item.
+Long display labels are clipped to the available item width, with the full label available on hover. Inline inputs stay within the bar and scroll long text, as specified in the UX specification. One-week bars must retain usable resize targets, and dragging by the visible label still moves the item.
 
 ## 9. Calendar mode, timeline, and zoom
 
@@ -235,6 +239,8 @@ Exercise pointer proposals as deterministic sequences: start, move, enter anothe
 
 Use a real browser for pointer capture, actual layout geometry, focus, double-click, inline editors, menus, resize handles, edge auto-scroll, and Svelte component integration. Component stories or equivalent fixtures should expose named, reviewable states.
 
+The first slice's named fixtures live in `apps/web/tests/fixtures` and render production components through the development server. They are excluded from the production entry. Browser tests use actual `page.mouse` input and layout geometry; forced interruption events are limited to cancellation paths.
+
 ### Integrated Playwright tests
 
 Keep a focused end-to-end suite for complete editor scenarios and cross-component behavior. Script pointer movement directly; these are deterministic automated browser tests, not browser-control sessions performed by an LLM.
@@ -242,6 +248,8 @@ Keep a focused end-to-end suite for complete editor scenarios and cross-componen
 ### Visual and motion checks
 
 Use screenshot comparisons for stable visual states from the selected prototype and focused tests for motion-sensitive behavior. Ordinary behavioral tests may disable transitions for speed and determinism. Dedicated motion tests verify immediate pointer attachment, animated displacement rather than teleporting, reversible preview movement, and correct final settlement.
+
+Motion tests inspect actual CSS transitions and pause them at intermediate times so scheduling delays cannot hide the animation. Behavioral assertions also check settled bounding boxes. Include pickups during animation; waiting for every bar to settle before a drag would miss interrupted-motion defects.
 
 Automation can prove specified behavior and regression safety. Initial visual baselines and subjective interaction quality still require deliberate human design judgment when they are established or intentionally changed; they do not create a recurring manual regression checklist.
 

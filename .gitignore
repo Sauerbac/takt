@@ -1,2 +1,8 @@
 __pycache__/
 *.py[cod]
+node_modules/
+dist/
+test-results/
+playwright-report/
+.vite/
+.npm-cache/

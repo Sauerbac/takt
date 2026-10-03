@@ -1,0 +1,24 @@
+{
+  "name": "takt",
+  "private": true,
+  "workspaces": [
+    "apps/web"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace @takt/web",
+    "build": "npm run build --workspace @takt/web",
+    "preview": "npm run preview --workspace @takt/web",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "check": "npm run check --workspace @takt/web",
+    "test:rules": "npm run test:rules --workspace @takt/web",
+    "test:components": "npm run test:components --workspace @takt/web",
+    "test:e2e": "npm run test:e2e --workspace @takt/web",
+    "test:visual": "npm run test:visual --workspace @takt/web",
+    "test": "npm run test:rules && npm run test:components && npm run test:e2e && npm run test:visual"
+  },
+  "devDependencies": {
+    "prettier": "^3.6.2",
+    "prettier-plugin-svelte": "^3.4.0"
+  }
+}
