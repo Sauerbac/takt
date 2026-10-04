@@ -65,6 +65,10 @@ Each row corresponds to a scenario in UX section 14. Related assertions may shar
 
 ## Reconciliation changes
 
+The context-menu refinement retains existing commands. `tests/components/colors-menus.spec.ts` checks measured placement at the right and bottom edges, keyboard focus across grouped actions and swatches, neutral mouse opening, and one shared highlight during pointer/keyboard handoff. `tests/visual/states.spec.ts` covers the target headings, icons, palette, separators and destructive actions for all five menu targets, plus the shared deletion buttons.
+
+The custom-control refinement adds `tests/components/custom-controls.spec.ts` for the zoom listbox, keyboard and outside dismissal, intermediate wheel values, centered calendar backdrop, focus containment, date drafts, leap-day/month navigation, Today, year limits and chevron motion. `src/components/calendar-grid.test.ts` verifies grid arithmetic and invalid dates. Visual baselines include the open zoom menu, selected calendar draft, full date dialog and shared confirmation buttons.
+
 History reveal previously looked only for the primary object in the resulting document. Undoing creation removed that object; redoing deletion did too. The document changed correctly, but a collapsed section could stay closed and an off-screen result stay invisible. `src/viewport.ts` now derives the affected location from the command snapshots when the object no longer exists, while only selecting objects that still exist. Container removal reveals the surviving parent or neighboring section; removal of the final section reveals the empty chart. These view adjustments stay outside history.
 
 The reconciliation adds deterministic location rules, three-browser behavioral and motion regressions, and a production scenario for initial state, negative weeks, mixed deletion/hint recovery, and refresh reset. Existing visual baselines remain unchanged because the corrected reveal uses the existing expansion and layout styles.

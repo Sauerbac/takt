@@ -1,128 +1,377 @@
 <script lang="ts">
   import { tick } from 'svelte';
+  import Button from './Button.svelte';
+  import Dialog from './Dialog.svelte';
+  import { formatDate } from '../model/calendar';
+  import {
+    calendarDate,
+    isoDate,
+    monthGrid,
+    moveDate,
+    moveMonth,
+    validDate,
+  } from './calendar-grid';
   let {
     week,
     date,
-    x,
-    y,
     onchoose,
     onclose,
   }: {
     week: number;
     date: string;
-    x: number;
-    y: number;
     onchoose: (date: string) => void;
     onclose: () => void;
   } = $props();
-  let dialog: HTMLDialogElement;
-  let input: HTMLInputElement;
-  // Each opening mounts a new picker with its own uncommitted date draft.
+  const id = $props.id();
+  const now = new Date();
+  const today = isoDate(
+    calendarDate(now.getFullYear(), now.getMonth(), now.getDate()),
+  );
+  // Each opening has an uncommitted draft. Showing today doesn't select a reference.
   // svelte-ignore state_referenced_locally
   let value = $state(date);
-  $effect(() => {
-    dialog.showModal();
-    void tick().then(() => input.focus());
-  });
-  function close() {
-    dialog.close();
-    onclose();
+  // svelte-ignore state_referenced_locally
+  let focused = $state(date || today);
+  // svelte-ignore state_referenced_locally
+  let month = $state(focused);
+  let input: HTMLInputElement;
+  let grid: HTMLTableElement;
+  const days = $derived(monthGrid(month));
+  const monthLabel = $derived(
+    new Intl.DateTimeFormat('en-GB', {
+      month: 'long',
+      year: 'numeric',
+      timeZone: 'UTC',
+    }).format(new Date(month)),
+  );
+  function enterDate() {
+    input.setCustomValidity(
+      value && !validDate(value) ? 'Enter a valid date as YYYY-MM-DD.' : '',
+    );
+    if (validDate(value)) {
+      focused = value;
+      month = value;
+    }
+  }
+  function selectDate(day: string) {
+    value = day;
+    focused = day;
+    month = day;
+    input.setCustomValidity('');
+  }
+  async function focusDate(day: string) {
+    focused = day;
+    month = day;
+    await tick();
+    grid.querySelector<HTMLButtonElement>(`[data-date="${day}"]`)?.focus();
+  }
+  function gridKey(event: KeyboardEvent, day: string) {
+    event.stopPropagation();
+    const weekday = (new Date(day).getUTCDay() + 6) % 7;
+    const offset: Record<string, number> = {
+      ArrowLeft: -1,
+      ArrowRight: 1,
+      ArrowUp: -7,
+      ArrowDown: 7,
+      Home: -weekday,
+      End: 6 - weekday,
+    };
+    const next =
+      event.key === 'PageUp'
+        ? moveMonth(day, -1)
+        : event.key === 'PageDown'
+          ? moveMonth(day, 1)
+          : event.key in offset
+            ? moveDate(day, offset[event.key])
+            : null;
+    if (next) {
+      event.preventDefault();
+      void focusDate(next);
+    }
   }
 </script>
 
-<dialog
-  bind:this={dialog}
-  aria-labelledby="calendar-title"
-  style:left={`${Math.max(8, Math.min(x, window.innerWidth - 300))}px`}
-  style:top={`${Math.max(8, Math.min(y, window.innerHeight - 190))}px`}
-  oncancel={(event) => {
-    event.preventDefault();
-    close();
-  }}
-  onclick={(event) => {
-    if (event.target === dialog) {
-      const bounds = dialog.getBoundingClientRect();
-      if (
-        event.clientX < bounds.left ||
-        event.clientX > bounds.right ||
-        event.clientY < bounds.top ||
-        event.clientY > bounds.bottom
-      )
-        close();
-    }
-  }}
+<Dialog
+  titleId={`${id}-title`}
+  descriptionId={`${id}-description`}
+  {onclose}
+  dismissOutside
+  initialFocus="input"
+  width={360}
 >
+  <div class="heading">
+    <span class="calendar-icon" aria-hidden="true"
+      ><svg viewBox="0 0 24 24"
+        ><rect x="4" y="5" width="16" height="16" rx="3" /><path
+          d="M8 3v4m8-4v4M4 11h16m-11 4h2"
+        /></svg
+      ></span
+    >
+    <div>
+      <h2 id={`${id}-title`}>Week {week} starts on</h2>
+      <p id={`${id}-description`}>Choose the first day of this week.</p>
+    </div>
+  </div>
   <form
     onsubmit={(event) => {
       event.preventDefault();
-      if (input.checkValidity()) {
-        dialog.close();
-        onchoose(value);
-      }
+      enterDate();
+      if (input.reportValidity() && validDate(value)) onchoose(value);
     }}
   >
-    <label id="calendar-title" for="calendar-date">Week {week} starts on</label>
+    <div class="month-navigation">
+      <button
+        type="button"
+        class="month-arrow"
+        aria-label="Previous month"
+        disabled={month.slice(0, 7) === '0001-01'}
+        onclick={() => {
+          const next = moveMonth(month, -1);
+          month = next;
+          focused = next;
+        }}
+        ><svg viewBox="0 0 16 16" aria-hidden="true"
+          ><path d="m10 4-4 4 4 4" /></svg
+        ></button
+      >
+      <span aria-live="polite">{monthLabel}</span>
+      <button
+        type="button"
+        class="month-arrow"
+        aria-label="Next month"
+        disabled={month.slice(0, 7) === '9999-12'}
+        onclick={() => {
+          const next = moveMonth(month, 1);
+          month = next;
+          focused = next;
+        }}
+        ><svg viewBox="0 0 16 16" aria-hidden="true"
+          ><path d="m6 4 4 4-4 4" /></svg
+        ></button
+      >
+    </div>
+    <table bind:this={grid} role="grid" aria-label={monthLabel}>
+      <thead
+        ><tr
+          >{#each ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'] as day}<th
+              scope="col">{day}</th
+            >{/each}</tr
+        ></thead
+      >
+      <tbody
+        >{#each days as row}<tr
+            >{#each row as day}<td aria-selected={!!day && value === day}>
+                {#if day}<button
+                    type="button"
+                    data-date={day}
+                    aria-label={formatDate(day)}
+                    aria-current={day === today ? 'date' : undefined}
+                    tabindex={focused === day ? 0 : -1}
+                    class:outside={day.slice(0, 7) !== month.slice(0, 7)}
+                    class:selected={value === day}
+                    onclick={() => {
+                      selectDate(day);
+                      void focusDate(day);
+                    }}
+                    onkeydown={(event) => gridKey(event, day)}
+                    >{Number(day.slice(8))}</button
+                  >{/if}
+              </td>{/each}</tr
+          >{/each}</tbody
+      >
+    </table>
+    <div class="date-entry">
+      <label for={`${id}-date`}>Selected date</label><button
+        type="button"
+        class="today"
+        onclick={() => selectDate(today)}>Today</button
+      >
+    </div>
     <input
-      id="calendar-date"
       bind:this={input}
-      type="date"
+      id={`${id}-date`}
+      type="text"
+      placeholder="YYYY-MM-DD"
       required
-      min="0001-01-01"
-      max="9999-12-31"
+      maxlength="10"
+      autocomplete="off"
+      spellcheck="false"
       bind:value
+      oninput={(event) => {
+        value = event.currentTarget.value;
+        enterDate();
+      }}
     />
-    <div>
-      <button type="button" onclick={close}>Cancel</button><button type="submit"
-        >Set date</button
+    <div class="actions">
+      <Button onclick={onclose}>Cancel</Button><Button
+        type="submit"
+        variant="primary"
+        ><svg viewBox="0 0 16 16" aria-hidden="true"
+          ><path d="m3.5 8 3 3 6-6" /></svg
+        >Set date</Button
       >
     </div>
   </form>
-</dialog>
+</Dialog>
 
 <style>
-  dialog {
-    position: fixed;
+  .heading {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 22px;
+  }
+  .calendar-icon {
+    display: grid;
+    place-items: center;
+    width: 40px;
+    height: 40px;
+    border: 1px solid #f3b18455;
+    border-radius: 10px;
+    background: #f3b18426;
+    color: #ad6b3e;
+  }
+  svg {
+    width: 18px;
+    height: 18px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.7;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+  .calendar-icon svg {
+    width: 22px;
+    height: 22px;
+  }
+  h2 {
+    font-size: 16px;
+    letter-spacing: -0.3px;
+    margin: 0 0 5px;
+  }
+  p {
     margin: 0;
-    width: 284px;
-    padding: 18px;
-    color: var(--ink);
-    border: 1px solid var(--line);
-    border-radius: var(--radius);
-    background: var(--surface);
-    box-shadow: 0 8px 24px #182e471a;
+    color: var(--muted);
+    font-size: 12px;
   }
-  dialog::backdrop {
-    background: transparent;
-  }
-  label {
-    display: block;
+  .month-navigation {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
     font-size: 13px;
     font-weight: 600;
-    margin-bottom: 12px;
   }
-  input {
-    width: 100%;
-    padding: 7px;
+  .month-arrow {
+    display: grid;
+    place-items: center;
+    width: 30px;
+    height: 30px;
     border: 1px solid var(--line);
-    border-radius: var(--radius);
-    color: inherit;
-    background: var(--surface);
-  }
-  form div {
-    display: flex;
-    justify-content: flex-end;
-    gap: 8px;
-    margin-top: 14px;
-  }
-  button {
-    padding: 6px 10px;
-    border: 1px solid var(--line);
-    border-radius: var(--radius);
+    border-radius: 6px;
+    color: var(--ink);
     background: var(--surface);
     cursor: pointer;
   }
-  button[type='submit'] {
+  .month-arrow:hover:enabled {
+    background: var(--soft);
+  }
+  .month-arrow:disabled {
+    opacity: 0.4;
+    cursor: default;
+  }
+  table {
+    table-layout: fixed;
+    border-collapse: separate;
+    border-spacing: 3px;
+    width: 100%;
+  }
+  th {
+    height: 24px;
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--muted);
+  }
+  td {
+    padding: 0;
+    height: 35px;
+    text-align: center;
+  }
+  td button {
+    width: 100%;
+    height: 35px;
+    padding: 0;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--ink);
+    font-size: 12px;
+    cursor: pointer;
+    transition: background 150ms;
+  }
+  td button:hover {
+    background: var(--soft);
+  }
+  td button.outside {
+    color: #9ca7b4;
+  }
+  td button[aria-current='date'] {
+    border-color: #e5ab81;
+  }
+  td button.selected,
+  td button.selected:hover {
     background: var(--bar-fill);
-    border-color: var(--bar-fill);
+    color: var(--bar-ink);
+    font-weight: 600;
+    box-shadow: 0 1px 2px #182e4712;
+  }
+  button:focus-visible,
+  input:focus-visible {
+    outline: 3px solid #f3b18480;
+    outline-offset: 1px;
+  }
+  .date-entry {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin: 18px 0 7px;
+  }
+  label {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--muted);
+  }
+  .today {
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: #a16032;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .today:hover {
+    text-decoration: underline;
+  }
+  input {
+    width: 100%;
+    height: 36px;
+    padding: 0 10px;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    color: var(--ink);
+    background: var(--surface);
+    font-size: 13px;
+  }
+  input::placeholder {
+    color: #9ca7b4;
+  }
+  .actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 20px;
+    padding-top: 18px;
+    border-top: 1px solid var(--line);
   }
 </style>

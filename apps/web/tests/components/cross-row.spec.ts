@@ -420,6 +420,7 @@ test('context creation retains the opened row and week; duplicate creation shows
   // Open the bar command above an occupied time using the free edge of the lane.
   const bounds = (await page.getByTestId('lane').nth(1).boundingBox())!;
   await page.mouse.click(lane.x(0.3), bounds.y + 2, { button: 'right' });
+  await page.keyboard.press('ArrowDown');
   await page.keyboard.press('Enter');
   await page.getByRole('textbox', { name: 'Bar name' }).press('Escape');
   await interval(page.locator('.bar').last(), 0, 1);

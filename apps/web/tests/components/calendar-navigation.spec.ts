@@ -1,3 +1,4 @@
+import { chooseZoom } from '../helpers';
 import { test, expect } from '@playwright/test';
 import type { Page } from '@playwright/test';
 import { draw, interval, laneGeometry, settled } from '../helpers';
@@ -5,7 +6,9 @@ import { draw, interval, laneGeometry, settled } from '../helpers';
 const chart = (page: Page) =>
   page.getByRole('region', { name: 'Whole-week Gantt chart', exact: true });
 async function chooseDate(page: Page, date: string) {
-  await page.locator('input[type=date]').fill(date);
+  await page
+    .getByRole('textbox', { name: 'Selected date', exact: true })
+    .fill(date);
   await page.getByRole('button', { name: 'Set date', exact: true }).click();
   await expect(page.getByRole('dialog')).toHaveCount(0);
 }
@@ -34,7 +37,9 @@ test('calendar setup cancels cleanly, accepts user dates and preserves time/refe
   await page.goto('/tests/fixtures/index.html?state=CrossRows');
   const dates = page.getByRole('button', { name: 'Dates', exact: true });
   await dates.click();
-  await expect(page.locator('input[type=date]')).toBeFocused();
+  await expect(
+    page.getByRole('textbox', { name: 'Selected date', exact: true }),
+  ).toBeFocused();
   await page.getByRole('button', { name: 'Cancel', exact: true }).click();
   await expect(dates).toHaveAttribute('aria-pressed', 'false');
   await expect(
@@ -54,7 +59,9 @@ test('calendar setup cancels cleanly, accepts user dates and preserves time/refe
     'Kickoff · 10 Nov 2026',
   );
   await page.locator('[data-week="3"]').click();
-  await expect(page.locator('input[type=date]')).toHaveValue('2026-10-28');
+  await expect(
+    page.getByRole('textbox', { name: 'Selected date', exact: true }),
+  ).toHaveValue('2026-10-28');
   await chooseDate(page, '2026-10-05');
   await expect(page.locator('[data-week="0"]')).toHaveAccessibleName(
     '14 Sept 2026 · Set date for Week 0',
@@ -84,7 +91,9 @@ test('a heading sets a reference in Weeks mode, Escape/outside dismissal and emp
   await page.goto('/tests/fixtures/index.html?state=Empty');
   const heading = page.locator('[data-week="3"]');
   await heading.click();
-  await expect(page.locator('input[type=date]')).toHaveValue('');
+  await expect(
+    page.getByRole('textbox', { name: 'Selected date', exact: true }),
+  ).toHaveValue('');
   await page.getByRole('button', { name: 'Set date', exact: true }).click();
   await expect(page.getByRole('dialog')).toBeVisible();
   await page.keyboard.press('Escape');
@@ -128,13 +137,9 @@ test('toolbar and wheel zoom anchor time, clamp scale, and preserve redo with pi
   const bounds = (await chart(page).boundingBox())!;
   const center = (bounds.x + 218 + bounds.x + bounds.width) / 2;
   const initial = await timeAt(page, center);
-  await page
-    .getByRole('combobox', { name: 'Zoom', exact: true })
-    .selectOption('2');
+  await chooseZoom(page, '2');
   expect(await timeAt(page, center)).toBeCloseTo(initial, 3);
-  await page
-    .getByRole('combobox', { name: 'Zoom', exact: true })
-    .selectOption('0.5');
+  await chooseZoom(page, '0.5');
   expect(await timeAt(page, center)).toBeCloseTo(initial, 3);
   await page.setViewportSize({ width: 900, height: 800 });
   await chart(page).evaluate((node) => {
@@ -154,12 +159,12 @@ test('toolbar and wheel zoom anchor time, clamp scale, and preserve redo with pi
   await page.mouse.wheel(0, -5000);
   await expect(
     page.getByRole('combobox', { name: 'Zoom', exact: true }),
-  ).toHaveValue('2');
+  ).toHaveText('200%');
   expect(await timeAt(page, anchor)).toBeCloseTo(before, 3);
   await page.mouse.wheel(0, 5000);
   await expect(
     page.getByRole('combobox', { name: 'Zoom', exact: true }),
-  ).toHaveValue('0.5');
+  ).toHaveText('50%');
   await page.keyboard.up('Control');
   expect((await page.locator('.row-label').boundingBox())!.x).toBeCloseTo(
     label.x,
@@ -176,9 +181,7 @@ for (const scale of ['0.5', '2']) {
     page,
   }) => {
     await page.goto('/tests/fixtures/index.html?state=Empty');
-    await page
-      .getByRole('combobox', { name: 'Zoom', exact: true })
-      .selectOption(scale);
+    await chooseZoom(page, scale);
     // Zoom anchors the view center: pick a visible interval at both extremes.
     await draw(page, 2, 3, 'Work');
     const bar = page.locator('.bar');
@@ -207,7 +210,7 @@ for (const scale of ['0.5', '2']) {
     await interval(bar, 3, 4);
     await expect(
       page.getByRole('combobox', { name: 'Zoom', exact: true }),
-    ).toHaveValue(scale);
+    ).toHaveText(`${Number(scale) * 100}%`);
   });
 }
 

@@ -1,6 +1,13 @@
 import { expect } from '@playwright/test';
 import type { Page, Locator } from '@playwright/test';
 
+export async function chooseZoom(page: Page, scale: string) {
+  await page.getByRole('combobox', { name: 'Zoom', exact: true }).click();
+  await page
+    .getByRole('option', { name: `${Number(scale) * 100}%`, exact: true })
+    .click();
+}
+
 export async function laneGeometry(page: Page, row = 0) {
   const element = page.getByTestId('lane').nth(row);
   const bounds = await element.boundingBox();

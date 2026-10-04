@@ -1,3 +1,4 @@
+import { chooseZoom } from '../helpers';
 import { test, expect } from '@playwright/test';
 import {
   beginBarDrag,
@@ -7,20 +8,61 @@ import {
   settled,
 } from '../helpers';
 
+test('Apricot context menus group timeline, row, section and milestone actions', async ({
+  page,
+}) => {
+  await page.goto('/tests/fixtures/index.html?state=CalendarColors');
+  await page.locator('.section-name').first().click({ button: 'right' });
+  await expect(page.getByRole('menu')).toHaveScreenshot('section-menu.png');
+  await page.keyboard.press('Escape');
+  await page.locator('.row-name').first().click({ button: 'right' });
+  await expect(page.getByRole('menu')).toHaveScreenshot('row-menu.png');
+  await page.keyboard.press('Escape');
+  await page
+    .getByTestId('lane')
+    .first()
+    .click({ button: 'right', position: { x: 800, y: 3 } });
+  await expect(page.getByRole('menu')).toBeFocused();
+  await expect(page.getByRole('menu')).toHaveScreenshot('timeline-menu.png');
+  await page
+    .getByRole('menuitem', { name: 'Add bar here', exact: true })
+    .hover();
+  await expect(page.getByRole('menu')).toHaveScreenshot(
+    'timeline-menu-hover.png',
+  );
+  await page.keyboard.press('ArrowDown');
+  await expect(page.getByRole('menu')).toHaveScreenshot(
+    'timeline-menu-keyboard.png',
+  );
+  await page.keyboard.press('Escape');
+  await page.getByTestId('milestone-m').click({ button: 'right' });
+  await expect(page.getByRole('menu')).toHaveScreenshot('milestone-menu.png');
+});
+
+test('Apricot custom zoom menu and selected date draft', async ({ page }) => {
+  await page.clock.setFixedTime(new Date('2026-10-04T12:00:00Z'));
+  await page.goto('/tests/fixtures/index.html?state=CalendarColors');
+  await page.getByRole('combobox', { name: 'Zoom', exact: true }).click();
+  await expect(page.locator('main')).toHaveScreenshot('zoom-menu.png');
+  await page.keyboard.press('Escape');
+  await page.locator('[data-week="3"]').click();
+  await page.getByRole('button', { name: '12 Oct 2026', exact: true }).click();
+  await expect(page).toHaveScreenshot('calendar-selected.png');
+});
+
 test('Apricot calendar dates, inherited colors, item palettes and calendar setup', async ({
   page,
 }) => {
+  await page.clock.setFixedTime(new Date('2026-10-04T12:00:00Z'));
   await page.goto('/tests/fixtures/index.html?state=CalendarColors');
   await expect(page.locator('main')).toHaveScreenshot('calendar-colors.png');
   await page.getByTestId('bar-b').click({ button: 'right' });
   await expect(page.locator('main')).toHaveScreenshot('item-palette.png');
   await page.keyboard.press('Escape');
   await page.locator('[data-week="3"]').click();
-  await expect(page.locator('main')).toHaveScreenshot('calendar-picker.png');
+  await expect(page).toHaveScreenshot('calendar-picker.png');
   await page.getByRole('button', { name: 'Cancel', exact: true }).click();
-  await page
-    .getByRole('combobox', { name: 'Zoom', exact: true })
-    .selectOption('0.5');
+  await chooseZoom(page, '0.5');
   await expect(page.locator('main')).toHaveScreenshot(
     'calendar-zoomed-out.png',
   );
@@ -55,9 +97,7 @@ test('Apricot structural controls, collapsed sections, insertion preview and sco
   await page
     .getByRole('menuitem', { name: 'Delete section…', exact: true })
     .click();
-  await expect(page.locator('main')).toHaveScreenshot(
-    'container-confirmation.png',
-  );
+  await expect(page).toHaveScreenshot('container-confirmation.png');
 });
 
 test('Apricot collapsed section drag keeps its hidden contents out of the carried group', async ({

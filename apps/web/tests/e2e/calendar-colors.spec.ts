@@ -1,3 +1,4 @@
+import { chooseZoom } from '../helpers';
 import { test, expect } from '@playwright/test';
 import { draw, interval, laneGeometry } from '../helpers';
 
@@ -8,7 +9,9 @@ test('production editor combines user calendar dates, navigation, inheritance an
   await draw(page, 0, 2, 'Explore');
   const bar = page.locator('.bar');
   await page.locator('[data-week="3"]').click();
-  await page.locator('input[type=date]').fill('2026-10-05');
+  await page
+    .getByRole('textbox', { name: 'Selected date', exact: true })
+    .fill('2026-10-05');
   await page.getByRole('button', { name: 'Set date', exact: true }).click();
   await page.getByRole('button', { name: 'Dates', exact: true }).click();
   await expect(page.locator('[data-week="0"]')).toHaveAccessibleName(
@@ -34,9 +37,7 @@ test('production editor combines user calendar dates, navigation, inheritance an
   await bar.click({ button: 'right' });
   await page.getByRole('menuitemradio', { name: 'Rose', exact: true }).click();
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
-  await page
-    .getByRole('combobox', { name: 'Zoom', exact: true })
-    .selectOption('0.75');
+  await chooseZoom(page, '0.75');
   await page
     .getByRole('region', { name: 'Whole-week Gantt chart', exact: true })
     .focus();
@@ -52,7 +53,7 @@ test('production editor combines user calendar dates, navigation, inheritance an
   await interval(bar, 0, 2);
   await expect(
     page.getByRole('combobox', { name: 'Zoom', exact: true }),
-  ).toHaveValue('0.75');
+  ).toHaveText('75%');
   await bar.click({ button: 'right' });
   await page
     .getByRole('menuitem', { name: 'Use section color', exact: true })

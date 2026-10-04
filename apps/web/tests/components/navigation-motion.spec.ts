@@ -1,3 +1,4 @@
+import { chooseZoom } from '../helpers';
 import { test, expect } from '@playwright/test';
 import { laneGeometry, pauseClock } from '../helpers';
 
@@ -7,9 +8,7 @@ for (const scale of ['0.5', '2']) {
   }) => {
     await page.goto('/tests/fixtures/index.html?state=CalendarColors');
     await pauseClock(page);
-    await page
-      .getByRole('combobox', { name: 'Zoom', exact: true })
-      .selectOption(scale);
+    await chooseZoom(page, scale);
     const lane = await laneGeometry(page, 1);
     const bar = page.getByTestId('bar-c');
     const milestone = page.getByTestId('milestone-m');

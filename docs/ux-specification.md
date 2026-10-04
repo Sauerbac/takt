@@ -118,7 +118,7 @@ The chosen date does not have to be a Monday. Each week is a seven-day period st
 
 Calendar mode labels weeks by their starting dates. Bars still occupy whole weeks. Switching between relative and calendar displays preserves their positions and the calendar reference.
 
-Selecting calendar mode before a reference exists opens a compact date-picker popover. The selected date represents the start of Week 0. Cancelling the popover leaves relative-week mode selected. Selecting a week heading can set or replace the date assigned to the start of that specific week; the remaining labels are derived in seven-day increments. Setting a reference from a heading preserves the current display mode. Dates use an English day–short-month–year format, for example **5 Oct 2026**; headings may put the year on a second line. The user chooses the date; the example is not a default reference.
+Selecting calendar mode before a reference exists opens a centered date-picker dialog with the same dimmed backdrop as deletion confirmation. Its custom calendar is visible immediately, with Monday-first weeks, month navigation, a Today shortcut, and a date field accepting `YYYY-MM-DD` for direct entry. The selected date represents the start of Week 0. Choosing a day changes an uncommitted draft; **Set date** applies it. Cancel, Escape, or clicking the backdrop discards the draft and leaves relative-week mode selected. Selecting a week heading opens the same dialog to set or replace the date assigned to the start of that specific week; the remaining labels are derived in seven-day increments. Setting a reference from a heading preserves the current display mode. The calendar initially shows the existing reference or today's month without selecting a default reference. Arrow keys navigate days, Home/End navigate within a week, and Page Up/Down navigate months. Dates in the chart use an English day–short-month–year format, for example **5 Oct 2026**; headings may put the year on a second line. The user chooses the date; the example is not a default reference.
 
 ### 5.3 Milestone timing
 
@@ -152,6 +152,8 @@ The document name is omitted. Item properties do not accumulate in this toolbar.
 | Ctrl/Cmd + mouse wheel    | Zoom shortcut.                         |
 
 Zoom changes the viewing scale, not the time precision: editing remains in whole weeks at every zoom level.
+
+The zoom control is a custom dropdown with a nearby chevron that rotates while open, a marked current preset, and keyboard navigation. Arrow keys, Home, and End navigate presets; Enter or Space applies one. Escape or clicking outside dismisses it without changing zoom. Wheel zoom continues to show its current percentage even between presets.
 
 Navigation must coexist with creation gestures. An ordinary drag in empty row space creates a bar; Space-drag is the distinct panning gesture.
 
@@ -204,6 +206,8 @@ Display labels are clipped to the available item width and expose the complete n
 Only one item is selected at a time. There is no Shift-click multi-selection, selection rectangle, or grouped movement of independently selected items.
 
 Clicking empty chart space clears selection. Right-clicking an item selects it before opening its context menu. A context menu opened over empty lane space retains the exact row and week at which it was opened. Collapsing a section clears the selection if the selected item becomes hidden.
+
+Opening a context menu with the mouse focuses the menu without highlighting an action. Mouse movement and arrow keys share a single active action or color swatch; a stationary pointer does not override keyboard navigation. Moving away from the actions clears the pointer highlight. Arrow Down starts at the first action, Arrow Up at the last, and subsequent arrows wrap through actions and swatches. Enter activates the focused action; Escape dismisses the menu.
 
 ### 8.1 Bar movement
 

@@ -39,6 +39,10 @@
   import Bar from './Bar.svelte';
   import Milestone from './Milestone.svelte';
   import CalendarPicker from './CalendarPicker.svelte';
+  import Select from './Select.svelte';
+  import Button from './Button.svelte';
+  import Dialog from './Dialog.svelte';
+  import MenuItem from './MenuItem.svelte';
 
   let { initial = emptyDocument() }: { initial?: ChartDocument } = $props();
   // The initial document seeds this editor instance once; remount to open another document.
@@ -55,8 +59,6 @@
   let calendarPicker = $state<{
     week: number;
     date: string;
-    x: number;
-    y: number;
     switchMode: boolean;
   } | null>(null);
   let calendarTrigger: HTMLElement | null = null;
@@ -91,7 +93,6 @@
     bars: number;
     milestones: number;
   } | null>(null);
-  let dialog = $state<HTMLDialogElement>(null!);
   let canUndo = $state(false);
   let canRedo = $state(false);
   let viewport: HTMLDivElement;
@@ -118,6 +119,19 @@
     id: string;
   } | null>(null);
   let menuElement = $state<HTMLDivElement>(null!);
+  let menuUsingKeyboard = false;
+  const menuName = $derived(
+    menu
+      ? menu.kind === 'lane'
+        ? weekLabel(document, menu.week)
+        : [
+            ...document.sections,
+            ...document.rows,
+            ...document.bars,
+            ...document.milestones,
+          ].find((item) => item.id === menu!.id)?.name || `Unnamed ${menu.kind}`
+      : '',
+  );
   let notice = $state('');
   const weekWidth = $derived((laneWidth / WEEK_COUNT) * view.zoom);
   const timelineShift = $derived((FIRST_WEEK - view.firstWeek) * weekWidth);
@@ -677,15 +691,27 @@
     finishName(true);
     view.selectedId = id;
     menu = {
-      x: Math.max(0, Math.min(event.clientX, window.innerWidth - 210)),
-      y: Math.max(0, Math.min(event.clientY, window.innerHeight - 260)),
+      x: event.clientX,
+      y: event.clientY,
       rowId: id,
       week: 0,
       kind,
       id,
     };
+    await focusMenu();
+  }
+  async function focusMenu() {
     await tick();
-    menuElement.querySelector<HTMLButtonElement>('button')?.focus();
+    if (!menu) return;
+    const bounds = menuElement.getBoundingClientRect();
+    menu = {
+      ...menu,
+      x: Math.max(8, Math.min(menu.x, window.innerWidth - bounds.width - 8)),
+      y: Math.max(8, Math.min(menu.y, window.innerHeight - bounds.height - 8)),
+    };
+    await tick();
+    menuUsingKeyboard = false;
+    menuElement.focus({ preventScroll: true });
   }
   async function askDelete(id: string) {
     if (busy) return;
@@ -706,14 +732,10 @@
       milestones: document.milestones.filter((item) => ids.has(item.rowId))
         .length,
     };
-    await tick();
-    dialog.showModal();
-    dialog.querySelector<HTMLButtonElement>('button')?.focus();
   }
   function closeConfirmation() {
-    dialog.close();
     confirmation = null;
-    viewport.focus({ preventScroll: true });
+    void tick().then(() => viewport.focus({ preventScroll: true }));
   }
   function confirmDelete() {
     if (!confirmation) return;
@@ -919,15 +941,14 @@
     finishName(true);
     view.selectedId = null;
     menu = {
-      x: Math.max(0, Math.min(event.clientX, window.innerWidth - 210)),
-      y: Math.max(0, Math.min(event.clientY, window.innerHeight - 105)),
+      x: event.clientX,
+      y: event.clientY,
       rowId,
       kind: 'lane',
       id: rowId,
       week: Math.floor(weekAt(event.clientX)),
     };
-    await tick();
-    menuElement.querySelector<HTMLButtonElement>('button')?.focus();
+    await focusMenu();
   }
 
   function startPan(event: PointerEvent) {
@@ -1007,12 +1028,9 @@
     finishName(true);
     menu = null;
     calendarTrigger = event.currentTarget as HTMLElement;
-    const bounds = calendarTrigger.getBoundingClientRect();
     calendarPicker = {
       week,
       switchMode,
-      x: bounds.left,
-      y: bounds.bottom + 6,
       date: document.calendar ? dateAt(document.calendar, week) : '',
     };
   }
@@ -1060,15 +1078,14 @@
     finishName(true);
     view.selectedId = id;
     menu = {
-      x: Math.max(0, Math.min(event.clientX, window.innerWidth - 210)),
-      y: Math.max(0, Math.min(event.clientY, window.innerHeight - 240)),
+      x: event.clientX,
+      y: event.clientY,
       kind,
       id,
       rowId: '',
       week: 0,
     };
-    await tick();
-    menuElement.querySelector<HTMLButtonElement>('button')?.focus();
+    await focusMenu();
   }
   function setColor(color?: Color) {
     if (!menu || busy) return;
@@ -1127,17 +1144,25 @@
 {/snippet}
 
 {#snippet colorPalette()}
-  <div class="palette" role="group" aria-label="Color palette">
-    {#each colorKeys as color}
-      <button
-        role="menuitemradio"
-        aria-label={palette[color].name}
-        aria-checked={menuColor === color}
-        style:background={palette[color].fill}
-        style:color={palette[color].ink}
-        onclick={() => setColor(color)}>{menuColor === color ? '✓' : ''}</button
-      >
-    {/each}
+  <div class="color-group" role="group" aria-label="Color palette">
+    <div class="color-label">
+      <span>Color</span><span>{palette[menuColor ?? 'apricot'].name}</span>
+    </div>
+    <div class="palette">
+      {#each colorKeys as color}
+        <button
+          role="menuitemradio"
+          aria-label={palette[color].name}
+          aria-checked={menuColor === color}
+          type="button"
+          title={palette[color].name}
+          style:--swatch-fill={palette[color].fill}
+          style:--swatch-ink={palette[color].ink}
+          onclick={() => setColor(color)}
+          >{menuColor === color ? '✓' : ''}</button
+        >
+      {/each}
+    </div>
   </div>
 {/snippet}
 
@@ -1162,20 +1187,16 @@
         />
       </div>
       <span class="divider"></span>
-      <select
-        class="zoom"
-        aria-label="Zoom"
+      <Select
+        label="Zoom"
         disabled={busy}
         value={view.zoom}
-        onchange={(event) => zoomTo(Number(event.currentTarget.value))}
-      >
-        {#if ![0.5, 0.75, 1, 1.25, 1.5, 2].includes(view.zoom)}<option
-            value={view.zoom}>{Math.round(view.zoom * 100)}%</option
-          >{/if}
-        {#each [0.5, 0.75, 1, 1.25, 1.5, 2] as zoom}<option value={zoom}
-            >{zoom * 100}%</option
-          >{/each}
-      </select>
+        options={[0.5, 0.75, 1, 1.25, 1.5, 2].map((value) => ({
+          value,
+          label: `${value * 100}%`,
+        }))}
+        onchange={zoomTo}
+      />
       <span class="divider"></span>
       <div class="mode-switch" aria-label="Timeline display">
         <button
@@ -1459,7 +1480,20 @@
       tabindex="-1"
       style:left={`${menu.x}px`}
       style:top={`${menu.y}px`}
+      onpointermove={(event) => {
+        if (event.pointerType !== 'mouse') return;
+        menuUsingKeyboard = false;
+        const item = (event.target as Element).closest<HTMLButtonElement>(
+          'button',
+        );
+        (item ?? menuElement).focus({ preventScroll: true });
+      }}
+      onpointerleave={(event) => {
+        if (event.pointerType === 'mouse' && !menuUsingKeyboard)
+          menuElement.focus({ preventScroll: true });
+      }}
       onkeydown={(event) => {
+        menuUsingKeyboard = true;
         const buttons = [
           ...menuElement.querySelectorAll<HTMLButtonElement>('button'),
         ];
@@ -1468,33 +1502,42 @@
         );
         if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
           event.preventDefault();
-          buttons[
-            (index + (event.key === 'ArrowDown' ? 1 : buttons.length - 1)) %
-              buttons.length
-          ].focus();
+          const next =
+            index === -1
+              ? event.key === 'ArrowDown'
+                ? 0
+                : buttons.length - 1
+              : (index + (event.key === 'ArrowDown' ? 1 : buttons.length - 1)) %
+                buttons.length;
+          buttons[next].focus();
         } else if (event.key === 'Tab') menu = null;
       }}
     >
-      {#if menu.kind === 'lane'}
-        <small>{weekLabel(document, menu.week)}</small>
-        <button role="menuitem" onclick={() => void menuBar()}
-          >Add bar here</button
+      <div class="menu-heading">
+        <small>{menu.kind === 'lane' ? 'Timeline' : menu.kind}</small><strong
+          title={menuName}>{menuName}</strong
         >
-        <button
-          role="menuitem"
+      </div>
+      <hr />
+      {#if menu.kind === 'lane'}
+        <MenuItem icon="bar" onclick={() => void menuBar()}
+          >Add bar here</MenuItem
+        >
+        <MenuItem
+          icon="milestone"
           onclick={() => {
             if (menu) void createMilestone(menu.rowId, menu.week);
-          }}>Add milestone here</button
+          }}>Add milestone here</MenuItem
         >
       {:else if menu.kind === 'section'}
-        <button
-          role="menuitem"
+        <MenuItem
+          icon="row"
           onclick={() => {
             if (menu) void addRow(menu.id);
-          }}>Add row</button
+          }}>Add row</MenuItem
         >
-        <button
-          role="menuitem"
+        <MenuItem
+          icon="section"
           onclick={() => {
             if (menu)
               void addSection(
@@ -1502,42 +1545,50 @@
                   (section) => section.id === menu!.id,
                 ) + 1,
               );
-          }}>Add section</button
+          }}>Add section</MenuItem
         >
-        <button
-          role="menuitem"
+        <MenuItem
+          icon="rename"
           onclick={() => {
             const id = menu!.id;
             menu = null;
             rename(id);
-          }}>Rename</button
+          }}>Rename</MenuItem
         >
+        <hr />
         {@render colorPalette()}
-        <button
-          role="menuitem"
+        <hr />
+        <MenuItem
+          icon="trash"
+          destructive
           onclick={() => {
             if (menu) void askDelete(menu.id);
-          }}>Delete section…</button
+          }}>Delete section…</MenuItem
         >
       {:else if menu.kind === 'bar' || menu.kind === 'milestone'}
-        <button
-          role="menuitem"
+        <MenuItem
+          icon="rename"
           onclick={() => {
             const id = menu!.id;
             menu = null;
             rename(id);
-          }}>Rename</button
+          }}>Rename</MenuItem
         >
+        <hr />
         {@render colorPalette()}
-        <button role="menuitem" onclick={() => setColor()}
-          >Use section color</button
+        <MenuItem icon="inherit" onclick={() => setColor()}
+          >Use section color</MenuItem
         >
-        <button role="menuitem" onclick={() => deleteItem(menu!.id)}
-          >Delete {menu.kind}</button
+        <hr />
+        <MenuItem
+          icon="trash"
+          destructive
+          shortcut="Del"
+          onclick={() => deleteItem(menu!.id)}>Delete {menu.kind}</MenuItem
         >
       {:else}
-        <button
-          role="menuitem"
+        <MenuItem
+          icon="above"
           onclick={() => {
             const row = document.rows.find((row) => row.id === menu!.id)!;
             void addRow(
@@ -1546,10 +1597,10 @@
                 (item) => item.id === row.id,
               ),
             );
-          }}>Insert row above</button
+          }}>Insert row above</MenuItem
         >
-        <button
-          role="menuitem"
+        <MenuItem
+          icon="below"
           onclick={() => {
             const row = document.rows.find((row) => row.id === menu!.id)!;
             void addRow(
@@ -1558,21 +1609,23 @@
                 (item) => item.id === row.id,
               ) + 1,
             );
-          }}>Insert row below</button
+          }}>Insert row below</MenuItem
         >
-        <button
-          role="menuitem"
+        <MenuItem
+          icon="rename"
           onclick={() => {
             const id = menu!.id;
             menu = null;
             rename(id);
-          }}>Rename</button
+          }}>Rename</MenuItem
         >
-        <button
-          role="menuitem"
+        <hr />
+        <MenuItem
+          icon="trash"
+          destructive
           onclick={() => {
             if (menu) void askDelete(menu.id);
-          }}>Delete row…</button
+          }}>Delete row…</MenuItem
         >
       {/if}
     </div>
@@ -1585,14 +1638,10 @@
     />
   {/if}
   {#if confirmation}
-    <dialog
-      bind:this={dialog}
-      aria-labelledby="delete-title"
-      aria-describedby="delete-description"
-      oncancel={(event) => {
-        event.preventDefault();
-        closeConfirmation();
-      }}
+    <Dialog
+      titleId="delete-title"
+      descriptionId="delete-description"
+      onclose={closeConfirmation}
     >
       <h2 id="delete-title">Delete “{confirmation.name}”?</h2>
       <p id="delete-description">
@@ -1606,12 +1655,15 @@
           : ' in this row'}. You can undo this action.
       </p>
       <div class="dialog-actions">
-        <button onclick={closeConfirmation}>Cancel</button><button
-          class="danger"
-          onclick={confirmDelete}>Delete {confirmation.kind}</button
+        <Button onclick={closeConfirmation}>Cancel</Button><Button
+          variant="danger"
+          onclick={confirmDelete}
+          ><svg class="delete-icon" viewBox="0 0 18 18" aria-hidden="true"
+            ><path d="M3 5h12M7 5V3h4v2M5 5l1 11h6l1-11M8 8v5m2-5v5" /></svg
+          >Delete {confirmation.kind}</Button
         >
       </div>
-    </dialog>
+    </Dialog>
   {/if}
   <span class="notice" role="status">{notice}</span>
   <footer>
@@ -1676,7 +1728,6 @@
     height: 20px;
     background: var(--line);
   }
-  .zoom,
   .mode-switch {
     font-size: 13px;
     font-weight: 600;
@@ -1701,10 +1752,6 @@
   .mode-switch button.active {
     color: var(--ink);
     background: var(--soft);
-  }
-  .zoom {
-    color: var(--ink);
-    cursor: pointer;
   }
   .pannable,
   .panning {
@@ -2004,23 +2051,11 @@
     padding-left: 8px;
     gap: 6px;
   }
-  dialog {
-    border: 1px solid var(--line);
-    border-radius: var(--radius);
-    padding: 24px;
-    max-width: 400px;
-    color: var(--row-ink);
-    background: var(--surface);
-    box-shadow: 0 12px 40px #182e4725;
-  }
-  dialog::backdrop {
-    background: #182e4730;
-  }
-  dialog h2 {
+  #delete-title {
     font-size: 17px;
     margin: 0 0 12px;
   }
-  dialog p {
+  #delete-description {
     font-size: 13px;
     line-height: 1.6;
   }
@@ -2029,18 +2064,17 @@
     justify-content: flex-end;
     gap: 8px;
     margin-top: 20px;
+    padding-top: 18px;
+    border-top: 1px solid var(--line);
   }
-  .dialog-actions button {
-    border: 1px solid var(--line);
-    background: var(--surface);
-    border-radius: var(--radius);
-    padding: 7px 12px;
-    cursor: pointer;
-  }
-  .dialog-actions .danger {
-    background: #a23e42;
-    color: white;
-    border-color: #a23e42;
+  .delete-icon {
+    width: 16px;
+    height: 16px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.4;
+    stroke-linecap: round;
+    stroke-linejoin: round;
   }
   .add-row {
     position: sticky;
@@ -2061,48 +2095,81 @@
   .context-menu {
     position: fixed;
     z-index: 20;
-    width: 210px;
-    padding: 8px;
+    width: 232px;
+    max-height: calc(100dvh - 16px);
+    overflow-y: auto;
+    padding: 6px;
     background: var(--surface);
     border: 1px solid var(--line);
-    border-radius: var(--radius);
-    box-shadow: 0 8px 24px #182e471a;
+    border-radius: 9px;
+    box-shadow:
+      0 12px 32px #182e471a,
+      0 2px 6px #182e470a;
   }
-  .context-menu small {
+  .menu-heading {
+    padding: 6px 9px 5px;
+  }
+  .menu-heading small {
     display: block;
     color: var(--muted);
-    padding: 4px 8px;
+    font-size: 10px;
+    text-transform: capitalize;
+    margin-bottom: 4px;
   }
-  .context-menu button {
+  .menu-heading strong {
     display: block;
-    width: 100%;
-    text-align: left;
-    padding: 7px 8px;
-    border: 0;
-    border-radius: 3px;
-    background: none;
-    cursor: pointer;
+    font-size: 12px;
+    font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
-  .context-menu button:hover,
-  .context-menu button:focus {
-    background: var(--soft);
+  .context-menu hr {
+    border: 0;
+    border-top: 1px solid var(--line);
+    margin: 5px -6px;
+  }
+  .color-group {
+    padding: 7px 9px 8px;
+  }
+  .color-label {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    color: var(--muted);
+    font-size: 10px;
+    margin-bottom: 9px;
+  }
+  .color-label span:first-child {
+    font-weight: 600;
+  }
+  .palette button:focus-visible {
+    outline: 2px solid var(--swatch-ink);
+    outline-offset: 2px;
   }
   .palette {
     display: flex;
-    gap: 7px;
-    padding: 8px;
-    border-top: 1px solid var(--line);
-    margin-top: 4px;
+    justify-content: space-between;
+    gap: 8px;
   }
-  .context-menu .palette button {
-    width: 26px;
-    height: 26px;
+  .palette button {
+    width: 32px;
+    height: 30px;
     padding: 0;
-    border: 1px solid transparent;
+    border: 1px solid #182e4710;
+    border-radius: 5px;
+    color: var(--swatch-ink);
+    background: var(--swatch-fill);
+    box-shadow: inset 0 1px 0 #ffffff30;
+    cursor: pointer;
     text-align: center;
+    font-size: 13px;
   }
-  .context-menu .palette button[aria-checked='true'] {
-    border-color: currentColor;
+  .palette button:focus {
+    box-shadow: inset 0 0 0 1px var(--swatch-ink);
+  }
+  .palette button[aria-checked='true'] {
+    border-color: var(--swatch-ink);
   }
   .notice {
     position: fixed;
