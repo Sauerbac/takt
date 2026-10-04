@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import type { Locator, Page } from '@playwright/test';
-import { settled } from '../helpers';
+import { draw, settled } from '../helpers';
 
 async function freeze(page: Page) {
   await page.evaluate(() => {
@@ -57,6 +57,26 @@ async function press(page: Page, name: string) {
   await page.mouse.down();
   return point;
 }
+
+test('undoing creation in a collapsed section animates expansion even after its reveal item disappears', async ({
+  page,
+}) => {
+  await page.goto('/tests/fixtures/index.html?state=Tall');
+  await draw(page, -1, 1);
+  await page
+    .getByRole('button', { name: 'Collapse Unnamed section', exact: true })
+    .click();
+  const row = page.getByTestId('row-row-1');
+  await settled(row);
+  await freeze(page);
+  await page.keyboard.press('Control+z');
+  const expansion = await halfway(row, 'height');
+  expect(expansion.duration).toBe(150);
+  expect(expansion.height).toBeGreaterThan(0);
+  expect(expansion.height).toBeLessThan(44);
+  await expect(page.getByTestId('bar-a')).toBeVisible();
+  await expect(page.locator('.bar')).toHaveCount(1);
+});
 
 test('row contents track immediately, neighbors glide and reverse, and the carried row settles', async ({
   page,

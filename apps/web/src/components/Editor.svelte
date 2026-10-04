@@ -33,6 +33,7 @@
     LABEL_WIDTH,
     clampZoom,
     zoomFirstWeek,
+    historyLocation,
   } from '../viewport';
   import IconButton from './IconButton.svelte';
   import Bar from './Bar.svelte';
@@ -760,45 +761,32 @@
     const command = history[direction]();
     syncHistory();
     if (command) {
-      const items = [...document.bars, ...document.milestones];
-      view.selectedId = items.some((item) => item.id === command.revealId)
-        ? command.revealId
-        : null;
-      const affectedRow = document.rows.find(
-        (row) =>
-          row.id === command.revealId ||
-          items.some(
-            (item) => item.id === command.revealId && item.rowId === row.id,
-          ),
+      const { selectedId, rowId, sectionId, interval } = historyLocation(
+        document,
+        command,
       );
-      const sectionId =
-        affectedRow?.sectionId ??
-        document.sections.find((section) => section.id === command.revealId)
-          ?.id;
+      view.selectedId = selectedId;
       if (sectionId) collapsed = collapsed.filter((id) => id !== sectionId);
       await tick();
-      const item = items.find((item) => item.id === command.revealId);
-      if (item) {
-        const bar =
-          'boundary' in item
-            ? { start: item.boundary - 1, end: item.boundary }
-            : item;
+      if (interval) {
         const bounds = visibleTimeline();
         const left = weekAt(bounds.left);
         const right = weekAt(bounds.right);
-        if (bar.start < left) view.firstWeek += bar.start - left;
-        else if (bar.end > right)
-          view.firstWeek += Math.min(bar.end - right, bar.start - left);
-        revealRow(item.rowId);
-      } else {
-        if (
-          document.sections.some((section) => section.id === command.revealId)
-        ) {
-          const element = chart.querySelector<HTMLElement>(
-            `[data-section-heading="${command.revealId}"]`,
+        if (interval.start < left) view.firstWeek += interval.start - left;
+        else if (interval.end > right)
+          view.firstWeek += Math.min(
+            interval.end - right,
+            interval.start - left,
           );
-          if (element) revealElement(element);
-        } else revealRow(command.revealId);
+      }
+      if (rowId) revealRow(rowId);
+      else if (sectionId) {
+        const element = chart.querySelector<HTMLElement>(
+          `[data-section-heading="${sectionId}"]`,
+        );
+        if (element) revealElement(element);
+      } else if (document.sections.length === 0) {
+        viewport.scrollTop = 0;
       }
     }
   }

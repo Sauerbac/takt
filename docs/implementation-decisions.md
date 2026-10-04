@@ -302,6 +302,8 @@ Automation can prove specified behavior and regression safety. Initial visual ba
 5. Add calendar setup and mapping, Weeks/Dates history behavior, zoom and panning, colors and inheritance, remaining menus, and full acceptance coverage.
 6. Reconcile the implementation against every acceptance scenario in the UX specification and keep `AGENTS.md` current with the actual commands and repository conventions introduced during the work.
 
+All six steps are implemented. The [acceptance reconciliation](acceptance-coverage.md) maps every UX scenario and the additional interaction contracts to their automated rule, browser, production, visual, and motion coverage. It also records the final history-reveal correction for objects removed by undo/redo. Reveal locations use command snapshots when the primary object no longer exists, without selecting a different item or adding viewport changes to history. The existing concise `AGENTS.md` remains current.
+
 ## 16. Details still intentionally open
 
 The discussion resolved the interaction gaps required to start implementation, but a few lower-level choices remain deliberately tunable or deferred:
