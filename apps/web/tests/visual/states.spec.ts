@@ -8,6 +8,28 @@ import {
   settled,
 } from '../helpers';
 
+test('Apricot calendar reference menus expose setup, replacement and clearing', async ({
+  page,
+}) => {
+  await page.goto('/tests/fixtures/index.html?state=Empty');
+  await page.locator('[data-week="3"]').click({ button: 'right' });
+  await expect(page.getByRole('menu')).toHaveScreenshot(
+    'set-reference-menu.png',
+  );
+  await page.keyboard.press('Escape');
+  await page.goto('/tests/fixtures/index.html?state=CalendarColors');
+  await page.getByRole('button', { name: 'Dates', exact: true }).click({
+    button: 'right',
+  });
+  await expect(page.getByRole('menu')).toHaveScreenshot(
+    'reset-reference-menu.png',
+  );
+  await page.keyboard.press('ArrowUp');
+  await expect(page.getByRole('menu')).toHaveScreenshot(
+    'clear-reference-menu.png',
+  );
+});
+
 test('Apricot context menus group timeline, row, section and milestone actions', async ({
   page,
 }) => {

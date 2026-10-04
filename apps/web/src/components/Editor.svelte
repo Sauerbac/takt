@@ -115,14 +115,14 @@
     y: number;
     rowId: string;
     week: number;
-    kind: 'lane' | 'row' | 'section' | 'bar' | 'milestone';
+    kind: 'lane' | 'row' | 'section' | 'bar' | 'milestone' | 'calendar';
     id: string;
   } | null>(null);
   let menuElement = $state<HTMLDivElement>(null!);
   let menuUsingKeyboard = false;
   const menuName = $derived(
     menu
-      ? menu.kind === 'lane'
+      ? menu.kind === 'lane' || menu.kind === 'calendar'
         ? weekLabel(document, menu.week)
         : [
             ...document.sections,
@@ -1034,6 +1034,44 @@
       date: document.calendar ? dateAt(document.calendar, week) : '',
     };
   }
+  async function calendarMenu(event: MouseEvent, week: number) {
+    event.preventDefault();
+    event.stopPropagation();
+    if (busy) return;
+    finishName(true);
+    calendarTrigger = event.currentTarget as HTMLElement;
+    menu = {
+      x: event.clientX,
+      y: event.clientY,
+      kind: 'calendar',
+      id: '',
+      rowId: '',
+      week,
+    };
+    await focusMenu();
+  }
+  function editReference() {
+    if (!menu || busy) return;
+    const { week } = menu;
+    menu = null;
+    calendarPicker = {
+      week,
+      switchMode: false,
+      date: document.calendar ? dateAt(document.calendar, week) : '',
+    };
+  }
+  function clearReference() {
+    if (busy || !document.calendar) return;
+    const { calendar: _reference, ...withoutReference } = history.document;
+    history.commit(
+      'calendar',
+      { ...withoutReference, display: 'weeks' },
+      'calendar',
+    );
+    menu = null;
+    syncHistory();
+    calendarTrigger?.focus({ preventScroll: true });
+  }
   function closeCalendar() {
     calendarPicker = null;
     // The trigger is disabled while the picker is open. Restore focus only
@@ -1116,6 +1154,7 @@
 </script>
 
 <svelte:window
+  oncontextmenu={(event) => event.preventDefault()}
   onkeydown={keydown}
   onkeyup={(event) => {
     if (event.code === 'Space') spaceHeld = false;
@@ -1209,6 +1248,7 @@
           class:active={document.display === 'dates'}
           aria-pressed={document.display === 'dates'}
           disabled={busy}
+          oncontextmenu={(event) => void calendarMenu(event, 0)}
           onclick={(event) => setDisplay(event, 'dates')}>Dates</button
         >
       </div>
@@ -1249,6 +1289,7 @@
               aria-label={`${weekLabel(document, week)} · Set date for Week ${week}`}
               data-week={week}
               disabled={busy}
+              oncontextmenu={(event) => void calendarMenu(event, week)}
               onclick={(event) => openCalendar(event, week)}
               style:left={`${(week - view.firstWeek) * weekWidth}px`}
               style:width={`${weekWidth}px`}
@@ -1514,12 +1555,25 @@
       }}
     >
       <div class="menu-heading">
-        <small>{menu.kind === 'lane' ? 'Timeline' : menu.kind}</small><strong
-          title={menuName}>{menuName}</strong
-        >
+        <small
+          >{menu.kind === 'lane'
+            ? 'Timeline'
+            : menu.kind === 'calendar'
+              ? 'Calendar reference'
+              : menu.kind}</small
+        ><strong title={menuName}>{menuName}</strong>
       </div>
       <hr />
-      {#if menu.kind === 'lane'}
+      {#if menu.kind === 'calendar'}
+        <MenuItem icon="calendar" onclick={editReference}
+          >{document.calendar ? 'Reset reference' : 'Set reference'}</MenuItem
+        >
+        {#if document.calendar}
+          <MenuItem icon="reset" onclick={clearReference}
+            >Clear reference</MenuItem
+          >
+        {/if}
+      {:else if menu.kind === 'lane'}
         <MenuItem icon="bar" onclick={() => void menuBar()}
           >Add bar here</MenuItem
         >

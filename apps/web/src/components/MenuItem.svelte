@@ -16,7 +16,9 @@
       | 'inherit'
       | 'trash'
       | 'above'
-      | 'below';
+      | 'below'
+      | 'calendar'
+      | 'reset';
     destructive?: boolean;
     shortcut?: string;
     onclick: () => void;
@@ -32,6 +34,8 @@
     trash: 'M3 5h12M7 5V3h4v2M5 5l1 11h6l1-11M8 8v5m2-5v5',
     above: 'M3 13h12v3H3zM9 10V2m-3 3 3-3 3 3',
     below: 'M3 2h12v3H3zM9 8v8m-3-3 3 3 3-3',
+    calendar: 'M3 4h12v12H3zM6 2v4m6-4v4M3 8h12',
+    reset: 'M3 8a6 6 0 1 1 1 6M3 3v5h5',
   };
 </script>
 

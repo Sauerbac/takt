@@ -65,6 +65,8 @@ Each row corresponds to a scenario in UX section 14. Related assertions may shar
 
 ## Reconciliation changes
 
+Calendar-reference menus on week headings and the Dates control are covered by `tests/components/date-menus.spec.ts` in all three browsers: reference setup and replacement at the captured week, draft cancellation, clearing and atomic undo/redo, Week 0 from the toolbar, and browser-menu suppression across editor surfaces. `tests/e2e/calendar-colors.spec.ts` verifies clearing and restoration in the production editor; `tests/visual/states.spec.ts` covers Set reference, Reset/Clear reference, and the keyboard highlight using the shared Apricot menu.
+
 The context-menu refinement retains existing commands. `tests/components/colors-menus.spec.ts` checks measured placement at the right and bottom edges, keyboard focus across grouped actions and swatches, neutral mouse opening, and one shared highlight during pointer/keyboard handoff. `tests/visual/states.spec.ts` covers the target headings, icons, palette, separators and destructive actions for all five menu targets, plus the shared deletion buttons.
 
 The custom-control refinement adds `tests/components/custom-controls.spec.ts` for the zoom listbox, keyboard and outside dismissal, intermediate wheel values, centered calendar backdrop, focus containment, date drafts, leap-day/month navigation, Today, year limits and chevron motion. `src/components/calendar-grid.test.ts` verifies grid arithmetic and invalid dates. Visual baselines include the open zoom menu, selected calendar draft, full date dialog and shared confirmation buttons.
