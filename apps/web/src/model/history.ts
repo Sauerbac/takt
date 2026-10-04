@@ -14,7 +14,10 @@ export interface Command {
     | 'add-row'
     | 'add-section'
     | 'move-row'
-    | 'move-section';
+    | 'move-section'
+    | 'calendar'
+    | 'display'
+    | 'color';
   readonly before: ChartDocument;
   readonly after: ChartDocument;
   readonly revealId: string;

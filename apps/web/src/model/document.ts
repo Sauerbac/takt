@@ -1,9 +1,16 @@
+export type Color = 'apricot' | 'lavender' | 'sea-blue' | 'slate' | 'rose';
+export interface CalendarReference {
+  readonly week: number;
+  readonly date: string;
+}
+
 export interface Bar {
   readonly id: string;
   readonly rowId: string;
   readonly start: number;
   readonly end: number;
   readonly name: string;
+  readonly color?: Color;
 }
 
 export interface Row {
@@ -15,6 +22,7 @@ export interface Row {
 export interface Section {
   readonly id: string;
   readonly name: string;
+  readonly color?: Color;
 }
 
 // A milestone's boundary is the start of the following week (Week 2 ends at 3).
@@ -23,9 +31,12 @@ export interface Milestone {
   readonly rowId: string;
   readonly boundary: number;
   readonly name: string;
+  readonly color?: Color;
 }
 
 export interface ChartDocument {
+  readonly calendar?: CalendarReference;
+  readonly display?: 'weeks' | 'dates';
   readonly sections: readonly Section[];
   readonly rows: readonly Row[];
   readonly bars: readonly Bar[];
@@ -40,6 +51,7 @@ export const emptyDocument = (): ChartDocument => ({
 });
 export const copyDocument = (document: ChartDocument): ChartDocument => ({
   ...document,
+  ...(document.calendar ? { calendar: { ...document.calendar } } : {}),
   sections: document.sections.map((section) => ({ ...section })),
   rows: document.rows.map((row) => ({ ...row })),
   bars: document.bars.map((bar) => ({ ...bar })),
@@ -47,6 +59,27 @@ export const copyDocument = (document: ChartDocument): ChartDocument => ({
 });
 
 export function assertDocument(document: ChartDocument): void {
+  if (document.display === 'dates' && !document.calendar)
+    throw new Error('Calendar display requires a reference');
+  if (
+    document.calendar &&
+    (!Number.isInteger(document.calendar.week) ||
+      !/^\d{4}-\d{2}-\d{2}$/.test(document.calendar.date) ||
+      !Number.isFinite(Date.parse(document.calendar.date)) ||
+      new Date(document.calendar.date).toISOString().slice(0, 10) !==
+        document.calendar.date)
+  )
+    throw new Error('Invalid calendar reference');
+  for (const item of [
+    ...document.sections,
+    ...document.bars,
+    ...document.milestones,
+  ])
+    if (
+      item.color !== undefined &&
+      !['apricot', 'lavender', 'sea-blue', 'slate', 'rose'].includes(item.color)
+    )
+      throw new Error('Invalid color');
   const ids = new Set<string>();
   const rowIds = new Set<string>();
   const sectionIds = new Set<string>();

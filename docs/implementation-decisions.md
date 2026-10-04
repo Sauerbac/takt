@@ -65,7 +65,7 @@ The first slice places document invariants, collision rules, and atomic history 
 
 The cross-row slice adds explicit row IDs, an ordered row collection, and a separate milestone collection. Milestone boundaries store the start of the following week. The visible Add row command and its separate inline naming action make cross-row operations available in the production editor.
 
-Render items in a stable keyed overlay across all lanes, clipping it at the timeline column. Changing an item's row must not remount its captured pointer surface or interrupt its settlement animation. Lane geometry supplies destination hit testing; the adapter tracks the carried item's painted vertical offset separately from its snapped row. Empty-lane menus retain their row/week at opening. Structural menus retain container identity for insertion, naming, and deletion. General item menus remain later work.
+Render items in a stable keyed overlay across all lanes, clipping it at the timeline column. Changing an item's row must not remount its captured pointer surface or interrupt its settlement animation. Lane geometry supplies destination hit testing; the adapter tracks the carried item's painted vertical offset separately from its snapped row. Empty-lane menus retain their row/week at opening. Structural and item menus retain object identity for insertion, naming, recoloring, inheritance reset, and deletion.
 
 The structural slice adds an ordered section collection and explicit section ownership on rows. Row order within a section comes from the ordered row collection; section movement preserves every row and item. `model/structure.ts` owns insertion, movement, and cascading container deletion. Empty sections and a document with no sections are valid; the bottom Add section control remains available. New sections start empty, as recorded in the UX specification.
 
@@ -198,6 +198,14 @@ If the user selects **Dates** without a calendar reference, open a compact date-
 
 Changing between Weeks and Dates is an undoable editor action. Calendar-reference changes are also undoable. Scrolling, panning, and zooming are view changes outside document history.
 
+`model/calendar.ts` uses UTC date-only arithmetic for seven-day mapping and inclusive bar/milestone end dates, avoiding daylight-saving shifts. Documents optionally carry a week/date reference and display mode; omitted mode means Weeks. Heading setup preserves the display mode. The first Dates setup commits the reference and display together as one action; later display/reference changes have separate history entries. `CalendarPicker` provides an anchored native modal dialog with a date input, focus containment, cancellation, outside dismissal, and focus restoration after its trigger is re-enabled. The UX specification records the chosen date format.
+
+Zoom is a viewport multiplier over the default week width. Toolbar presets are 50%, 75%, 100%, 125%, 150%, and 200%; wheel zoom uses a clamped exponential scale and a non-passive native wheel listener. Coordinate conversion accounts for the native horizontal scroll offset when anchoring at the visible center or pointer. Headings render enough cells for the current zoom. Scale changes suppress item settlement transitions for two animation frames to keep the whole chart synchronized; panning translates timeline content immediately. Space-drag captures the stable viewport, retains the view on cancellation, and never starts a document transaction. Horizontal wheel input (including Shift-wheel) uses native overflow first, then changes the fractional first week to continue beyond either edge; normal vertical scrolling stays native. Zoom controls are disabled during document gestures so their pickup scale remains stable.
+
+`model/colors.ts` resolves item overrides against the item's current row/section on every render. Missing section colors use Apricot. The fixed palette stores semantic color keys and paired fill/ink values from the prototype; no row colors or custom color input are added. Inheritance reset removes the override property. Moves preserve explicit overrides and dynamically adopt destination colors for inherited items. Section and item palettes share the context-menu keyboard navigation; right-click selects the item, with Rename, Use section color, and immediate item deletion commands.
+
+The `CalendarColors` fixture exposes nonzero calendar anchoring, two section colors, inherited bars/milestones, and an override. Coverage includes rule arithmetic and history, three-browser date setup and dismissal, anchored zoom after native scrolling, editing at both zoom limits, Space-pan cancellation and pointer attachment, cross-section inheritance, menu keyboard behavior, production integration, and screenshots for calendar labels, palette, date setup, and minimum zoom.
+
 ## 10. Selection, naming, deletion, and shortcuts
 
 Clicking empty chart space clears selection. Right-clicking an item selects it before opening its context menu. A context menu opened over empty lane space records and retains the exact row and week to which its commands apply.
@@ -298,11 +306,9 @@ Automation can prove specified behavior and regression safety. Initial visual ba
 
 The discussion resolved the interaction gaps required to start implementation, but a few lower-level choices remain deliberately tunable or deferred:
 
-- the exact calendar date display format;
 - the exact zoom step and wheel sensitivity within the agreed range;
 - final animation easing and whether timings differ by operation;
 - the precise collapsed-section hover delay around the initial half-second value;
-- whether the first palette supports arbitrary custom-color entry in addition to its fixed colors;
 - the concrete unstyled primitive library, if any, after evaluating current Svelte support;
 - persistence, document management, export, a home screen, and desktop packaging.
 

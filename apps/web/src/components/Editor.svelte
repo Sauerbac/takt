@@ -1,7 +1,14 @@
 <script lang="ts">
   import { onDestroy, tick } from 'svelte';
   import { emptyDocument } from '../model/document';
-  import type { ChartDocument } from '../model/document';
+  import type { ChartDocument, Color } from '../model/document';
+  import {
+    dateAt,
+    weekLabel,
+    barTiming,
+    milestoneTiming,
+  } from '../model/calendar';
+  import { palette, colorKeys, itemColor, recolor } from '../model/colors';
   import { History } from '../model/history';
   import { Gesture } from '../interaction/gesture';
   import type { GestureKind } from '../interaction/gesture';
@@ -24,10 +31,13 @@
     BAR_INSET,
     edgeVelocity,
     LABEL_WIDTH,
+    clampZoom,
+    zoomFirstWeek,
   } from '../viewport';
   import IconButton from './IconButton.svelte';
   import Bar from './Bar.svelte';
   import Milestone from './Milestone.svelte';
+  import CalendarPicker from './CalendarPicker.svelte';
 
   let { initial = emptyDocument() }: { initial?: ChartDocument } = $props();
   // The initial document seeds this editor instance once; remount to open another document.
@@ -41,6 +51,23 @@
     history.document.sections.map((section) => section.id),
   );
   let view = $state(initialViewport());
+  let calendarPicker = $state<{
+    week: number;
+    date: string;
+    x: number;
+    y: number;
+    switchMode: boolean;
+  } | null>(null);
+  let calendarTrigger: HTMLElement | null = null;
+  let spaceHeld = $state(false);
+  let changingScale = $state(false);
+  let scaleFrame: number | null = null;
+  let pan = $state.raw<{
+    x: number;
+    y: number;
+    firstWeek: number;
+    scrollTop: number;
+  } | null>(null);
   let gesture = $state.raw<Gesture | MilestoneGesture | null>(null);
   let motion = $state<{
     meaningful: boolean;
@@ -86,16 +113,16 @@
     y: number;
     rowId: string;
     week: number;
-    kind: 'lane' | 'row' | 'section';
+    kind: 'lane' | 'row' | 'section' | 'bar' | 'milestone';
     id: string;
   } | null>(null);
   let menuElement = $state<HTMLDivElement>(null!);
   let notice = $state('');
-  const weekWidth = $derived(laneWidth / WEEK_COUNT);
+  const weekWidth = $derived((laneWidth / WEEK_COUNT) * view.zoom);
   const timelineShift = $derived((FIRST_WEEK - view.firstWeek) * weekWidth);
   const weeks = $derived(
     Array.from(
-      { length: WEEK_COUNT + 1 },
+      { length: Math.ceil(WEEK_COUNT / view.zoom) + 2 },
       (_, i) => Math.floor(view.firstWeek) + i,
     ),
   );
@@ -120,7 +147,19 @@
       (row) => row.visible && row.top + 54 + 44 > visibleScrollTop,
     )?.id,
   );
-  const busy = $derived(!!gesture || !!structural || !!confirmation);
+  const busy = $derived(
+    !!gesture || !!structural || !!confirmation || !!pan || !!calendarPicker,
+  );
+  const menuColor = $derived(
+    menu
+      ? menu.kind === 'section'
+        ? (document.sections.find((section) => section.id === menu!.id)
+            ?.color ?? 'apricot')
+        : [...document.bars, ...document.milestones].find(
+            (item) => item.id === menu!.id,
+          )?.color
+      : undefined,
+  );
   const carriesRow = (id: string) =>
     !!structural &&
     structuralMeaningful &&
@@ -153,6 +192,7 @@
     stopScrolling();
     stopPushTimer();
     stopHoverTimer();
+    if (scaleFrame !== null) cancelAnimationFrame(scaleFrame);
   });
 
   function syncHistory() {
@@ -192,6 +232,10 @@
     id: string = crypto.randomUUID(),
     rowId = document.rows[0]?.id,
   ) {
+    if (spaceHeld) {
+      startPan(event);
+      return;
+    }
     if (event.button !== 0 || busy || !event.isPrimary) return;
     event.preventDefault();
     event.stopPropagation();
@@ -252,6 +296,11 @@
     captureOwner.setPointerCapture(event.pointerId);
   }
   function move(event: PointerEvent) {
+    if (pan && event.pointerId === pointerId) {
+      view.firstWeek = pan.firstWeek - (event.clientX - pan.x) / weekWidth;
+      viewport.scrollTop = pan.scrollTop - (event.clientY - pan.y);
+      return;
+    }
     if ((!gesture && !structural) || event.pointerId !== pointerId) return;
     pointer = { x: event.clientX, y: event.clientY };
     if (structural) updateStructure();
@@ -404,6 +453,12 @@
   }
   function cancel() {
     menu = null;
+    spaceHeld = false;
+    if (pan) {
+      pan = null;
+      releaseCapture();
+      return;
+    }
     if (structural) {
       document = structural.cancel();
       collapsed = structural.originalCollapsed;
@@ -419,6 +474,11 @@
     releaseCapture();
   }
   async function end(event: PointerEvent) {
+    if (pan && event.pointerId === pointerId) {
+      pan = null;
+      releaseCapture();
+      return;
+    }
     if (structural && event.pointerId === pointerId) {
       const transaction = structural;
       history.commit(transaction.kind, transaction.commit(), transaction.id);
@@ -516,6 +576,10 @@
     kind: StructureKind,
     id: string,
   ) {
+    if (spaceHeld) {
+      startPan(event);
+      return;
+    }
     if (event.button !== 0 || busy || !event.isPrimary) return;
     event.preventDefault();
     event.stopPropagation();
@@ -613,7 +677,7 @@
     view.selectedId = id;
     menu = {
       x: Math.max(0, Math.min(event.clientX, window.innerWidth - 210)),
-      y: Math.max(0, Math.min(event.clientY, window.innerHeight - 195)),
+      y: Math.max(0, Math.min(event.clientY, window.innerHeight - 260)),
       rowId: id,
       week: 0,
       kind,
@@ -745,6 +809,19 @@
       (event.target instanceof HTMLElement && event.target.isContentEditable)
     )
       return;
+    if (
+      event.code === 'Space' &&
+      (!busy || !!pan) &&
+      !menu &&
+      (!(event.target instanceof Element) ||
+        !event.target.closest('button, select') ||
+        !!event.target.closest('.bar, .milestone')) &&
+      viewport.contains(event.target as Node)
+    ) {
+      event.preventDefault();
+      spaceHeld = true;
+      return;
+    }
     if (event.key === 'Escape') {
       if (menu) {
         menu = null;
@@ -774,20 +851,14 @@
         void askDelete(id);
         return;
       }
-      history.commit(
-        'delete',
-        {
-          ...document,
-          bars: document.bars.filter((bar) => bar.id !== id),
-          milestones: document.milestones.filter((item) => item.id !== id),
-        },
-        id,
-      );
-      view.selectedId = null;
-      syncHistory();
+      deleteItem(id);
     }
   }
   function backgroundPress(event: PointerEvent) {
+    if (spaceHeld && !(event.target as Element).closest('input, button')) {
+      startPan(event);
+      return;
+    }
     if (
       event.button !== 0 ||
       busy ||
@@ -870,10 +941,180 @@
     await tick();
     menuElement.querySelector<HTMLButtonElement>('button')?.focus();
   }
+
+  function startPan(event: PointerEvent) {
+    if (event.button !== 0 || busy || !event.isPrimary) return;
+    event.preventDefault();
+    event.stopPropagation();
+    finishName(true);
+    menu = null;
+    pan = {
+      x: event.clientX,
+      y: event.clientY,
+      firstWeek: view.firstWeek,
+      scrollTop: viewport.scrollTop,
+    };
+    pointerId = event.pointerId;
+    captureOwner = viewport;
+    viewport.setPointerCapture(event.pointerId);
+  }
+  function zoomTo(value: number, anchor?: number) {
+    if (busy) return;
+    const bounds = visibleTimeline();
+    const left = chart.getBoundingClientRect().left + LABEL_WIDTH;
+    const x = (anchor ?? (bounds.left + bounds.right) / 2) - left;
+    const zoom = clampZoom(value);
+    if (zoom === view.zoom) return;
+    changingScale = true;
+    view.firstWeek = zoomFirstWeek(
+      view.firstWeek,
+      weekWidth,
+      (laneWidth / WEEK_COUNT) * zoom,
+      x,
+    );
+    view.zoom = zoom;
+    if (scaleFrame !== null) cancelAnimationFrame(scaleFrame);
+    // A view scale changes every item together; disable document settlement until
+    // the browser has painted the new scale, so the anchor remains attached.
+    scaleFrame = requestAnimationFrame(() => {
+      scaleFrame = requestAnimationFrame(() => {
+        changingScale = false;
+        scaleFrame = null;
+      });
+    });
+  }
+  // Non-passive native listener prevents browser zoom and preserves normal vertical scrolling.
+  function navigation(node: HTMLElement) {
+    const wheel = (event: WheelEvent) => {
+      if (event.ctrlKey || event.metaKey) {
+        event.preventDefault();
+        if (event.clientX >= visibleTimeline().left)
+          zoomTo(
+            view.zoom *
+              Math.exp(-event.deltaY * (event.deltaMode === 1 ? 0.03 : 0.002)),
+            event.clientX,
+          );
+      } else if ((event.deltaX || (event.shiftKey && event.deltaY)) && !busy) {
+        event.preventDefault();
+        const delta =
+          (event.deltaX || event.deltaY) * (event.deltaMode === 1 ? 16 : 1);
+        const before = viewport.scrollLeft;
+        viewport.scrollLeft += delta;
+        // Use native overflow first; continue beyond either edge through the
+        // unbounded timeline coordinate without shifting the pinned labels.
+        view.firstWeek += (delta - (viewport.scrollLeft - before)) / weekWidth;
+        if (!event.shiftKey)
+          viewport.scrollTop += event.deltaY * (event.deltaMode === 1 ? 16 : 1);
+      }
+    };
+    node.addEventListener('wheel', wheel, { passive: false });
+    return {
+      destroy() {
+        node.removeEventListener('wheel', wheel);
+      },
+    };
+  }
+  function openCalendar(event: MouseEvent, week: number, switchMode = false) {
+    if (busy) return;
+    finishName(true);
+    menu = null;
+    calendarTrigger = event.currentTarget as HTMLElement;
+    const bounds = calendarTrigger.getBoundingClientRect();
+    calendarPicker = {
+      week,
+      switchMode,
+      x: bounds.left,
+      y: bounds.bottom + 6,
+      date: document.calendar ? dateAt(document.calendar, week) : '',
+    };
+  }
+  function closeCalendar() {
+    calendarPicker = null;
+    // The trigger is disabled while the picker is open. Restore focus only
+    // after the overlay has unmounted and the controls are enabled again.
+    void tick().then(() => calendarTrigger?.focus({ preventScroll: true }));
+  }
+  function setCalendar(date: string) {
+    if (!calendarPicker) return;
+    const { week, switchMode } = calendarPicker;
+    history.commit(
+      'calendar',
+      {
+        ...history.document,
+        calendar: { week, date },
+        ...(switchMode ? { display: 'dates' as const } : {}),
+      },
+      'calendar',
+    );
+    closeCalendar();
+    syncHistory();
+  }
+  function setDisplay(event: MouseEvent, display: 'weeks' | 'dates') {
+    if (busy) return;
+    if (display === 'dates' && !document.calendar) {
+      openCalendar(event, 0, true);
+      return;
+    }
+    if ((document.display ?? 'weeks') === display) return;
+    finishName(true);
+    menu = null;
+    history.commit('display', { ...history.document, display }, 'calendar');
+    syncHistory();
+  }
+  async function itemMenu(
+    event: MouseEvent,
+    kind: 'bar' | 'milestone',
+    id: string,
+  ) {
+    event.preventDefault();
+    event.stopPropagation();
+    if (busy) return;
+    finishName(true);
+    view.selectedId = id;
+    menu = {
+      x: Math.max(0, Math.min(event.clientX, window.innerWidth - 210)),
+      y: Math.max(0, Math.min(event.clientY, window.innerHeight - 240)),
+      kind,
+      id,
+      rowId: '',
+      week: 0,
+    };
+    await tick();
+    menuElement.querySelector<HTMLButtonElement>('button')?.focus();
+  }
+  function setColor(color?: Color) {
+    if (!menu || busy) return;
+    const id = menu.id;
+    history.commit('color', recolor(history.document, id, color), id);
+    menu = null;
+    syncHistory();
+    viewport.focus({ preventScroll: true });
+  }
+  function deleteItem(id: string) {
+    if (busy) return;
+    menu = null;
+    history.commit(
+      'delete',
+      {
+        ...history.document,
+        bars: history.document.bars.filter((bar) => bar.id !== id),
+        milestones: history.document.milestones.filter(
+          (item) => item.id !== id,
+        ),
+      },
+      id,
+    );
+    view.selectedId = null;
+    syncHistory();
+    viewport.focus({ preventScroll: true });
+  }
 </script>
 
 <svelte:window
   onkeydown={keydown}
+  onkeyup={(event) => {
+    if (event.code === 'Space') spaceHeld = false;
+  }}
   onblur={cancel}
   onpointerdown={(event) => {
     if (menu && !menuElement.contains(event.target as Node)) menu = null;
@@ -897,6 +1138,21 @@
   />
 {/snippet}
 
+{#snippet colorPalette()}
+  <div class="palette" role="group" aria-label="Color palette">
+    {#each colorKeys as color}
+      <button
+        role="menuitemradio"
+        aria-label={palette[color].name}
+        aria-checked={menuColor === color}
+        style:background={palette[color].fill}
+        style:color={palette[color].ink}
+        onclick={() => setColor(color)}>{menuColor === color ? '✓' : ''}</button
+      >
+    {/each}
+  </div>
+{/snippet}
+
 <main class="shell">
   <header>
     <div class="brand" aria-label="Takt">
@@ -917,13 +1173,45 @@
           onclick={() => void travel('redo')}
         />
       </div>
-      <span class="divider"></span><span class="mode">Weeks</span>
+      <span class="divider"></span>
+      <select
+        class="zoom"
+        aria-label="Zoom"
+        disabled={busy}
+        value={view.zoom}
+        onchange={(event) => zoomTo(Number(event.currentTarget.value))}
+      >
+        {#if ![0.5, 0.75, 1, 1.25, 1.5, 2].includes(view.zoom)}<option
+            value={view.zoom}>{Math.round(view.zoom * 100)}%</option
+          >{/if}
+        {#each [0.5, 0.75, 1, 1.25, 1.5, 2] as zoom}<option value={zoom}
+            >{zoom * 100}%</option
+          >{/each}
+      </select>
+      <span class="divider"></span>
+      <div class="mode-switch" aria-label="Timeline display">
+        <button
+          class:active={document.display !== 'dates'}
+          aria-pressed={document.display !== 'dates'}
+          disabled={busy}
+          onclick={(event) => setDisplay(event, 'weeks')}>Weeks</button
+        >
+        <button
+          class:active={document.display === 'dates'}
+          aria-pressed={document.display === 'dates'}
+          disabled={busy}
+          onclick={(event) => setDisplay(event, 'dates')}>Dates</button
+        >
+      </div>
     </div>
   </header>
   <!-- The scroll region is focusable so keyboard users can scroll its overflow. -->
   <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
   <div
     class="viewport"
+    class:pannable={spaceHeld}
+    class:panning={!!pan}
+    use:navigation
     bind:this={viewport}
     role="region"
     aria-label="Whole-week Gantt chart"
@@ -946,13 +1234,22 @@
       <div class="chart-header">
         <div class="lane-heading">Sections &amp; rows</div>
         <div class="weeks" bind:clientWidth={laneWidth}>
-          {#each weeks as week}<div
+          {#each weeks as week}<button
               class="week"
+              class:date-week={document.display === 'dates'}
+              aria-label={`${weekLabel(document, week)} · Set date for Week ${week}`}
+              data-week={week}
+              disabled={busy}
+              onclick={(event) => openCalendar(event, week)}
               style:left={`${(week - view.firstWeek) * weekWidth}px`}
               style:width={`${weekWidth}px`}
             >
-              Week {week < 0 ? `−${-week}` : week}
-            </div>{/each}
+              {#if document.display === 'dates'}
+                {@const label = weekLabel(document, week)}
+                <span>{label.slice(0, -5)}</span><small>{label.slice(-4)}</small
+                >
+              {:else}{weekLabel(document, week)}{/if}
+            </button>{/each}
         </div>
       </div>
       {#each renderedSections as section (section.id)}
@@ -978,7 +1275,13 @@
                 <path d="m6 4 4 4-4 4" />
               </svg>
             </button>
-            <span class="section-color"></span>
+            <span
+              class="section-color"
+              style:background={palette[
+                document.sections.find((item) => item.id === section.id)
+                  ?.color ?? 'apricot'
+              ].ink}
+            ></span>
             {#if view.editingId === section.id}
               {@render nameInput('Section')}
             {:else}
@@ -1046,6 +1349,7 @@
             data-testid="lane"
             data-row-lane={row.id}
             data-first-week={view.firstWeek}
+            data-week-width={weekWidth}
             onpointerdown={(event) =>
               start(event, 'draw', crypto.randomUUID(), row.id)}
             ondblclick={(event) => {
@@ -1082,6 +1386,7 @@
       {/each}
       <div
         class="items"
+        class:changingScale
         style:width={`${laneWidth}px`}
         style:height={`${structural ? Math.max(layout.height, structuralTop + 200) : layout.height}px`}
       >
@@ -1095,6 +1400,9 @@
                 ? { ...bar, ...motion.proposal }
                 : bar}
               {weekWidth}
+              color={palette[itemColor(shown, bar)]}
+              timing={barTiming(shown, bar.start, bar.end)}
+              onmenu={itemMenu}
               visible={rowVisible(bar.rowId)}
               carried={carriesRow(bar.rowId)}
               top={gesture?.id === bar.id && movingBetweenRows
@@ -1125,6 +1433,9 @@
                   }
                 : item}
               {weekWidth}
+              color={palette[itemColor(shown, item)]}
+              timing={milestoneTiming(shown, item.boundary)}
+              onmenu={itemMenu}
               visible={rowVisible(item.rowId)}
               carried={carriesRow(item.rowId)}
               top={gesture?.id === item.id ? trackingTop : rowTop(item.rowId)}
@@ -1177,7 +1488,7 @@
       }}
     >
       {#if menu.kind === 'lane'}
-        <small>Week {menu.week}</small>
+        <small>{weekLabel(document, menu.week)}</small>
         <button role="menuitem" onclick={() => void menuBar()}
           >Add bar here</button
         >
@@ -1213,11 +1524,28 @@
             rename(id);
           }}>Rename</button
         >
+        {@render colorPalette()}
         <button
           role="menuitem"
           onclick={() => {
             if (menu) void askDelete(menu.id);
           }}>Delete section…</button
+        >
+      {:else if menu.kind === 'bar' || menu.kind === 'milestone'}
+        <button
+          role="menuitem"
+          onclick={() => {
+            const id = menu!.id;
+            menu = null;
+            rename(id);
+          }}>Rename</button
+        >
+        {@render colorPalette()}
+        <button role="menuitem" onclick={() => setColor()}
+          >Use section color</button
+        >
+        <button role="menuitem" onclick={() => deleteItem(menu!.id)}
+          >Delete {menu.kind}</button
         >
       {:else}
         <button
@@ -1260,6 +1588,13 @@
         >
       {/if}
     </div>
+  {/if}
+  {#if calendarPicker}
+    <CalendarPicker
+      {...calendarPicker}
+      onchoose={setCalendar}
+      onclose={closeCalendar}
+    />
   {/if}
   {#if confirmation}
     <dialog
@@ -1353,13 +1688,50 @@
     height: 20px;
     background: var(--line);
   }
-  .mode {
+  .zoom,
+  .mode-switch {
     font-size: 13px;
     font-weight: 600;
     padding: 7px 11px;
     background: var(--surface);
     border: 1px solid var(--line);
     border-radius: var(--radius);
+  }
+  .mode-switch {
+    display: flex;
+    padding: 3px;
+    gap: 2px;
+  }
+  .mode-switch button {
+    border: 0;
+    padding: 5px 9px;
+    border-radius: 3px;
+    background: transparent;
+    color: var(--muted);
+    cursor: pointer;
+  }
+  .mode-switch button.active {
+    color: var(--ink);
+    background: var(--soft);
+  }
+  .zoom {
+    color: var(--ink);
+    cursor: pointer;
+  }
+  .pannable,
+  .panning {
+    cursor: grab;
+    user-select: none;
+  }
+  .panning {
+    cursor: grabbing;
+  }
+  .pannable :global(.bar),
+  .pannable :global(.handle),
+  .pannable :global(.milestone),
+  .pannable .row-name,
+  .pannable .section-name {
+    cursor: inherit;
   }
   .viewport {
     outline: none;
@@ -1415,9 +1787,24 @@
     align-items: center;
     justify-content: center;
     border-right: 1px solid var(--grid);
+    border-top: 0;
+    border-left: 0;
+    border-bottom: 0;
+    background: transparent;
+    padding: 0;
+    cursor: pointer;
     font-size: 13px;
     color: var(--row-ink);
     font-weight: 500;
+  }
+  .date-week {
+    flex-direction: column;
+    gap: 2px;
+    font-size: 11px;
+  }
+  .date-week small {
+    color: var(--muted);
+    font-size: 9px;
   }
   .section {
     position: absolute;
@@ -1506,6 +1893,10 @@
     top: 54px;
     overflow: clip;
     pointer-events: none;
+  }
+  .changingScale :global(.bar),
+  .changingScale :global(.milestone) {
+    transition: none;
   }
   .row-name,
   .section-name {
@@ -1707,6 +2098,23 @@
   .context-menu button:hover,
   .context-menu button:focus {
     background: var(--soft);
+  }
+  .palette {
+    display: flex;
+    gap: 7px;
+    padding: 8px;
+    border-top: 1px solid var(--line);
+    margin-top: 4px;
+  }
+  .context-menu .palette button {
+    width: 26px;
+    height: 26px;
+    padding: 0;
+    border: 1px solid transparent;
+    text-align: center;
+  }
+  .context-menu .palette button[aria-checked='true'] {
+    border-color: currentColor;
   }
   .notice {
     position: fixed;

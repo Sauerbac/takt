@@ -1,10 +1,37 @@
 import { mount } from 'svelte';
 import Editor from '../../src/components/Editor.svelte';
 import { emptyDocument } from '../../src/model/document';
+import type { ChartDocument } from '../../src/model/document';
 import '../../src/tokens.css';
 
 // Named, deterministic component states. This entry is never part of the production build.
-const states = {
+const states: Record<string, ChartDocument> = {
+  CalendarColors: {
+    ...emptyDocument(),
+    display: 'dates',
+    calendar: { week: 3, date: '2026-10-05' },
+    sections: [
+      { id: 'section-1', name: 'Research', color: 'lavender' },
+      { id: 'section-2', name: 'Delivery', color: 'sea-blue' },
+    ],
+    rows: [
+      { id: 'row-1', sectionId: 'section-1', name: 'Discovery' },
+      { id: 'row-2', sectionId: 'section-2', name: 'Build' },
+    ],
+    bars: [
+      { id: 'a', rowId: 'row-1', start: 0, end: 2, name: 'Explore' },
+      {
+        id: 'b',
+        rowId: 'row-1',
+        start: 2,
+        end: 4,
+        name: 'Review',
+        color: 'apricot',
+      },
+      { id: 'c', rowId: 'row-2', start: 3, end: 5, name: 'Implement' },
+    ],
+    milestones: [{ id: 'm', rowId: 'row-1', boundary: 5, name: 'Approved' }],
+  },
   Empty: emptyDocument(),
   TallSections: {
     ...emptyDocument(),

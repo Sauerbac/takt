@@ -6,10 +6,11 @@ export async function laneGeometry(page: Page, row = 0) {
   const bounds = await element.boundingBox();
   if (!bounds) throw new Error('Timeline is not visible');
   const firstWeek = Number(await element.getAttribute('data-first-week'));
+  const weekWidth = Number(await element.getAttribute('data-week-width'));
   return {
-    x: (week: number) => bounds.x + ((week - firstWeek) * bounds.width) / 12,
+    x: (week: number) => bounds.x + (week - firstWeek) * weekWidth,
     y: bounds.y + 22,
-    width: bounds.width / 12,
+    width: weekWidth,
   };
 }
 export async function draw(

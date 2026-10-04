@@ -1,8 +1,26 @@
 import { expect, it } from 'vitest';
-import { displayedInterval, pointerWeek } from './viewport';
+import {
+  clampZoom,
+  zoomFirstWeek,
+  displayedInterval,
+  pointerWeek,
+} from './viewport';
 import { Gesture } from './interaction/gesture';
 import { emptyDocument } from './model/document';
 import { History } from './model/history';
+
+it('preserves pointer or center time across clamped zoom levels and scrolled geometry', () => {
+  expect(clampZoom(0.1)).toBe(0.5);
+  expect(clampZoom(3)).toBe(2);
+  for (const first of [-20.4, -2, 3.5])
+    for (const anchor of [0, 100, 450, 900])
+      for (const scale of [0.5, 0.75, 1, 1.25, 2]) {
+        const next = zoomFirstWeek(first, 75, 75 * scale, anchor);
+        expect(pointerWeek(anchor, 0, 75 * scale, next)).toBeCloseTo(
+          pointerWeek(anchor, 0, 75, first),
+        );
+      }
+});
 
 it('maps painted pickup geometry through a fractional viewport without shifting document weeks', () => {
   const firstWeek = -6.25;

@@ -118,7 +118,7 @@ The chosen date does not have to be a Monday. Each week is a seven-day period st
 
 Calendar mode labels weeks by their starting dates. Bars still occupy whole weeks. Switching between relative and calendar displays preserves their positions and the calendar reference.
 
-Selecting calendar mode before a reference exists opens a compact date-picker popover. The selected date represents the start of Week 0. Cancelling the popover leaves relative-week mode selected. After a reference exists, selecting a week heading can set or replace the date assigned to the start of that specific week; the remaining labels are derived in seven-day increments. The exact date-display format remains open.
+Selecting calendar mode before a reference exists opens a compact date-picker popover. The selected date represents the start of Week 0. Cancelling the popover leaves relative-week mode selected. Selecting a week heading can set or replace the date assigned to the start of that specific week; the remaining labels are derived in seven-day increments. Setting a reference from a heading preserves the current display mode. Dates use an English day–short-month–year format, for example **5 Oct 2026**; headings may put the year on a second line. The user chooses the date; the example is not a default reference.
 
 ### 5.3 Milestone timing
 
@@ -371,7 +371,7 @@ The inheritance rules are:
 - Moving an item or an entire row to another section adopts the destination color for items without overrides.
 - Explicit overrides survive movement between sections.
 
-Whether the palette includes arbitrary custom-color entry in the first draft is not settled.
+The first draft uses a fixed Apricot palette: apricot, lavender, sea blue, slate, and rose. Arbitrary custom-color entry is deferred.
 
 ## 13. Deletion and undo/redo
 
@@ -448,10 +448,8 @@ Keyboard operation covers standard controls, inline naming, deletion, cancellati
 
 The interaction decisions required to begin implementation are settled. The following lower-level details remain intentionally tunable:
 
-1. The exact calendar date-display format.
-2. Exact zoom steps and wheel sensitivity within the agreed range.
-3. Final animation easing and whether individual operations need timings different from the initial 150 ms value.
-4. The precise collapsed-section hover delay around the initial half-second value.
-5. Whether the first color palette permits arbitrary custom-color entry in addition to fixed choices.
+1. Exact zoom steps and wheel sensitivity within the agreed range.
+2. Final animation easing and whether individual operations need timings different from the initial 150 ms value.
+3. The precise collapsed-section hover delay around the initial half-second value.
 
 Persistence, autosave, document reopening, export, a home screen, mobile interaction design, and desktop packaging remain outside the first implementation milestone. The first milestone is a working editor whose contents reset on refresh.

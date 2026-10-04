@@ -17,6 +17,9 @@
     ondraft,
     onfinish,
     top = 8,
+    color,
+    timing,
+    onmenu,
   }: {
     bar: Bar;
     weekWidth: number;
@@ -32,6 +35,9 @@
     ondraft: (value: string) => void;
     onfinish: (commit: boolean) => void;
     top?: number;
+    color?: { fill: string; ink: string };
+    timing?: string;
+    onmenu?: (event: MouseEvent, kind: 'bar', id: string) => void;
   } = $props();
   const position = $derived(tracking ?? bar);
   let input = $state<HTMLInputElement>();
@@ -57,10 +63,13 @@
   data-start={bar.start}
   data-end={bar.end}
   data-row={bar.rowId}
+  style:--bar-fill={color?.fill}
+  style:--bar-ink={color?.ink}
   style:top={`${top}px`}
   style:left={`${(position.start - FIRST_WEEK) * weekWidth + BAR_INSET}px`}
   style:width={`${Math.max(1, (position.end - position.start) * weekWidth - BAR_INSET * 2)}px`}
-  title={`${invalid ? 'Cannot drop here · Move clear or hold to push · ' : ''}${bar.name || 'Unnamed bar'} · Weeks ${bar.start}–${bar.end - 1}`}
+  title={`${invalid ? 'Cannot drop here · Move clear or hold to push · ' : ''}${bar.name || 'Unnamed bar'} · ${timing ?? `Weeks ${bar.start}–${bar.end - 1}`}`}
+  oncontextmenu={(event) => onmenu?.(event, 'bar', bar.id)}
   onpointerdown={(event) => {
     if (!editing) onstart(event, 'move', bar.id);
     else event.stopPropagation();

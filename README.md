@@ -71,4 +71,8 @@ The structural slice adds section creation, per-section Add row controls, insert
 
 The additional `?state=Sections` and `?state=TallSections` fixtures expose structural flow, empty sections, confirmations, and scrolling. Automated motion checks cover immediate attachment, neighboring flow, reversible movement, settlement, collapse, expansion, and pickup during animation. Native modal dialogs confirm every row/section deletion, including empty containers.
 
-The implementation follows the staged sequence in the implementation decisions. Panning/zoom, calendar mode, colors and inheritance, remaining item menus, persistence, export, and desktop packaging remain future work.
+The calendar/navigation/color slice adds user-selected week-start dates, the undoable Weeks/Dates switch, zoom from 50% to 200%, Ctrl/Cmd-wheel zoom, Space-drag panning, and horizontal wheel navigation. Calendar mapping keeps seven-day periods stable across daylight-saving changes. Click a week heading to assign a date to that week; choosing Dates without a reference asks for Week 0's start. Milestone tooltips show the final date of their week. Zoom preserves time at the pointer or visible center, and view navigation preserves redo.
+
+Right-click sections, bars, or milestones to choose an Apricot palette color. Items inherit their section unless overridden; Use section color removes the override. Inherited items adopt destination colors when an item or row moves between sections. Item menus also provide Rename and undoable deletion. The additional `?state=CalendarColors` fixture exposes these states. Automated coverage includes date/color rules and history, real-browser controls and menus in all three browsers, motion/cancellation checks, production integration, and visual comparisons.
+
+The next stage is the full acceptance reconciliation in the implementation decisions. Persistence, export, arbitrary custom colors, and desktop packaging remain deferred.

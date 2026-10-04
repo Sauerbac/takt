@@ -3,16 +3,28 @@ export interface ViewportState {
   selectedId: string | null;
   editingId: string | null;
   firstWeek: number;
+  zoom: number;
 }
 export const initialViewport = (): ViewportState => ({
   selectedId: null,
   editingId: null,
   firstWeek: FIRST_WEEK,
+  zoom: 1,
 });
 export const FIRST_WEEK = -2;
 export const WEEK_COUNT = 12;
 export const BAR_INSET = 5;
 export const LABEL_WIDTH = 218;
+export const clampZoom = (zoom: number) => Math.max(0.5, Math.min(2, zoom));
+// Anchor is a distance in CSS pixels from the timeline's (possibly scrolled) left edge.
+export function zoomFirstWeek(
+  firstWeek: number,
+  oldWidth: number,
+  newWidth: number,
+  anchor: number,
+): number {
+  return firstWeek + anchor / oldWidth - anchor / newWidth;
+}
 export const pointerWeek = (
   clientX: number,
   laneLeft: number,

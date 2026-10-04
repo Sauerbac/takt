@@ -7,6 +7,25 @@ import {
   settled,
 } from '../helpers';
 
+test('Apricot calendar dates, inherited colors, item palettes and calendar setup', async ({
+  page,
+}) => {
+  await page.goto('/tests/fixtures/index.html?state=CalendarColors');
+  await expect(page.locator('main')).toHaveScreenshot('calendar-colors.png');
+  await page.getByTestId('bar-b').click({ button: 'right' });
+  await expect(page.locator('main')).toHaveScreenshot('item-palette.png');
+  await page.keyboard.press('Escape');
+  await page.locator('[data-week="3"]').click();
+  await expect(page.locator('main')).toHaveScreenshot('calendar-picker.png');
+  await page.getByRole('button', { name: 'Cancel', exact: true }).click();
+  await page
+    .getByRole('combobox', { name: 'Zoom', exact: true })
+    .selectOption('0.5');
+  await expect(page.locator('main')).toHaveScreenshot(
+    'calendar-zoomed-out.png',
+  );
+});
+
 test('Apricot structural controls, collapsed sections, insertion preview and scoped confirmation', async ({
   page,
 }) => {
@@ -238,6 +257,7 @@ test('Apricot dragging at the left timeline boundary preserves the label column'
   page,
 }) => {
   await page.goto('/tests/fixtures/index.html?state=Chain');
+  await pauseClock(page);
   const lane = await laneGeometry(page);
   const from = await beginBarDrag(page, 'a');
   await page.mouse.move(from.x - lane.width * 2.4, from.y);

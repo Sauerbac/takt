@@ -16,6 +16,9 @@
     onrename,
     ondraft,
     onfinish,
+    color,
+    timing,
+    onmenu,
   }: {
     item: Milestone;
     weekWidth: number;
@@ -31,6 +34,9 @@
     onrename: (id: string) => void;
     ondraft: (value: string) => void;
     onfinish: (commit: boolean) => void;
+    color?: { fill: string; ink: string };
+    timing?: string;
+    onmenu?: (event: MouseEvent, kind: 'milestone', id: string) => void;
   } = $props();
   let input = $state<HTMLInputElement>();
   $effect(() => {
@@ -54,10 +60,13 @@
   data-testid={`milestone-${item.id}`}
   data-boundary={item.boundary}
   data-row={item.rowId}
+  style:--bar-fill={color?.fill}
+  style:--bar-ink={color?.ink}
   style:left={`${((tracking ?? item.boundary) - FIRST_WEEK) * weekWidth}px`}
   style:width={`${item.name || editing ? 150 : 14}px`}
   style:top={`${top}px`}
-  title={`${invalid ? 'Cannot drop here · A milestone already marks this boundary · ' : ''}${item.name || 'Unnamed milestone'} · End of Week ${item.boundary - 1}`}
+  title={`${invalid ? 'Cannot drop here · A milestone already marks this boundary · ' : ''}${item.name || 'Unnamed milestone'} · ${timing ?? `End of Week ${item.boundary - 1}`}`}
+  oncontextmenu={(event) => onmenu?.(event, 'milestone', item.id)}
   onpointerdown={(event) => {
     if (!editing) onstart(event, 'milestone-move', item.id);
     else event.stopPropagation();
