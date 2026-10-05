@@ -125,29 +125,30 @@ test('heading reference menus retain their week, cancel cleanly and clear/restor
   );
 });
 
-test('Week 0 reference menu uses Week 0, switches to Dates and dismissal preserves redo', async ({
+test('Dates toolbar reference menu uses Week 0, restores focus, and preserves redo on dismissal', async ({
   page,
 }) => {
   await page.goto('/tests/fixtures/index.html?state=Empty');
   await zoomToWeekZero(page);
   const dates = page.getByRole('button', { name: 'Dates', exact: true });
-  await page.locator('[data-week="0"]').click({ button: 'right' });
+  await dates.click({ button: 'right' });
+  await expect(page.getByRole('menu')).toBeFocused();
   await page.getByRole('menuitem', { name: 'Set reference' }).click();
   const field = page
     .getByRole('grid')
     .locator('td[aria-selected="true"] button');
   await selectDate(page, '2026-10-07');
   await page.getByRole('button', { name: 'Set date', exact: true }).click();
-  await expect(page.locator('[data-week="0"]')).toBeFocused();
+  await expect(dates).toBeFocused();
   await expect(dates).toHaveAttribute('aria-pressed', 'true');
-  await page.locator('[data-week="0"]').click({ button: 'right' });
+  await dates.click({ button: 'right' });
   await page.getByRole('menuitem', { name: 'Reset reference' }).click();
   await expect(field).toHaveAttribute('data-date', '2026-10-07');
   await page.getByRole('button', { name: 'Cancel', exact: true }).click();
-  await page.locator('[data-week="0"]').click({ button: 'right' });
+  await dates.click({ button: 'right' });
   await page.getByRole('menuitem', { name: 'Clear reference' }).click();
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
-  await page.locator('[data-week="0"]').click({ button: 'right' });
+  await dates.click({ button: 'right' });
   await page.mouse.click(10, 10);
   await expect(page.getByRole('menu')).toHaveCount(0);
   await expect(
@@ -181,7 +182,6 @@ test('browser context menus remain available outside chart targets, in inline fi
   for (const target of [
     page.locator('.brand'),
     page.getByRole('button', { name: 'Weeks', exact: true }),
-    page.getByRole('button', { name: 'Dates', exact: true }),
     page.getByRole('combobox', { name: 'Zoom', exact: true }),
     page.locator('.lane-heading'),
     page.locator('footer'),

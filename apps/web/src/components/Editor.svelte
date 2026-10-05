@@ -1456,6 +1456,7 @@
           class:active={document.display === 'dates'}
           aria-pressed={document.display === 'dates'}
           disabled={busy}
+          oncontextmenu={(event) => void calendarMenu(event, 0)}
           onclick={(event) => setDisplay(event, 'dates')}>Dates</button
         >
       </div>

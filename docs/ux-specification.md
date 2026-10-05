@@ -122,7 +122,9 @@ Selecting calendar mode before a reference exists opens a centered date-picker d
 
 Right-clicking a timeline heading opens a calendar-reference context menu. Without a reference, it offers **Set reference**. With a reference, it offers **Reset reference** and **Clear reference**. Set and Reset open the existing date picker for the clicked week, with Dates selected when the reference is applied. The draft remains uncommitted until Set date; cancellation preserves the reference and history. Clear removes the reference and switches to Weeks as one undoable action; undo restores both the previous reference and display mode. These actions preserve all item positions.
 
-App context menus are limited to chart targets: timeline headings, sections, rows, bars, milestones, and empty lanes. Other surfaces, including the toolbar, page margins, footer, inline text inputs, and dialogs, retain the browser's native context menu.
+The toolbar's **Dates** button also opens the calendar-reference context menu on right-click, using Week 0 for Set and Reset. Clearing, history, draft cancellation, and focus restoration follow the same behavior as the timeline-heading menu.
+
+App context menus are limited to chart targets (timeline headings, sections, rows, bars, milestones, and empty lanes) and the Dates toolbar button. Other surfaces, including the remaining toolbar controls, page margins, footer, inline text inputs, and dialogs, retain the browser's native context menu.
 
 ### 5.3 Milestone timing
 

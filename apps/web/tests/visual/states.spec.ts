@@ -73,7 +73,9 @@ test('Apricot calendar reference menus expose setup, replacement and clearing', 
   await page.keyboard.press('Escape');
   await page.goto('/tests/fixtures/index.html?state=CalendarColors');
   await zoomToWeekZero(page);
-  await page.locator('[data-week="0"]').click({ button: 'right' });
+  await page
+    .getByRole('button', { name: 'Dates', exact: true })
+    .click({ button: 'right' });
   await expect(page.getByRole('menu')).toHaveScreenshot(
     'reset-reference-menu.png',
   );
