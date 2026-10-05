@@ -1,4 +1,6 @@
-export type Color = 'apricot' | 'lavender' | 'sea-blue' | 'slate' | 'rose';
+import { palette } from './palette';
+import type { Color } from './palette';
+export type { Color } from './palette';
 export interface CalendarReference {
   readonly week: number;
   readonly date: string;
@@ -75,10 +77,7 @@ export function assertDocument(document: ChartDocument): void {
     ...document.bars,
     ...document.milestones,
   ])
-    if (
-      item.color !== undefined &&
-      !['apricot', 'lavender', 'sea-blue', 'slate', 'rose'].includes(item.color)
-    )
+    if (item.color !== undefined && !Object.hasOwn(palette, item.color))
       throw new Error('Invalid color');
   const ids = new Set<string>();
   const rowIds = new Set<string>();

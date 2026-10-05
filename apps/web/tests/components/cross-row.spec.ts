@@ -1,3 +1,4 @@
+import { zoomToWeekZero } from '../helpers';
 import { test, expect } from '@playwright/test';
 import {
   beginBarDrag,
@@ -13,13 +14,16 @@ test('the global empty hint follows the first visible row after native vertical 
   page,
 }) => {
   await page.goto('/tests/fixtures/index.html?state=TallEmpty');
+  await zoomToWeekZero(page);
   const viewport = page.locator('.viewport');
   await viewport.evaluate((element) => {
     element.scrollTop = 500;
   });
   await expect(page.locator('.hint')).toHaveCount(1);
   await expect(page.locator('.hint')).toBeInViewport();
-  await expect(page.getByTestId('lane').nth(9).locator('.hint')).toHaveCount(1);
+  await expect(page.getByTestId('lane').nth(10).locator('.hint')).toHaveCount(
+    1,
+  );
 });
 
 for (const right of [true, false]) {
@@ -27,6 +31,7 @@ for (const right of [true, false]) {
     page,
   }) => {
     await page.goto('/tests/fixtures/index.html?state=CrossRows');
+    await zoomToWeekZero(page);
     await pauseClock(page);
     const viewport = page.locator('.viewport'),
       bounds = (await viewport.boundingBox())!;
@@ -76,6 +81,7 @@ test('inserting between two bars pushes both sides outward, restores the departe
   page,
 }) => {
   await page.goto('/tests/fixtures/index.html?state=BetweenBars');
+  await zoomToWeekZero(page);
   await pauseClock(page);
   const destination = await laneGeometry(page),
     source = await laneGeometry(page, 1);
@@ -127,6 +133,7 @@ for (const direction of ['left', 'right'] as const) {
     page,
   }) => {
     await page.goto('/tests/fixtures/index.html?state=RowEntry');
+    await zoomToWeekZero(page);
     // Contact/history sequences use stable pickup geometry. Dedicated motion
     // tests cover settlement and pickup while transitions are still running.
     await page.addStyleTag({
@@ -224,6 +231,7 @@ test('leaving and re-entering a pending destination restarts its full contact de
   page,
 }) => {
   await page.goto('/tests/fixtures/index.html?state=RowEntry');
+  await zoomToWeekZero(page);
   await pauseClock(page);
   const destination = await laneGeometry(page),
     source = await laneGeometry(page, 1);
@@ -254,6 +262,7 @@ test('vertical-only bar movement restores each departed row and commits only the
   page,
 }) => {
   await page.goto('/tests/fixtures/index.html?state=CrossRows');
+  await zoomToWeekZero(page);
   const second = await laneGeometry(page, 1),
     third = await laneGeometry(page, 2);
   const pickup = await beginBarDrag(page, 'a');
@@ -294,6 +303,7 @@ test('cross-row previews cancel on Escape, pointer interruption and window blur 
   page,
 }) => {
   await page.goto('/tests/fixtures/index.html?state=CrossRows');
+  await zoomToWeekZero(page);
   const row = await laneGeometry(page, 1);
   let pickup = await beginBarDrag(page, 'a');
   await page.mouse.move(pickup.x, row.y);
@@ -333,6 +343,7 @@ test('draw and resize remain in the pressed row when the pointer crosses rows', 
   page,
 }) => {
   await page.goto('/tests/fixtures/index.html?state=CrossRows');
+  await zoomToWeekZero(page);
   const second = await laneGeometry(page, 1);
   const pickup = await beginBarDrag(page, 'a', 'right');
   await page.mouse.move(pickup.x + second.width, second.y);
@@ -360,6 +371,7 @@ test('double-click creates an end-of-week milestone with separate naming, text s
   page,
 }) => {
   await page.goto('/tests/fixtures/index.html?state=Empty');
+  await zoomToWeekZero(page);
   const lane = await laneGeometry(page);
   await page.mouse.dblclick(lane.x(2.4), lane.y);
   const item = page.locator('.milestone');
@@ -397,6 +409,7 @@ test('context creation retains the opened row and week; duplicate creation shows
   page,
 }) => {
   await page.goto('/tests/fixtures/index.html?state=CrossRows');
+  await zoomToWeekZero(page);
   const lane = await laneGeometry(page, 1);
   const laneBounds = (await page.getByTestId('lane').nth(1).boundingBox())!;
   await page.mouse.click(lane.x(2.3), laneBounds.y + 2, { button: 'right' });
@@ -438,6 +451,7 @@ test('milestones overlap bars without pushing, and duplicate cross-row drops can
   page,
 }) => {
   await page.goto('/tests/fixtures/index.html?state=CrossRows');
+  await zoomToWeekZero(page);
   const first = await laneGeometry(page),
     second = await laneGeometry(page, 1);
   let pickup = await beginMilestone(page);
@@ -497,6 +511,7 @@ test('duplicate double-click creation preserves the existing milestone and the r
   page,
 }) => {
   await page.goto('/tests/fixtures/index.html?state=Empty');
+  await zoomToWeekZero(page);
   const lane = await laneGeometry(page);
   await page.mouse.dblclick(lane.x(2.2), lane.y);
   await page.getByRole('textbox', { name: 'Milestone name' }).fill('Saved');
@@ -517,6 +532,7 @@ test('Add row and naming have separate history, and the empty-document hint appe
   page,
 }) => {
   await page.goto('/tests/fixtures/index.html?state=Empty');
+  await zoomToWeekZero(page);
   await page
     .getByRole('button', { name: 'Add row to Unnamed section', exact: true })
     .click();
@@ -547,13 +563,14 @@ for (const milestone of [false, true]) {
     page,
   }) => {
     await page.goto('/tests/fixtures/index.html?state=Tall');
+    await zoomToWeekZero(page);
     await pauseClock(page);
     const viewport = page.locator('.viewport'),
       bounds = (await viewport.boundingBox())!;
     const pickup = milestone
       ? await beginMilestone(page)
       : await beginBarDrag(page, 'a');
-    const y = bounds.y + bounds.height - 5;
+    const y = Math.round(bounds.y + bounds.height - 5);
     await page.mouse.move(pickup.x, y);
     await page.clock.runFor(600);
     const scroll = await viewport.evaluate((element) => element.scrollTop);
@@ -590,6 +607,7 @@ test('vertical scrolling accelerates toward the edge, reverses upward, and cance
   page,
 }) => {
   await page.goto('/tests/fixtures/index.html?state=Tall');
+  await zoomToWeekZero(page);
   await pauseClock(page);
   const viewport = page.locator('.viewport'),
     bounds = (await viewport.boundingBox())!;
@@ -602,6 +620,9 @@ test('vertical scrolling accelerates toward the edge, reverses upward, and cance
   const fast = await viewport.evaluate((element) => element.scrollTop);
   expect(fast - slow).toBeGreaterThan(slow * 2);
   await page.mouse.move(pickup.x, bounds.y + 3);
+  await page.clock.runFor(100);
+  expect(await viewport.evaluate((element) => element.scrollTop)).toBe(fast);
+  await page.mouse.move(pickup.x, bounds.y + 54 + 3);
   await page.clock.runFor(100);
   const reversed = await viewport.evaluate((element) => element.scrollTop);
   expect(reversed).toBeLessThan(fast);

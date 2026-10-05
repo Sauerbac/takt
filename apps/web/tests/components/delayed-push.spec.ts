@@ -1,3 +1,4 @@
+import { zoomToWeekZero } from '../helpers';
 import { expect, test } from '@playwright/test';
 import {
   beginBarDrag,
@@ -12,6 +13,7 @@ for (const direction of ['right', 'left'] as const) {
     page,
   }) => {
     await page.goto('/tests/fixtures/index.html?state=Separated');
+    await zoomToWeekZero(page);
     await pauseClock(page);
     const lane = await laneGeometry(page);
     const right = direction === 'right';
@@ -63,6 +65,7 @@ for (const outbound of ['right', 'left'] as const) {
     page,
   }) => {
     await page.goto('/tests/fixtures/index.html?state=Separated');
+    await zoomToWeekZero(page);
     await pauseClock(page);
     const lane = await laneGeometry(page);
     const right = outbound === 'right';
@@ -116,6 +119,7 @@ for (const direction of ['right', 'left'] as const) {
       page,
     }) => {
       await page.goto('/tests/fixtures/index.html?state=Separated');
+      await zoomToWeekZero(page);
       await pauseClock(page);
       const lane = await laneGeometry(page);
       const right = direction === 'right';
@@ -177,6 +181,7 @@ for (const direction of ['right', 'left'] as const) {
     page,
   }) => {
     await page.goto('/tests/fixtures/index.html?state=Chain');
+    await zoomToWeekZero(page);
     await pauseClock(page);
     const lane = await laneGeometry(page);
     const id = direction === 'right' ? 'a' : 'c';
@@ -227,6 +232,7 @@ test('a stationary pointer waits exactly 300ms, then the whole cascade activates
   page,
 }) => {
   await page.goto('/tests/fixtures/index.html?state=Chain');
+  await zoomToWeekZero(page);
   await pauseClock(page);
   const lane = await laneGeometry(page);
   const bar = page.getByTestId('bar-a');
@@ -274,6 +280,7 @@ test('retracting clear reverses an activated push and returning starts a fresh d
   page,
 }) => {
   await page.goto('/tests/fixtures/index.html?state=Separated');
+  await zoomToWeekZero(page);
   await pauseClock(page);
   const lane = await laneGeometry(page);
   const pickup = await beginBarDrag(page, 'a');
@@ -302,6 +309,7 @@ for (const ending of ['release', 'Escape', 'cancel', 'capture', 'blur']) {
     page,
   }) => {
     await page.goto('/tests/fixtures/index.html?state=Chain');
+    await zoomToWeekZero(page);
     // Retain a real redo entry while testing cancellation of a different action.
     await page.getByTestId('bar-c').click();
     await page.keyboard.press('Delete');
@@ -347,6 +355,7 @@ test('edge scrolling advances the proposal without restarting the same-neighbor 
   page,
 }) => {
   await page.goto('/tests/fixtures/index.html?state=EdgeContact');
+  await zoomToWeekZero(page);
   await pauseClock(page);
   const lane = await laneGeometry(page);
   await beginBarDrag(page, 'a');
@@ -379,6 +388,7 @@ test('native horizontal scrolling and edge scrolling keep labels pinned and the 
 }) => {
   await page.setViewportSize({ width: 900, height: 800 });
   await page.goto('/tests/fixtures/index.html?state=Chain');
+  await zoomToWeekZero(page);
   const labels = page.locator('.lane-heading, .section-label, .row-label');
   const original = await labels.evaluateAll((elements) =>
     elements.map((element) => element.getBoundingClientRect().x),

@@ -6,12 +6,14 @@ import {
   interval,
   pauseClock,
   settled,
+  zoomToWeekZero,
 } from '../helpers';
 
 test('production editor: entering above from the right pushes left after contact and undo restores both rows', async ({
   page,
 }) => {
   await page.goto('/');
+  await zoomToWeekZero(page);
   await draw(page, 2, 3);
   const neighbor = page.locator('.bar').first();
   await draw(page, 1, 2);

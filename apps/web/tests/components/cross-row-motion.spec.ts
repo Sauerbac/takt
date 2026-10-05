@@ -5,6 +5,7 @@ import {
   laneGeometry,
   readyToDrop,
   settled,
+  zoomToWeekZero,
 } from '../helpers';
 import type { Locator, Page } from '@playwright/test';
 
@@ -92,6 +93,7 @@ for (const direction of ['left', 'right'] as const) {
     page,
   }) => {
     await page.goto('/tests/fixtures/index.html?state=RowEntry');
+    await zoomToWeekZero(page);
     const destination = await laneGeometry(page),
       source = await laneGeometry(page, 1);
     const neighbor = page.getByTestId('bar-b'),

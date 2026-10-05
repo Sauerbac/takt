@@ -1,15 +1,11 @@
 import type { Bar, ChartDocument, Color, Milestone } from './document';
+import { palette } from './palette';
 
-export const palette: Readonly<
-  Record<Color, { name: string; fill: string; ink: string }>
-> = {
-  apricot: { name: 'Apricot', fill: '#f3b184', ink: '#874327' },
-  lavender: { name: 'Lavender', fill: '#b5a2e0', ink: '#563c86' },
-  'sea-blue': { name: 'Sea blue', fill: '#a0d4dd', ink: '#2e626b' },
-  slate: { name: 'Slate', fill: '#8290a3', ink: '#182e47' },
-  rose: { name: 'Rose', fill: '#b37976', ink: '#442c2b' },
-};
-export const colorKeys = Object.keys(palette) as Color[];
+export { palette, quickColors, colorRows } from './palette';
+export function colorLabelInk(color: Color): string {
+  const appearance = palette[color];
+  return 'labelInk' in appearance ? appearance.labelInk : appearance.ink;
+}
 export function itemColor(
   document: ChartDocument,
   item: Bar | Milestone,

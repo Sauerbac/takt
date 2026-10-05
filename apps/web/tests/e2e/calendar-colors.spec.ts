@@ -1,19 +1,27 @@
+import { zoomToWeekZero } from '../helpers';
 import { chooseZoom } from '../helpers';
 import { test, expect } from '@playwright/test';
-import { draw, interval, laneGeometry } from '../helpers';
+import {
+  draw,
+  interval,
+  laneGeometry,
+  selectDate,
+  chooseColor,
+} from '../helpers';
 
 test('production editor combines user calendar dates, navigation, inheritance and item menu history', async ({
   page,
 }) => {
   await page.goto('/');
+  await zoomToWeekZero(page);
   await draw(page, 0, 2, 'Explore');
   const bar = page.locator('.bar');
   await page.locator('[data-week="3"]').click();
-  await page
-    .getByRole('textbox', { name: 'Selected date', exact: true })
-    .fill('2026-10-05');
+  await selectDate(page, '2026-10-05');
   await page.getByRole('button', { name: 'Set date', exact: true }).click();
-  await page.getByRole('button', { name: 'Dates', exact: true }).click();
+  await expect(
+    page.getByRole('button', { name: 'Dates', exact: true }),
+  ).toHaveAttribute('aria-pressed', 'true');
   await expect(page.locator('[data-week="0"]')).toHaveAccessibleName(
     '14 Sept 2026 · Set date for Week 0',
   );
@@ -35,7 +43,7 @@ test('production editor combines user calendar dates, navigation, inheritance an
     'Approved · 18 Oct 2026',
   );
   await bar.click({ button: 'right' });
-  await page.getByRole('menuitemradio', { name: 'Rose', exact: true }).click();
+  await chooseColor(page, 'Rose');
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
   await chooseZoom(page, '0.75');
   await page
@@ -68,9 +76,8 @@ test('production editor combines user calendar dates, navigation, inheritance an
   await page.getByRole('menuitem', { name: 'Delete bar', exact: true }).click();
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
   await expect(bar).toBeVisible();
-  await page.getByRole('button', { name: 'Dates', exact: true }).click({
-    button: 'right',
-  });
+  await zoomToWeekZero(page);
+  await page.locator('[data-week="0"]').click({ button: 'right' });
   await page
     .getByRole('menuitem', { name: 'Clear reference', exact: true })
     .click();
@@ -79,5 +86,15 @@ test('production editor combines user calendar dates, navigation, inheritance an
   await expect(page.locator('[data-week="0"]')).toHaveAccessibleName(
     '14 Sept 2026 · Set date for Week 0',
   );
+  await interval(bar, 0, 2);
+  await chooseZoom(page, '0.125');
+  await expect(page.locator('.month-band')).not.toHaveCount(0);
+  await expect(page.locator('.year-band')).toContainText([
+    '2025',
+    '2026',
+    '2027',
+  ]);
+  await page.getByRole('button', { name: 'Weeks', exact: true }).click();
+  await expect(page.locator('.month-band')).toHaveCount(0);
   await interval(bar, 0, 2);
 });

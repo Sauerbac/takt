@@ -1,10 +1,16 @@
 import { test, expect } from '@playwright/test';
 import type { Page, Locator } from '@playwright/test';
-import { beginBarDrag, interval, laneGeometry, settled } from '../helpers';
+import {
+  beginBarDrag,
+  interval,
+  laneGeometry,
+  settled,
+  chooseColor,
+} from '../helpers';
 
 async function color(page: Page, target: Locator, name: string) {
   await target.click({ button: 'right' });
-  await page.getByRole('menuitemradio', { name, exact: true }).click();
+  await chooseColor(page, name);
 }
 const fill = (item: Locator) =>
   item.evaluate((node) =>
@@ -30,9 +36,9 @@ test('section colors update inherited items; overrides and inheritance resets ha
   await color(page, bar, 'Rose');
   expect(await fill(bar)).toBe('#b37976');
   await bar.click({ button: 'right' });
-  await expect(
-    page.getByRole('menuitemradio', { name: 'Rose', exact: true }),
-  ).toHaveAttribute('aria-checked', 'true');
+  await expect(page.getByRole('menu').locator('.color-label')).toContainText(
+    'Rose',
+  );
   await page
     .getByRole('menuitem', { name: 'Use section color', exact: true })
     .click();
@@ -128,7 +134,7 @@ test('item context menus select, rename inline, reset inheritance and delete imm
   await expect(rename).toBeFocused();
   await page.keyboard.press('ArrowDown');
   await expect(
-    page.getByRole('menuitemradio', { name: 'Apricot', exact: true }),
+    page.getByRole('menuitemradio', { name: 'Peach', exact: true }),
   ).toBeFocused();
   await page.keyboard.press('ArrowUp');
   await page.keyboard.press('Enter');
@@ -209,7 +215,7 @@ test('restyled menus clamp to both viewport edges and retain keyboard order acro
   await expect(deletion).toBeFocused();
   await page.keyboard.press('ArrowUp');
   await expect(
-    page.getByRole('menuitemradio', { name: 'Rose', exact: true }),
+    page.getByRole('menuitem', { name: 'More colors…', exact: true }),
   ).toBeFocused();
   await page.keyboard.press('Escape');
   await page.goto('/tests/fixtures/index.html?state=TallSections');

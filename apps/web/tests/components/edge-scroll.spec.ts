@@ -1,3 +1,4 @@
+import { zoomToWeekZero } from '../helpers';
 import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
 import { beginBarDrag, interval, laneGeometry, pauseClock } from '../helpers';
@@ -31,6 +32,7 @@ for (const direction of ['left', 'right'] as const) {
       await page.goto(
         `/tests/fixtures/index.html?state=${operation === 'draw' ? 'Empty' : 'Chain'}`,
       );
+      await zoomToWeekZero(page);
       await pauseClock(page);
       const lane = await laneGeometry(page);
       const edge = await edges(page);
@@ -56,9 +58,7 @@ for (const direction of ['left', 'right'] as const) {
       await page.clock.runFor(800);
       const during = (await bar.boundingBox())!;
       const shifted = await firstWeek(page);
-      const heading = (await page
-        .getByText('Week 0', { exact: true })
-        .boundingBox())!;
+      const heading = (await page.locator('[data-week="0"]').boundingBox())!;
       expect(heading.x).toBeCloseTo((await laneGeometry(page)).x(0), 0);
       expect(
         (shifted - origin) * (direction === 'left' ? -1 : 1),
@@ -131,6 +131,7 @@ test('edge speed increases toward the boundary and stops on leaving, outside the
   page,
 }) => {
   await page.goto('/tests/fixtures/index.html?state=Chain');
+  await zoomToWeekZero(page);
   await pauseClock(page);
   const edge = await edges(page);
   await beginBarDrag(page, 'a');
@@ -181,6 +182,7 @@ test('reversing a scrolled resize restores every collision preview without a his
   page,
 }) => {
   await page.goto('/tests/fixtures/index.html?state=Chain');
+  await zoomToWeekZero(page);
   await pauseClock(page);
   const edge = await edges(page);
   await beginBarDrag(page, 'a', 'right');
@@ -208,6 +210,7 @@ test('an edge click does not scroll or create; cancelled scrolling preserves red
 }) => {
   await page.setViewportSize({ width: 900, height: 800 });
   await page.goto('/tests/fixtures/index.html?state=Empty');
+  await zoomToWeekZero(page);
   await pauseClock(page);
   const edge = await edges(page);
   await page.mouse.move(edge.right - 8, edge.y);

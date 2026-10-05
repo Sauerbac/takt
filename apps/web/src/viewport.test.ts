@@ -107,11 +107,11 @@ it('container removal reveals its surviving parent or neighboring section, inclu
 });
 
 it('preserves pointer or center time across clamped zoom levels and scrolled geometry', () => {
-  expect(clampZoom(0.1)).toBe(0.5);
+  expect(clampZoom(0.1)).toBe(0.125);
   expect(clampZoom(3)).toBe(2);
   for (const first of [-20.4, -2, 3.5])
     for (const anchor of [0, 100, 450, 900])
-      for (const scale of [0.5, 0.75, 1, 1.25, 2]) {
+      for (const scale of [0.125, 0.25, 0.5, 0.75, 1, 1.25, 2]) {
         const next = zoomFirstWeek(first, 75, 75 * scale, anchor);
         expect(pointerWeek(anchor, 0, 75 * scale, next)).toBeCloseTo(
           pointerWeek(anchor, 0, 75, first),

@@ -1,3 +1,4 @@
+import { zoomToWeekZero } from '../helpers';
 import { chooseZoom } from '../helpers';
 import { test, expect } from '@playwright/test';
 import {
@@ -8,19 +9,71 @@ import {
   settled,
 } from '../helpers';
 
+test('compact overview bars hide clutter and zoom into readable inline naming', async ({
+  page,
+}) => {
+  await page.goto('/tests/fixtures/index.html?state=ShortBars');
+  await chooseZoom(page, '0.125');
+  await pauseClock(page);
+  await expect(page.locator('main')).toHaveScreenshot('compact-overview.png');
+  const bar = page.getByTestId('bar-short-2');
+  await bar.click({ button: 'right' });
+  await page.getByRole('menuitem', { name: 'Rename', exact: true }).click();
+  await page.clock.runFor(64);
+  await expect(page.locator('main')).toHaveScreenshot(
+    'compact-zoom-intermediate.png',
+  );
+  await page.clock.runFor(160);
+  await expect(page.getByRole('textbox', { name: 'Bar name' })).toBeFocused();
+  await expect(page.locator('main')).toHaveScreenshot(
+    'compact-zoom-naming.png',
+  );
+});
+
+test('overview dates, spaced weeks and frozen headings preserve timeline context', async ({
+  page,
+}) => {
+  await page.goto('/tests/fixtures/index.html?state=CalendarColors');
+  await chooseZoom(page, '0.125');
+  await expect(page.locator('main')).toHaveScreenshot('overview-dates.png');
+  await page.getByRole('button', { name: 'Weeks', exact: true }).click();
+  await expect(page.locator('main')).toHaveScreenshot('overview-weeks.png');
+  await page.goto('/tests/fixtures/index.html?state=Tall');
+  await page.locator('.viewport').evaluate((node) => {
+    node.scrollTop = 240;
+  });
+  // Capture the full viewport with both frozen axes in their scrolled positions.
+  await expect(page).toHaveScreenshot('frozen-headings.png', {
+    maxDiffPixelRatio: 0,
+  });
+});
+
+test('color picker shows coordinated shades and a draft preview in the shared overlay', async ({
+  page,
+}) => {
+  await page.goto('/tests/fixtures/index.html?state=CalendarColors');
+  await page.getByTestId('bar-b').click({ button: 'right' });
+  await page
+    .getByRole('menuitem', { name: 'More colors…', exact: true })
+    .click();
+  await expect(page).toHaveScreenshot('color-picker.png');
+  await page.getByRole('radio', { name: 'Deep sage', exact: true }).click();
+  await expect(page).toHaveScreenshot('color-picker-selected.png');
+});
+
 test('Apricot calendar reference menus expose setup, replacement and clearing', async ({
   page,
 }) => {
   await page.goto('/tests/fixtures/index.html?state=Empty');
+  await zoomToWeekZero(page);
   await page.locator('[data-week="3"]').click({ button: 'right' });
   await expect(page.getByRole('menu')).toHaveScreenshot(
     'set-reference-menu.png',
   );
   await page.keyboard.press('Escape');
   await page.goto('/tests/fixtures/index.html?state=CalendarColors');
-  await page.getByRole('button', { name: 'Dates', exact: true }).click({
-    button: 'right',
-  });
+  await zoomToWeekZero(page);
+  await page.locator('[data-week="0"]').click({ button: 'right' });
   await expect(page.getByRole('menu')).toHaveScreenshot(
     'reset-reference-menu.png',
   );
@@ -67,6 +120,7 @@ test('Apricot custom zoom menu and selected date draft', async ({ page }) => {
   await page.getByRole('combobox', { name: 'Zoom', exact: true }).click();
   await expect(page.locator('main')).toHaveScreenshot('zoom-menu.png');
   await page.keyboard.press('Escape');
+  await zoomToWeekZero(page);
   await page.locator('[data-week="3"]').click();
   await page.getByRole('button', { name: '12 Oct 2026', exact: true }).click();
   await expect(page).toHaveScreenshot('calendar-selected.png');
@@ -81,6 +135,7 @@ test('Apricot calendar dates, inherited colors, item palettes and calendar setup
   await page.getByTestId('bar-b').click({ button: 'right' });
   await expect(page.locator('main')).toHaveScreenshot('item-palette.png');
   await page.keyboard.press('Escape');
+  await zoomToWeekZero(page);
   await page.locator('[data-week="3"]').click();
   await expect(page).toHaveScreenshot('calendar-picker.png');
   await page.getByRole('button', { name: 'Cancel', exact: true }).click();
@@ -296,6 +351,7 @@ test('Apricot selected bar, clipped label, and inline naming', async ({
   page,
 }) => {
   await page.goto('/tests/fixtures/index.html?state=Narrow');
+  await zoomToWeekZero(page);
   await page.getByTestId('bar-a').click();
   await expect(page.locator('main')).toHaveScreenshot('selected-narrow.png');
   await page.getByTestId('bar-a').dblclick();

@@ -1,4 +1,6 @@
+import { zoomToWeekZero } from '../helpers';
 import { test, expect } from '@playwright/test';
+import { selectDate, chooseZoom } from '../helpers';
 
 test('zoom keyboard navigation works before native popover toggle notifications arrive', async ({
   page,
@@ -31,10 +33,10 @@ test('zoom keyboard navigation works before native popover toggle notifications 
   await zoom.click();
   await page.keyboard.press('Home');
   await expect(
-    page.getByRole('option', { name: '50%', exact: true }),
+    page.getByRole('option', { name: '12.5%', exact: true }),
   ).toBeFocused();
   await page.keyboard.press('Enter');
-  await expect(zoom).toHaveText('50%');
+  await expect(zoom).toHaveText('12.5%');
   await expect(zoom).toBeFocused();
 });
 
@@ -65,7 +67,7 @@ test('custom zoom menu supports keyboard selection, dismissal, focus and wheel v
   await zoom.click();
   await page.keyboard.press('Home');
   await page.keyboard.press('Space');
-  await expect(zoom).toHaveText('50%');
+  await expect(zoom).toHaveText('12.5%');
   await zoom.click();
   await page.mouse.click(10, 10);
   await expect(zoom).toHaveAttribute('aria-expanded', 'false');
@@ -83,33 +85,34 @@ test('custom zoom menu supports keyboard selection, dismissal, focus and wheel v
   await page.keyboard.down('Control');
   await page.mouse.wheel(0, -80);
   await page.keyboard.up('Control');
-  await expect(zoom).toHaveText('59%');
+  await expect(zoom).toHaveText('15%');
   await zoom.click();
   await expect(page.getByRole('option', { selected: true })).toHaveCount(0);
   await page.keyboard.press('Escape');
 });
 
-test('Today chooses a draft and supported-year bounds remain navigable', async ({
+test('Today sits beside month navigation and chooses an uncommitted draft', async ({
   page,
 }) => {
   await page.clock.setFixedTime(new Date('2026-10-04T12:00:00Z'));
   await page.goto('/tests/fixtures/index.html?state=Empty');
+  await zoomToWeekZero(page);
   await page.getByRole('button', { name: 'Dates', exact: true }).click();
-  const date = page.getByRole('textbox', {
-    name: 'Selected date',
-    exact: true,
-  });
-  await expect(date).toHaveValue('');
+  const date = page
+    .getByRole('grid')
+    .locator('td[aria-selected="true"] button');
+  await expect(date).toHaveCount(0);
+  await expect(page.getByRole('textbox')).toHaveCount(0);
+  await expect(page.getByText('Selected date', { exact: true })).toHaveCount(0);
+  await expect(
+    page
+      .locator('.month-navigation')
+      .getByRole('button', { name: 'Today', exact: true }),
+  ).toBeVisible();
   await page.getByRole('button', { name: 'Today', exact: true }).click();
-  await expect(date).toHaveValue('2026-10-04');
-  await date.fill('0001-01-01');
-  await expect(
-    page.getByRole('button', { name: 'Previous month', exact: true }),
-  ).toBeDisabled();
-  await date.fill('9999-12-31');
-  await expect(
-    page.getByRole('button', { name: 'Next month', exact: true }),
-  ).toBeDisabled();
+  await expect(date).toHaveAttribute('data-date', '2026-10-04');
+  await page.getByRole('button', { name: 'Next month', exact: true }).click();
+  await expect(page.getByRole('grid')).toHaveAccessibleName('November 2026');
   await page.getByRole('button', { name: 'Today', exact: true }).click();
   await page.getByRole('button', { name: 'Set date', exact: true }).click();
   await expect(page.locator('[data-week="0"]')).toHaveAccessibleName(
@@ -121,13 +124,13 @@ test('custom calendar opens centered with backdrop, confines focus and commits o
   page,
 }) => {
   await page.goto('/tests/fixtures/index.html?state=CalendarColors');
+  await zoomToWeekZero(page);
   const heading = page.locator('[data-week="3"]');
   await heading.click();
   const dialog = page.getByRole('dialog');
-  const date = page.getByRole('textbox', {
-    name: 'Selected date',
-    exact: true,
-  });
+  const date = page
+    .getByRole('grid')
+    .locator('td[aria-selected="true"] button');
   await expect(page.getByRole('grid')).toBeVisible();
   const bounds = (await dialog.boundingBox())!;
   expect(bounds.x + bounds.width / 2).toBeCloseTo(640, 0);
@@ -140,7 +143,7 @@ test('custom calendar opens centered with backdrop, confines focus and commits o
   await page.getByRole('button', { name: 'Next month', exact: true }).click();
   await expect(page.getByRole('grid')).toHaveAccessibleName('November 2026');
   await page.getByRole('button', { name: '12 Nov 2026', exact: true }).click();
-  await expect(date).toHaveValue('2026-11-12');
+  await expect(date).toHaveAttribute('data-date', '2026-11-12');
   await page.getByRole('button', { name: 'Set date', exact: true }).focus();
   await page.keyboard.press('Tab');
   expect(
@@ -163,22 +166,16 @@ test('custom calendar opens centered with backdrop, confines focus and commits o
   );
 });
 
-test('calendar handles leap-day keyboard navigation, invalid entry, month boundaries and selection', async ({
+test('calendar handles leap-day keyboard navigation, month boundaries and selection', async ({
   page,
 }) => {
   await page.goto('/tests/fixtures/index.html?state=Empty');
+  await zoomToWeekZero(page);
   await page.getByRole('button', { name: 'Dates', exact: true }).click();
-  const date = page.getByRole('textbox', {
-    name: 'Selected date',
-    exact: true,
-  });
-  await date.fill('2023-02-29');
-  await page.getByRole('button', { name: 'Set date', exact: true }).click();
-  await expect(page.getByRole('dialog')).toBeVisible();
-  expect(
-    await date.evaluate((node: HTMLInputElement) => node.validity.valid),
-  ).toBe(false);
-  await date.fill('2024-02-28');
+  const date = page
+    .getByRole('grid')
+    .locator('td[aria-selected="true"] button');
+  await selectDate(page, '2024-02-28');
   await page.getByRole('button', { name: '28 Feb 2024', exact: true }).focus();
   await page.keyboard.press('ArrowRight');
   await expect(
@@ -197,7 +194,7 @@ test('calendar handles leap-day keyboard navigation, invalid entry, month bounda
     page.getByRole('button', { name: '29 Jan 2024', exact: true }),
   ).toBeFocused();
   await page.keyboard.press('Space');
-  await expect(date).toHaveValue('2024-01-29');
+  await expect(date).toHaveAttribute('data-date', '2024-01-29');
   await page.getByRole('button', { name: 'Set date', exact: true }).click();
   await expect(page.locator('[data-week="0"]')).toHaveAccessibleName(
     '29 Jan 2024 · Set date for Week 0',

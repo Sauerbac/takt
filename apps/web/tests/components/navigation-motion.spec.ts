@@ -1,21 +1,23 @@
-import { chooseZoom } from '../helpers';
+import { chooseZoom, zoomToWeekZero } from '../helpers';
 import { test, expect } from '@playwright/test';
 import { laneGeometry, pauseClock } from '../helpers';
 
-for (const scale of ['0.5', '2']) {
+for (const scale of ['0.125', '0.5', '2']) {
   test(`zoom and fractional Space-pan at ${Number(scale) * 100}% attach every timeline item immediately without settlement lag`, async ({
     page,
   }) => {
     await page.goto('/tests/fixtures/index.html?state=CalendarColors');
     await pauseClock(page);
-    await chooseZoom(page, scale);
+    if (scale === '2') await zoomToWeekZero(page);
+    else await chooseZoom(page, scale);
     const lane = await laneGeometry(page, 1);
     const bar = page.getByTestId('bar-c');
     const milestone = page.getByTestId('milestone-m');
     const barBounds = (await bar.boundingBox())!;
     const milestoneBounds = (await milestone.boundingBox())!;
-    expect(barBounds.x).toBeCloseTo(lane.x(3) + 5, 0);
-    expect(barBounds.width).toBeCloseTo(2 * lane.width - 10, 0);
+    const inset = Math.min(5, lane.width / 4);
+    expect(barBounds.x).toBeCloseTo(lane.x(3) + inset, 0);
+    expect(barBounds.width).toBeCloseTo(2 * lane.width - 2 * inset, 0);
     expect(milestoneBounds.x).toBeCloseTo(lane.x(5), 0);
     expect(await bar.evaluate((node) => node.getAnimations().length)).toBe(0);
     await page.clock.runFor(48);

@@ -91,7 +91,12 @@ test('row contents track immediately, neighbors glide and reverse, and the carri
   const originalBar = (await bar.boundingBox())!,
     originalMilestone = (await milestone.boundingBox())!;
   await freeze(page);
-  const point = await press(page, 'Discovery');
+  const grip = (await page
+    .getByRole('button', { name: 'Drag row Discovery', exact: true })
+    .boundingBox())!;
+  const point = { x: grip.x + grip.width / 2, y: grip.y + grip.height / 2 };
+  await page.mouse.move(point.x, point.y);
+  await page.mouse.down();
   await page.mouse.move(point.x, point.y + 50);
   expect((await row.boundingBox())!.y).toBeCloseTo(original.y + 50, 0);
   expect((await bar.boundingBox())!.y).toBeCloseTo(originalBar.y + 50, 0);

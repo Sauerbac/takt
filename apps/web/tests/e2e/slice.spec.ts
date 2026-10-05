@@ -6,6 +6,7 @@ import {
   laneGeometry,
   pauseClock,
   settled,
+  zoomToWeekZero,
 } from '../helpers';
 
 test('production editor: draw, name, cascade, cancel, commit, undo and Windows redo', async ({
@@ -125,6 +126,7 @@ test('production editor: draw beyond the initial timeline, name, undo and reveal
   page,
 }) => {
   await page.goto('/');
+  await zoomToWeekZero(page);
   await pauseClock(page);
   const lane = await laneGeometry(page);
   await page.mouse.move(lane.x(0), lane.y);

@@ -6,6 +6,50 @@ test.beforeEach(async ({ page }) => {
   await page.goto('/tests/fixtures/index.html?state=Sections');
 });
 
+test('six-dot handles drag rows and sections without a click entering naming', async ({
+  page,
+}) => {
+  for (const name of ['Drag row Discovery', 'Drag section Research']) {
+    const grip = page.getByRole('button', { name, exact: true });
+    await expect(grip.locator('circle')).toHaveCount(6);
+    await grip.click();
+    await expect(page.getByRole('textbox')).toHaveCount(0);
+  }
+  const row = page.getByTestId('row-row-1');
+  const destination = (await page.getByTestId('row-row-3').boundingBox())!;
+  const rowGrip = (await page
+    .getByRole('button', { name: 'Drag row Discovery', exact: true })
+    .boundingBox())!;
+  await page.mouse.move(
+    rowGrip.x + rowGrip.width / 2,
+    rowGrip.y + rowGrip.height / 2,
+  );
+  await page.mouse.down();
+  await page.mouse.move(
+    rowGrip.x + rowGrip.width / 2,
+    destination.y + destination.height / 2 + 5,
+  );
+  await page.mouse.up();
+  await expect(row).toHaveAttribute('data-section', 'section-2');
+  await interval(page.getByTestId('bar-a'), 0, 2);
+  await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  await expect(row).toHaveAttribute('data-section', 'section-1');
+  await settled(row);
+  const grip = (await page
+    .getByRole('button', { name: 'Drag section Research', exact: true })
+    .boundingBox())!;
+  await page.mouse.move(grip.x + grip.width / 2, grip.y + grip.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(
+    grip.x + grip.width / 2,
+    grip.y + grip.height / 2 + 360,
+  );
+  await page.mouse.up();
+  expect((await sectionOrder(page)).at(-1)).toBe('section-1');
+  await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  expect((await sectionOrder(page))[0]).toBe('section-1');
+});
+
 async function pickup(page: Page, name: string) {
   const label = page.getByRole('button', { name, exact: true });
   const bounds = (await label.boundingBox())!;
@@ -429,16 +473,14 @@ test('structural edge scrolling follows a stationary pointer and stops on cancel
   });
   const bounds = (await viewport.boundingBox())!;
   const point = await pickup(page, 'Lane 1');
-  await page.mouse.move(point.x, bounds.y + bounds.height - 2);
+  const y = Math.round(bounds.y + bounds.height - 2);
+  await page.mouse.move(point.x, y);
   const carried = page.getByTestId('row-row-1');
   for (let i = 0; i < 10; i++) await page.clock.runFor(16);
   expect(
     await viewport.evaluate((element) => element.scrollTop),
   ).toBeGreaterThan(15);
-  expect((await carried.boundingBox())!.y + 22).toBeCloseTo(
-    bounds.y + bounds.height - 2,
-    0,
-  );
+  expect((await carried.boundingBox())!.y + 22).toBeCloseTo(y, 0);
   await page.keyboard.press('Escape');
   await page.mouse.up();
   const scroll = await viewport.evaluate((element) => element.scrollTop);
@@ -469,7 +511,7 @@ for (const kind of ['row', 'section'] as const) {
     const bounds = await viewport.evaluate((element) => {
       const rect = element.getBoundingClientRect();
       return {
-        top: rect.top + element.clientTop,
+        top: rect.top + element.clientTop + 54,
         bottom: rect.top + element.clientTop + element.clientHeight,
       };
     });

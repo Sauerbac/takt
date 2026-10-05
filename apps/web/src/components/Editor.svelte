@@ -8,7 +8,13 @@
     barTiming,
     milestoneTiming,
   } from '../model/calendar';
-  import { palette, colorKeys, itemColor, recolor } from '../model/colors';
+  import {
+    palette,
+    quickColors,
+    colorLabelInk,
+    itemColor,
+    recolor,
+  } from '../model/colors';
   import { History } from '../model/history';
   import { Gesture } from '../interaction/gesture';
   import type { GestureKind } from '../interaction/gesture';
@@ -28,21 +34,29 @@
     initialViewport,
     pointerWeek,
     displayedInterval,
-    BAR_INSET,
+    barInset,
     edgeVelocity,
     LABEL_WIDTH,
     clampZoom,
     zoomFirstWeek,
     historyLocation,
+    OVERVIEW_ZOOM_DURATION,
+    BAR_LABEL_WIDTH,
   } from '../viewport';
   import IconButton from './IconButton.svelte';
   import Bar from './Bar.svelte';
   import Milestone from './Milestone.svelte';
   import CalendarPicker from './CalendarPicker.svelte';
+  import ColorPicker from './ColorPicker.svelte';
   import Select from './Select.svelte';
   import Button from './Button.svelte';
   import Dialog from './Dialog.svelte';
   import MenuItem from './MenuItem.svelte';
+  import {
+    calendarBands,
+    headingStride,
+    weekGridPath,
+  } from '../timeline-headings';
 
   let { initial = emptyDocument() }: { initial?: ChartDocument } = $props();
   // The initial document seeds this editor instance once; remount to open another document.
@@ -59,12 +73,16 @@
   let calendarPicker = $state<{
     week: number;
     date: string;
-    switchMode: boolean;
   } | null>(null);
+  let colorPicker = $state<{ id: string; color: Color; name: string } | null>(
+    null,
+  );
   let calendarTrigger: HTMLElement | null = null;
   let spaceHeld = $state(false);
   let changingScale = $state(false);
   let scaleFrame: number | null = null;
+  let zoomFrame: number | null = null;
+  let zooming = $state(false);
   let pan = $state.raw<{
     x: number;
     y: number;
@@ -85,6 +103,7 @@
   let structuralMeaningful = $state(false);
   let hoverTimer: ReturnType<typeof setTimeout> | null = null;
   let rowClick: { id: string; time: number } | null = null;
+  let structureFromGrip = false;
   let confirmation = $state<{
     id: string;
     kind: 'row' | 'section';
@@ -134,7 +153,33 @@
   );
   let notice = $state('');
   const weekWidth = $derived((laneWidth / WEEK_COUNT) * view.zoom);
+  const inset = $derived(barInset(weekWidth));
+  const compactDates = $derived(
+    document.display === 'dates' && !!document.calendar && weekWidth < 60,
+  );
+  const stride = $derived(headingStride(weekWidth));
+  const months = $derived(
+    document.calendar
+      ? calendarBands(
+          document.calendar,
+          view.firstWeek,
+          laneWidth / weekWidth,
+          'month',
+        )
+      : [],
+  );
+  const years = $derived(
+    document.calendar
+      ? calendarBands(
+          document.calendar,
+          view.firstWeek,
+          laneWidth / weekWidth,
+          'year',
+        )
+      : [],
+  );
   const timelineShift = $derived((FIRST_WEEK - view.firstWeek) * weekWidth);
+  const gridPath = $derived(weekGridPath(view.firstWeek, weekWidth, laneWidth));
   const weeks = $derived(
     Array.from(
       { length: Math.ceil(WEEK_COUNT / view.zoom) + 2 },
@@ -158,12 +203,17 @@
     ),
   );
   const hintRow = $derived(
-    layout.rows.find(
-      (row) => row.visible && row.top + 54 + 44 > visibleScrollTop,
-    )?.id,
+    layout.rows.find((row) => row.visible && row.top + 44 > visibleScrollTop)
+      ?.id,
   );
   const busy = $derived(
-    !!gesture || !!structural || !!confirmation || !!pan || !!calendarPicker,
+    !!gesture ||
+      !!structural ||
+      !!confirmation ||
+      !!pan ||
+      !!calendarPicker ||
+      !!colorPicker ||
+      zooming,
   );
   const menuColor = $derived(
     menu
@@ -175,6 +225,12 @@
           )?.color
       : undefined,
   );
+  const menuEffectiveColor = $derived.by(() => {
+    const item = [...document.bars, ...document.milestones].find(
+      (item) => item.id === menu?.id,
+    );
+    return item ? itemColor(document, item) : (menuColor ?? 'apricot');
+  });
   const carriesRow = (id: string) =>
     !!structural &&
     structuralMeaningful &&
@@ -204,6 +260,7 @@
     structureTop(id, layout.rows.find((row) => row.id === id)?.top ?? 0) + 8;
 
   onDestroy(() => {
+    stopZoomAnimation();
     stopScrolling();
     stopPushTimer();
     stopHoverTimer();
@@ -259,6 +316,13 @@
     const pressedBar = (event.currentTarget as HTMLElement).closest(
       '.bar, .milestone',
     );
+    if (kind === 'move' && pressedBar?.classList.contains('compact')) {
+      finishName(true);
+      view.selectedId = id;
+      viewport.focus({ preventScroll: true });
+      animateZoom(2, event.clientX);
+      return;
+    }
     const displayed =
       kind !== 'draw' && kind !== 'milestone-move' && pressedBar
         ? displayedInterval(
@@ -270,6 +334,7 @@
         : undefined;
     finishName(true);
     view.selectedId = kind === 'draw' ? null : id;
+    viewport.focus({ preventScroll: true });
     pointerId = event.pointerId;
     pointer = { x: event.clientX, y: event.clientY };
     gesture =
@@ -396,7 +461,7 @@
         row.right,
         bounds.left + viewport.clientLeft + viewport.clientWidth,
       ),
-      top: bounds.top + viewport.clientTop,
+      top: bounds.top + viewport.clientTop + 54,
       bottom: bounds.top + viewport.clientTop + viewport.clientHeight,
     };
   }
@@ -467,6 +532,7 @@
     captureOwner = null;
   }
   function cancel() {
+    stopZoomAnimation();
     menu = null;
     spaceHeld = false;
     if (pan) {
@@ -503,9 +569,17 @@
       releaseCapture();
       syncHistory();
       // A simple section click still opens naming; a completed drag suppresses it.
-      if (!transaction.meaningful && transaction.kind === 'move-section')
+      if (
+        !structureFromGrip &&
+        !transaction.meaningful &&
+        transaction.kind === 'move-section'
+      )
         rename(transaction.id);
-      if (!transaction.meaningful && transaction.kind === 'move-row') {
+      if (
+        !structureFromGrip &&
+        !transaction.meaningful &&
+        transaction.kind === 'move-row'
+      ) {
         const time = performance.now();
         if (rowClick?.id === transaction.id && time - rowClick.time < 500) {
           rowClick = null;
@@ -547,6 +621,29 @@
     view.selectedId = id;
     view.editingId = id;
     draft = item.name;
+    const bar = history.document.bars.find((bar) => bar.id === id);
+    if (
+      bar &&
+      (bar.end - bar.start) * weekWidth - inset * 2 < BAR_LABEL_WIDTH
+    ) {
+      const week = (bar.start + bar.end) / 2;
+      const clientX =
+        chart.getBoundingClientRect().left +
+        LABEL_WIDTH +
+        (week - view.firstWeek) * weekWidth;
+      const bounds = visibleTimeline();
+      const finalWidth =
+        (bar.end - bar.start) * (laneWidth / WEEK_COUNT) * 2 - 10;
+      const margin = Math.min(
+        finalWidth / 2 + 8,
+        (bounds.right - bounds.left) / 2,
+      );
+      const targetX = Math.max(
+        bounds.left + margin,
+        Math.min(bounds.right - margin, clientX),
+      );
+      animateZoom(2, targetX, { week, clientX });
+    }
   }
   function revealRow(id: string) {
     const row = layout.rows.find((row) => row.id === id && row.visible);
@@ -562,14 +659,14 @@
     }
     const bounds = element.getBoundingClientRect();
     const visible = viewport.getBoundingClientRect();
-    if (bounds.top < visible.top)
-      viewport.scrollTop += bounds.top - visible.top;
+    if (bounds.top < visible.top + 54)
+      viewport.scrollTop += bounds.top - visible.top - 54;
     else if (bounds.bottom > visible.top + viewport.clientHeight)
       viewport.scrollTop += bounds.bottom - visible.top - viewport.clientHeight;
   }
   function revealAt(top: number, height: number) {
     // Use the destination layout, even while expansion/reordering is animating.
-    if (top < viewport.scrollTop) viewport.scrollTop = top;
+    if (top < viewport.scrollTop + 54) viewport.scrollTop = top - 54;
     else if (top + height > viewport.scrollTop + viewport.clientHeight)
       viewport.scrollTop = top + height - viewport.clientHeight;
   }
@@ -578,7 +675,7 @@
     return {
       left: bounds.left + viewport.clientLeft,
       right: bounds.left + viewport.clientWidth,
-      top: bounds.top + viewport.clientTop,
+      top: bounds.top + viewport.clientTop + 54,
       bottom: bounds.top + viewport.clientHeight,
     };
   }
@@ -601,6 +698,9 @@
     finishName(true);
     menu = null;
     view.selectedId = id;
+    structureFromGrip = (event.currentTarget as HTMLElement).classList.contains(
+      'drag-grip',
+    );
     const element = (event.currentTarget as HTMLElement).closest(
       '.row, .section',
     )!;
@@ -685,6 +785,7 @@
     kind: 'row' | 'section',
     id: string,
   ) {
+    if ((event.target as Element).closest('input')) return;
     event.preventDefault();
     event.stopPropagation();
     if (busy) return;
@@ -968,7 +1069,8 @@
     viewport.setPointerCapture(event.pointerId);
   }
   function zoomTo(value: number, anchor?: number) {
-    if (busy) return;
+    if (busy && !zooming) return;
+    stopZoomAnimation();
     const bounds = visibleTimeline();
     const left = chart.getBoundingClientRect().left + LABEL_WIDTH;
     const x = (anchor ?? (bounds.left + bounds.right) / 2) - left;
@@ -982,15 +1084,72 @@
       x,
     );
     view.zoom = zoom;
+    finishScale();
+  }
+  function finishScale() {
     if (scaleFrame !== null) cancelAnimationFrame(scaleFrame);
     // A view scale changes every item together; disable document settlement until
     // the browser has painted the new scale, so the anchor remains attached.
     scaleFrame = requestAnimationFrame(() => {
       scaleFrame = requestAnimationFrame(() => {
+        // Commit the final scale's layout before restoring transitions, even
+        // when multiple animation frames are coalesced before a paint.
+        chart?.getBoundingClientRect();
         changingScale = false;
         scaleFrame = null;
       });
     });
+  }
+  function stopZoomAnimation() {
+    if (zoomFrame !== null) cancelAnimationFrame(zoomFrame);
+    zoomFrame = null;
+    if (zooming) {
+      zooming = false;
+      finishScale();
+    }
+  }
+  function animateZoom(
+    value: number,
+    clientX: number,
+    focus?: { week: number; clientX: number },
+  ) {
+    stopZoomAnimation();
+    if (scaleFrame !== null) cancelAnimationFrame(scaleFrame);
+    scaleFrame = null;
+    const target = clampZoom(value);
+    const from = view.zoom;
+    if (target === from) return;
+    const x = clientX - chart.getBoundingClientRect().left - LABEL_WIDTH;
+    const fromX = focus
+      ? focus.clientX - chart.getBoundingClientRect().left - LABEL_WIDTH
+      : x;
+    const anchorWeek = focus?.week ?? view.firstWeek + x / weekWidth;
+    const started = performance.now();
+    zooming = true;
+    changingScale = true;
+    const frame = (time: number) => {
+      const progress = Math.min(
+        1,
+        Math.max(0, (time - started) / OVERVIEW_ZOOM_DURATION),
+      );
+      const eased = 1 - (1 - progress) ** 3;
+      const zoom =
+        progress === 1
+          ? target
+          : Math.exp(
+              Math.log(from) + (Math.log(target) - Math.log(from)) * eased,
+            );
+      const frameX = fromX + (x - fromX) * eased;
+      view.firstWeek = anchorWeek - frameX / ((laneWidth / WEEK_COUNT) * zoom);
+      view.zoom = zoom;
+      if (progress < 1) zoomFrame = requestAnimationFrame(frame);
+      else {
+        zoomFrame = null;
+        zooming = false;
+        finishScale();
+      }
+    };
+    zoomFrame = requestAnimationFrame(frame);
   }
   // Non-passive native listener prevents browser zoom and preserves normal vertical scrolling.
   function navigation(node: HTMLElement) {
@@ -1023,14 +1182,13 @@
       },
     };
   }
-  function openCalendar(event: MouseEvent, week: number, switchMode = false) {
+  function openCalendar(event: MouseEvent, week: number) {
     if (busy) return;
     finishName(true);
     menu = null;
     calendarTrigger = event.currentTarget as HTMLElement;
     calendarPicker = {
       week,
-      switchMode,
       date: document.calendar ? dateAt(document.calendar, week) : '',
     };
   }
@@ -1056,7 +1214,6 @@
     menu = null;
     calendarPicker = {
       week,
-      switchMode: false,
       date: document.calendar ? dateAt(document.calendar, week) : '',
     };
   }
@@ -1070,23 +1227,31 @@
     );
     menu = null;
     syncHistory();
-    calendarTrigger?.focus({ preventScroll: true });
+    restoreCalendarFocus();
+  }
+  function restoreCalendarFocus() {
+    // Overview reference changes can replace week headings with month bands.
+    void tick().then(() =>
+      (calendarTrigger?.isConnected ? calendarTrigger : viewport).focus({
+        preventScroll: true,
+      }),
+    );
   }
   function closeCalendar() {
     calendarPicker = null;
     // The trigger is disabled while the picker is open. Restore focus only
     // after the overlay has unmounted and the controls are enabled again.
-    void tick().then(() => calendarTrigger?.focus({ preventScroll: true }));
+    restoreCalendarFocus();
   }
   function setCalendar(date: string) {
     if (!calendarPicker) return;
-    const { week, switchMode } = calendarPicker;
+    const { week } = calendarPicker;
     history.commit(
       'calendar',
       {
         ...history.document,
         calendar: { week, date },
-        ...(switchMode ? { display: 'dates' as const } : {}),
+        display: 'dates',
       },
       'calendar',
     );
@@ -1096,7 +1261,7 @@
   function setDisplay(event: MouseEvent, display: 'weeks' | 'dates') {
     if (busy) return;
     if (display === 'dates' && !document.calendar) {
-      openCalendar(event, 0, true);
+      openCalendar(event, 0);
       return;
     }
     if ((document.display ?? 'weeks') === display) return;
@@ -1110,6 +1275,7 @@
     kind: 'bar' | 'milestone',
     id: string,
   ) {
+    if ((event.target as Element).closest('input')) return;
     event.preventDefault();
     event.stopPropagation();
     if (busy) return;
@@ -1133,6 +1299,22 @@
     syncHistory();
     viewport.focus({ preventScroll: true });
   }
+  function openColorPicker() {
+    if (!menu || busy) return;
+    colorPicker = { id: menu.id, color: menuEffectiveColor, name: menuName };
+    menu = null;
+  }
+  function closeColorPicker() {
+    colorPicker = null;
+    void tick().then(() => viewport.focus({ preventScroll: true }));
+  }
+  function chooseColor(color: Color) {
+    if (!colorPicker) return;
+    const { id } = colorPicker;
+    history.commit('color', recolor(history.document, id, color), id);
+    closeColorPicker();
+    syncHistory();
+  }
   function deleteItem(id: string) {
     if (busy) return;
     menu = null;
@@ -1154,7 +1336,6 @@
 </script>
 
 <svelte:window
-  oncontextmenu={(event) => event.preventDefault()}
   onkeydown={keydown}
   onkeyup={(event) => {
     if (event.code === 'Space') spaceHeld = false;
@@ -1185,10 +1366,10 @@
 {#snippet colorPalette()}
   <div class="color-group" role="group" aria-label="Color palette">
     <div class="color-label">
-      <span>Color</span><span>{palette[menuColor ?? 'apricot'].name}</span>
+      <span>Color</span><span>{palette[menuEffectiveColor].name}</span>
     </div>
     <div class="palette">
-      {#each colorKeys as color}
+      {#each quickColors as color}
         <button
           role="menuitemradio"
           aria-label={palette[color].name}
@@ -1201,8 +1382,35 @@
           >{menuColor === color ? '✓' : ''}</button
         >
       {/each}
+      <button
+        type="button"
+        role="menuitem"
+        class="more-colors"
+        aria-label="More colors…"
+        title="More colors"
+        onclick={openColorPicker}>+</button
+      >
     </div>
   </div>
+{/snippet}
+
+{#snippet dragGrip(kind: 'row' | 'section', id: string, name: string)}
+  <button
+    type="button"
+    class="drag-grip"
+    aria-label={`Drag ${kind} ${name}`}
+    title={`Drag to move ${kind}`}
+    onpointerdown={(event) =>
+      startStructure(event, kind === 'row' ? 'move-row' : 'move-section', id)}
+  >
+    <svg viewBox="0 0 10 16" aria-hidden="true"
+      >{#each [3, 8, 13] as y}<circle cx="3" cy={y} r="1" /><circle
+          cx="7"
+          cy={y}
+          r="1"
+        />{/each}</svg
+    >
+  </button>
 {/snippet}
 
 <main class="shell">
@@ -1230,7 +1438,7 @@
         label="Zoom"
         disabled={busy}
         value={view.zoom}
-        options={[0.5, 0.75, 1, 1.25, 1.5, 2].map((value) => ({
+        options={[0.125, 0.25, 0.5, 0.75, 1, 1.25, 1.5, 2].map((value) => ({
           value,
           label: `${value * 100}%`,
         }))}
@@ -1248,7 +1456,6 @@
           class:active={document.display === 'dates'}
           aria-pressed={document.display === 'dates'}
           disabled={busy}
-          oncontextmenu={(event) => void calendarMenu(event, 0)}
           onclick={(event) => setDisplay(event, 'dates')}>Dates</button
         >
       </div>
@@ -1264,6 +1471,7 @@
     bind:this={viewport}
     role="region"
     aria-label="Whole-week Gantt chart"
+    aria-busy={zooming}
     tabindex="0"
     onpointerdown={backgroundPress}
     onscroll={viewportScrolled}
@@ -1283,23 +1491,63 @@
       <div class="chart-header">
         <div class="lane-heading">Sections &amp; rows</div>
         <div class="weeks" bind:clientWidth={laneWidth}>
-          {#each weeks as week}<button
-              class="week"
-              class:date-week={document.display === 'dates'}
-              aria-label={`${weekLabel(document, week)} · Set date for Week ${week}`}
-              data-week={week}
-              disabled={busy}
-              oncontextmenu={(event) => void calendarMenu(event, week)}
-              onclick={(event) => openCalendar(event, week)}
-              style:left={`${(week - view.firstWeek) * weekWidth}px`}
-              style:width={`${weekWidth}px`}
-            >
-              {#if document.display === 'dates'}
-                {@const label = weekLabel(document, week)}
-                <span>{label.slice(0, -5)}</span><small>{label.slice(-4)}</small
-                >
-              {:else}{weekLabel(document, week)}{/if}
-            </button>{/each}
+          {#if compactDates}
+            {#each years as band}
+              <div
+                class="year-band"
+                style:left={`${Math.max(0, (band.start - view.firstWeek) * weekWidth)}px`}
+                style:width={`${(Math.min(band.end, view.firstWeek + laneWidth / weekWidth) - Math.max(band.start, view.firstWeek)) * weekWidth}px`}
+              >
+                {band.label}
+              </div>
+            {/each}
+            {#each months as band}
+              <button
+                class="month-band"
+                data-month={band.label}
+                aria-label={`${band.label} · Set reference at clicked week`}
+                disabled={busy}
+                style:left={`${Math.max(0, (band.start - view.firstWeek) * weekWidth)}px`}
+                style:width={`${(Math.min(band.end, view.firstWeek + laneWidth / weekWidth) - Math.max(band.start, view.firstWeek)) * weekWidth}px`}
+                oncontextmenu={(event) =>
+                  void calendarMenu(event, Math.floor(weekAt(event.clientX)))}
+                onclick={(event) =>
+                  openCalendar(
+                    event,
+                    event.detail
+                      ? Math.floor(weekAt(event.clientX))
+                      : Math.ceil(Math.max(band.start, view.firstWeek)),
+                  )}>{band.label}</button
+              >
+            {/each}
+          {:else}
+            {#each weeks as week}<button
+                class="week"
+                class:date-week={document.display === 'dates'}
+                aria-label={`${weekLabel(document, week)} · Set date for Week ${week}`}
+                title={weekLabel(document, week)}
+                data-week={week}
+                disabled={busy}
+                oncontextmenu={(event) => void calendarMenu(event, week)}
+                onclick={(event) => openCalendar(event, week)}
+                style:left={`${(week - view.firstWeek) * weekWidth}px`}
+                style:width={`${weekWidth}px`}
+              >
+                {#if document.display === 'dates'}
+                  {@const label = weekLabel(document, week)}
+                  <span>{label.slice(0, -5)}</span><small
+                    >{label.slice(-4)}</small
+                  >
+                {:else if week % stride === 0}
+                  <span
+                    class="week-label"
+                    style:width={`${weekWidth * stride}px`}
+                    style:left={`${(weekWidth * (1 - stride)) / 2}px`}
+                    >{weekLabel(document, week)}</span
+                  >
+                {/if}
+              </button>{/each}
+          {/if}
         </div>
       </div>
       {#each renderedSections as section (section.id)}
@@ -1315,6 +1563,11 @@
           aria-label={section.name || 'Unnamed section'}
         >
           <div class="section-label">
+            {@render dragGrip(
+              'section',
+              section.id,
+              section.name || 'Unnamed section',
+            )}
             <button
               class="collapse"
               aria-label={`${collapsed.includes(section.id) ? 'Expand' : 'Collapse'} ${section.name || 'Unnamed section'}`}
@@ -1327,10 +1580,10 @@
             </button>
             <span
               class="section-color"
-              style:background={palette[
+              style:background={colorLabelInk(
                 document.sections.find((item) => item.id === section.id)
-                  ?.color ?? 'apricot'
-              ].ink}
+                  ?.color ?? 'apricot',
+              )}
             ></span>
             {#if view.editingId === section.id}
               {@render nameInput('Section')}
@@ -1377,6 +1630,7 @@
             role="group"
             aria-label={row.name || 'Unnamed row'}
           >
+            {@render dragGrip('row', row.id, row.name || 'Unnamed row')}
             {#if view.editingId === row.id}
               {@render nameInput('Row')}
             {:else}
@@ -1391,8 +1645,6 @@
           </div>
           <div
             class="lane"
-            style:--week={`${weekWidth}px`}
-            style:background-position-x={`${timelineShift}px`}
             role="region"
             aria-label={`Timeline row ${layout.rows.findIndex((candidate) => candidate.id === row.id) + 1}`}
             tabindex="-1"
@@ -1408,6 +1660,8 @@
             }}
             oncontextmenu={(event) => void openMenu(event, row.id)}
           >
+            <svg class="week-grid" aria-hidden="true"><path d={gridPath} /></svg
+            >
             {#if empty && row.id === hintRow}<span class="hint"
                 >Drag to create a bar · Double-click for a milestone.</span
               >{/if}
@@ -1426,8 +1680,8 @@
                   data-end={proposal.end}
                   data-row={proposal.rowId}
                   data-valid={motion.validDrop}
-                  style:left={`${(proposal.start - FIRST_WEEK) * weekWidth + (gesture.kind === 'milestone-move' ? -7 : BAR_INSET)}px`}
-                  style:width={`${gesture.kind === 'milestone-move' ? 14 : (proposal.end - proposal.start) * weekWidth - BAR_INSET * 2}px`}
+                  style:left={`${(proposal.start - FIRST_WEEK) * weekWidth + (gesture.kind === 'milestone-move' ? -7 : inset)}px`}
+                  style:width={`${gesture.kind === 'milestone-move' ? 14 : (proposal.end - proposal.start) * weekWidth - inset * 2}px`}
                 ></div>
               {/if}
             </div>
@@ -1691,6 +1945,14 @@
       onclose={closeCalendar}
     />
   {/if}
+  {#if colorPicker}
+    <ColorPicker
+      color={colorPicker.color}
+      name={colorPicker.name}
+      onchoose={chooseColor}
+      onclose={closeColorPicker}
+    />
+  {/if}
   {#if confirmation}
     <Dialog
       titleId="delete-title"
@@ -1721,7 +1983,7 @@
   {/if}
   <span class="notice" role="status">{notice}</span>
   <footer>
-    Drag bars to move · Drag ends to resize · Double-click to rename<span
+    Click tiny bars to zoom · Drag bars to move · Drag ends to resize<span
       >Esc cancels · Ctrl / Cmd + Z undoes</span
     >
   </footer>
@@ -1730,6 +1992,9 @@
 <style>
   .shell {
     padding: 0 34px 26px;
+    height: 100dvh;
+    display: grid;
+    grid-template-rows: 88px minmax(0, 1fr) auto;
   }
   header {
     height: 88px;
@@ -1828,8 +2093,7 @@
     background: var(--surface);
     border: 1px solid var(--line);
     border-radius: var(--radius);
-    min-height: 470px;
-    height: 470px;
+    min-height: 0;
   }
   .chart {
     position: relative;
@@ -1851,10 +2115,15 @@
     background: var(--surface);
   }
   .chart-header {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background: var(--surface);
     height: 54px;
     border-bottom: 1px solid var(--line);
   }
   .lane-heading {
+    top: 0;
     display: flex;
     align-items: center;
     padding: 0 22px;
@@ -1891,9 +2160,46 @@
     gap: 2px;
     font-size: 11px;
   }
+  .week-label {
+    position: absolute;
+    top: 0;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    white-space: nowrap;
+    pointer-events: none;
+  }
   .date-week small {
     color: var(--muted);
     font-size: 9px;
+  }
+  .year-band,
+  .month-band {
+    position: absolute;
+    overflow: hidden;
+    white-space: nowrap;
+    border-right: 1px solid var(--line);
+    text-align: center;
+    font-size: 11px;
+  }
+  .year-band {
+    top: 0;
+    height: 20px;
+    line-height: 20px;
+    background: var(--section-bg);
+    color: var(--muted);
+    pointer-events: none;
+  }
+  .month-band {
+    top: 20px;
+    height: 33px;
+    border-top: 1px solid var(--grid);
+    border-bottom: 0;
+    border-left: 0;
+    padding: 0;
+    background: transparent;
+    cursor: pointer;
   }
   .section {
     position: absolute;
@@ -1908,7 +2214,7 @@
     display: flex;
     align-items: center;
     gap: 8px;
-    padding: 0 22px;
+    padding: 0 14px;
     font-size: 13px;
     font-weight: 650;
   }
@@ -1937,7 +2243,8 @@
   .row-label {
     display: flex;
     align-items: center;
-    padding: 0 22px;
+    padding: 0 14px;
+    gap: 8px;
     border-right: 1px solid var(--line);
     font-size: 14px;
     font-weight: 500;
@@ -1949,11 +2256,17 @@
     overflow: clip;
     touch-action: none;
     user-select: none;
-    background: repeating-linear-gradient(
-      to right,
-      transparent 0 calc(var(--week) - 1px),
-      var(--grid) calc(var(--week) - 1px) var(--week)
-    );
+  }
+  .week-grid {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    fill: none;
+    stroke: var(--grid);
+    stroke-width: 1;
+    shape-rendering: crispEdges;
   }
   .hint {
     position: absolute;
@@ -1999,6 +2312,30 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+  .drag-grip {
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+    width: 12px;
+    height: 24px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: #9ca7b4;
+    cursor: grab;
+    touch-action: none;
+  }
+  .drag-grip:hover {
+    color: var(--muted);
+  }
+  .drag-grip:active {
+    cursor: grabbing;
+  }
+  .drag-grip svg {
+    width: 10px;
+    height: 16px;
+    fill: currentColor;
   }
   .section-name {
     flex: 1;
@@ -2224,6 +2561,22 @@
   }
   .palette button[aria-checked='true'] {
     border-color: var(--swatch-ink);
+  }
+  .palette .more-colors {
+    color: var(--muted);
+    background: conic-gradient(
+      from 25deg,
+      #f3b18433,
+      #b5a2e044,
+      #a0d4dd44,
+      #abc4ad44,
+      #f3b18433
+    );
+    font-size: 20px;
+    line-height: 1;
+  }
+  .palette .more-colors:focus-visible {
+    outline-color: var(--accent);
   }
   .notice {
     position: fixed;

@@ -2,7 +2,7 @@
 
 **Status:** Agreed UX direction, refined for the first implementation milestone.
 
-**Last updated:** October 4, 2026.
+**Last updated:** October 5, 2026.
 
 **Audience:** Product, design, and implementation collaborators.
 
@@ -118,11 +118,11 @@ The chosen date does not have to be a Monday. Each week is a seven-day period st
 
 Calendar mode labels weeks by their starting dates. Bars still occupy whole weeks. Switching between relative and calendar displays preserves their positions and the calendar reference.
 
-Selecting calendar mode before a reference exists opens a centered date-picker dialog with the same dimmed backdrop as deletion confirmation. Its custom calendar is visible immediately, with Monday-first weeks, month navigation, a Today shortcut, and a date field accepting `YYYY-MM-DD` for direct entry. The selected date represents the start of Week 0. Choosing a day changes an uncommitted draft; **Set date** applies it. Cancel, Escape, or clicking the backdrop discards the draft and leaves relative-week mode selected. Selecting a week heading opens the same dialog to set or replace the date assigned to the start of that specific week; the remaining labels are derived in seven-day increments. Setting a reference from a heading preserves the current display mode. The calendar initially shows the existing reference or today's month without selecting a default reference. Arrow keys navigate days, Home/End navigate within a week, and Page Up/Down navigate months. Dates in the chart use an English day–short-month–year format, for example **5 Oct 2026**; headings may put the year on a second line. The user chooses the date; the example is not a default reference.
+Selecting calendar mode before a reference exists opens a centered date-picker dialog with the same dimmed backdrop as deletion confirmation. Its custom calendar is visible immediately, with Monday-first weeks, month navigation and a Today shortcut beside the month controls; there is no separate selected-date field below the calendar. The selected date represents the start of Week 0. Choosing a day changes an uncommitted draft; **Set date** applies it. Cancel, Escape, or clicking the backdrop discards the draft and leaves relative-week mode selected. Selecting a week heading opens the same dialog to set or replace the date assigned to the start of that specific week; the remaining labels are derived in seven-day increments. Applying a reference from any entry point automatically selects Dates. The reference and display change are one undoable action; undo restores both previous values. Set date is disabled until a draft date is selected. The calendar initially shows the existing reference or today's month without selecting a default reference. Arrow keys navigate days, Home/End navigate within a week, and Page Up/Down navigate months. Dates in the chart use an English day–short-month–year format, for example **5 Oct 2026**; headings may put the year on a second line. The user chooses the date; the example is not a default reference.
 
-Right-clicking a week heading or the toolbar's Dates control opens a calendar-reference context menu. Without a reference, it offers **Set reference**. With a reference, it offers **Reset reference** and **Clear reference**. Set and Reset open the existing date picker for the clicked week, or Week 0 from the Dates control, preserving the current display mode. The draft remains uncommitted until Set date; cancellation preserves the reference and history. Clear removes the reference and switches to Weeks as one undoable action; undo restores both the previous reference and display mode. These actions preserve all item positions.
+Right-clicking a timeline heading opens a calendar-reference context menu. Without a reference, it offers **Set reference**. With a reference, it offers **Reset reference** and **Clear reference**. Set and Reset open the existing date picker for the clicked week, with Dates selected when the reference is applied. The draft remains uncommitted until Set date; cancellation preserves the reference and history. Clear removes the reference and switches to Weeks as one undoable action; undo restores both the previous reference and display mode. These actions preserve all item positions.
 
-The browser's native right-click menu is suppressed throughout the editor window, including the toolbar, empty space, inline inputs, and dialogs. Existing app context menus continue to work on their targets; other surfaces show no menu.
+App context menus are limited to chart targets: timeline headings, sections, rows, bars, milestones, and empty lanes. Other surfaces, including the toolbar, page margins, footer, inline text inputs, and dialogs, retain the browser's native context menu.
 
 ### 5.3 Milestone timing
 
@@ -161,9 +161,9 @@ The zoom control is a custom dropdown with a nearby chevron that rotates while o
 
 Navigation must coexist with creation gestures. An ordinary drag in empty row space creates a bar; Space-drag is the distinct panning gesture.
 
-Horizontal scrolling moves only the timeline: week headings, grid lines, bars, and milestones. The section/row heading column, section names, row names, and their controls stay pinned on the left. They still move vertically with their corresponding rows and sections. Timeline content cannot paint or receive pointer input over that fixed column. This applies to ordinary horizontal scrolling, edge auto-scroll, and future panning.
+The editor fills the available window width and height between its toolbar and footer. Scrolling stays inside the chart viewport. The timeline heading row stays fixed vertically, including the top-left corner, while section and row headings move vertically with their corresponding lanes. Content under the fixed header cannot receive pointer input. Horizontal scrolling moves only the timeline: week headings, grid lines, bars, and milestones. The section/row heading column, section names, row names, and their controls stay pinned on the left. They still move vertically with their corresponding rows and sections. Timeline content cannot paint or receive pointer input over that fixed column. This applies to ordinary horizontal scrolling, edge auto-scroll, and future panning.
 
-The initial view is approximately Week -2 through Week 9 at the prototype's default week width. The initial zoom range is roughly 50% to 200%. Ctrl/Cmd plus mouse-wheel zoom preserves the time under the pointer; toolbar zoom preserves the time at the viewport center. Exact zoom steps and wheel sensitivity remain tunable implementation details.
+At 100%, the timeline shows approximately 24 weeks (initially Week -2 through Week 21); 200% shows approximately 12 weeks and 12.5% approximately 192. A narrow window may show fewer weeks because the chart retains its minimum width. The zoom range is 12.5% to 200%. At widths below 60 CSS pixels per week, Dates displays aligned calendar month bands below a year band; month boundaries follow actual calendar dates even within a week. Clicking or right-clicking a month band uses the week under the pointer; keyboard activation uses the first visible whole-week start in the band. Weeks displays spaced week labels at a power-of-two stride sufficient to give each label at least 60 CSS pixels. Its individual heading cells and lane grid remain one week wide, including unlabeled heading cells; selecting an unlabeled cell assigns a reference to that specific week. Grid lines and editing retain whole-week precision. Ctrl/Cmd plus mouse-wheel zoom preserves the time under the pointer; toolbar zoom preserves the time at the viewport center. Exact zoom steps and wheel sensitivity remain tunable implementation details.
 
 ## 7. Creating and naming items
 
@@ -199,11 +199,13 @@ The context menu also provides **“Add milestone here.”** It uses the same pl
 
 Clicking anywhere in a section's name area edits its name in place. Double-clicking a row name, bar label, or milestone label edits that text in place. A **“Rename”** context-menu action offers another route to the same editor. Opening any name editor places the caret at the end of the existing text without selecting it.
 
-Inline naming retains the label's typography, color, background, and position. Section, row, and milestone editors have no visible input box, border, or focus outline. Bar text is vertically centered in both display and editing modes. Bars and milestones gain no selection border or outline, and focusing the chart does not add an outline around it. Both bar resize handles remain visible regardless of selection or hover. Selection still determines keyboard deletion; invalid-drop feedback remains visible during gestures.
+Inline naming retains the label's typography, color, background, and position. Section, row, and milestone editors have no visible input box, border, or focus outline. Bar text is vertically centered in both display and editing modes. Bars and milestones gain no selection border or outline, and focusing the chart does not add an outline around it. Bar resize handles remain visible regardless of selection or hover when the painted bar is at least 32 CSS pixels wide. Smaller bars hide their handles and use a zoom-in cursor. Selection still determines keyboard deletion; invalid-drop feedback remains visible during gestures.
 
 Dragging a label still moves its item; the label is not an area that blocks direct manipulation. Dedicated bar end handles remain resize targets.
 
-Display labels are clipped to the available item width and expose the complete name on hover. During inline editing, the input stays within the bar; long text scrolls inside the field. One-week bars retain usable resize targets, and a visible label remains part of the bar's drag target.
+Display labels appear only when the painted bar is at least 56 CSS pixels wide; longer labels are clipped. The complete name and timing remain available on hover. During inline editing, the input stays within the bar; long text scrolls inside the field.
+
+Clicking a bar narrower than 32 CSS pixels animates to 200% over approximately 150 ms, preserving the week under the pointer. It selects the bar without moving or resizing it. Creating or renaming a bar narrower than 56 CSS pixels uses the same animation while keeping the name input focused and bringing the full bar into view. At the resulting detail scale, resize handles are available. Escape, window blur, or manual wheel zoom interrupts the animation at its current view. Space-drag still pans over tiny bars. These view changes preserve document history and redo. A visible label remains part of the bar's drag target.
 
 ## 8. Selection, movement, and resizing
 
@@ -235,7 +237,7 @@ Dragging a milestone changes its week-ending position and can change its row. It
 
 ### 8.4 Reorganization on the left
 
-Dragging a row's name area moves that entire row:
+Rows and section headings show a six-dot drag handle. Dragging the handle or name area moves the structure; clicking a handle alone does not open naming. Dragging a row's name area moves that entire row:
 
 - To a different position within its section.
 - Into another section.
@@ -379,7 +381,7 @@ The inheritance rules are:
 - Moving an item or an entire row to another section adopts the destination color for items without overrides.
 - Explicit overrides survive movement between sections.
 
-The first draft uses a fixed Apricot palette: apricot, lavender, sea blue, slate, and rose. Arbitrary custom-color entry is deferred.
+Each color menu has four quick swatches (Peach, Lavender, Sea blue, Slate); its fifth slot opens a centered color-picker overlay with the same dimmed backdrop as date setup and deletion confirmation. The picker offers six coordinated hue families (peach, lavender, sea blue, sage, rose, slate), each in light, medium and deep shades. Choosing a swatch updates only the draft and its preview; Apply color commits one undoable color action. Cancel, Escape, or clicking the backdrop discards the draft and preserves redo. Focus returns to the chart on dismissal. Arrow keys navigate the six-column palette (left/right by one, up/down by six); Home/End choose the first/last shade, and Tab stays within the overlay. Inherited items open with their effective section color selected. Arbitrary custom-color entry remains deferred. Prototype design names do not appear in user-facing labels; the original warm default is named Peach.
 
 ## 13. Deletion and undo/redo
 

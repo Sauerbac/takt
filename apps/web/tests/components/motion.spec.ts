@@ -1,3 +1,4 @@
+import { zoomToWeekZero } from '../helpers';
 import { test, expect } from '@playwright/test';
 import {
   beginBarDrag,
@@ -52,6 +53,7 @@ for (const escape of [true, false]) {
     page,
   }) => {
     await page.goto('/tests/fixtures/index.html?state=Chain');
+    await zoomToWeekZero(page);
     await pauseClock(page);
     await freezeTransitions(page);
     const lane = await laneGeometry(page);
@@ -111,6 +113,7 @@ test('returning after an overtake animates the neighbor toward the new approach 
   page,
 }) => {
   await page.goto('/tests/fixtures/index.html?state=Separated');
+  await zoomToWeekZero(page);
   const a = page.getByTestId('bar-a');
   const b = page.getByTestId('bar-b');
   await settled(a);
@@ -145,6 +148,7 @@ for (const edge of [undefined, 'left', 'right'] as const) {
     page,
   }) => {
     await page.goto('/tests/fixtures/index.html?state=Chain');
+    await zoomToWeekZero(page);
     const bar = page.getByTestId('bar-a');
     await settled(bar);
     await freezeTransitions(page);
@@ -191,6 +195,7 @@ test('pointer attachment is immediate; displaced bars animate and reverse; relea
   page,
 }) => {
   await page.goto('/tests/fixtures/index.html?state=Chain');
+  await zoomToWeekZero(page);
   const lane = await laneGeometry(page);
   const a = page.getByTestId('bar-a');
   const b = page.getByTestId('bar-b');
@@ -252,6 +257,7 @@ test('a bar still gliding from a collision can be picked up without a jump', asy
   page,
 }) => {
   await page.goto('/tests/fixtures/index.html?state=Chain');
+  await zoomToWeekZero(page);
   const a = page.getByTestId('bar-a'),
     b = page.getByTestId('bar-b');
   await settled(a);
@@ -284,6 +290,7 @@ test('resize tracks width immediately and animates the final snapped width', asy
   page,
 }) => {
   await page.goto('/tests/fixtures/index.html?state=Chain');
+  await zoomToWeekZero(page);
   const a = page.getByTestId('bar-a');
   await settled(a);
   await freezeTransitions(page);
@@ -317,6 +324,7 @@ test('a one-week creation can be resized during width settlement without jumping
   page,
 }) => {
   await page.goto('/tests/fixtures/index.html?state=Empty');
+  await zoomToWeekZero(page);
   const lane = await laneGeometry(page);
   await freezeTransitions(page);
   await page.mouse.move(lane.x(3), lane.y);

@@ -9,7 +9,6 @@
     monthGrid,
     moveDate,
     moveMonth,
-    validDate,
   } from './calendar-grid';
   let {
     week,
@@ -34,7 +33,6 @@
   let focused = $state(date || today);
   // svelte-ignore state_referenced_locally
   let month = $state(focused);
-  let input: HTMLInputElement;
   let grid: HTMLTableElement;
   const days = $derived(monthGrid(month));
   const monthLabel = $derived(
@@ -44,20 +42,10 @@
       timeZone: 'UTC',
     }).format(new Date(month)),
   );
-  function enterDate() {
-    input.setCustomValidity(
-      value && !validDate(value) ? 'Enter a valid date as YYYY-MM-DD.' : '',
-    );
-    if (validDate(value)) {
-      focused = value;
-      month = value;
-    }
-  }
   function selectDate(day: string) {
     value = day;
     focused = day;
     month = day;
-    input.setCustomValidity('');
   }
   async function focusDate(day: string) {
     focused = day;
@@ -96,7 +84,7 @@
   descriptionId={`${id}-description`}
   {onclose}
   dismissOutside
-  initialFocus="input"
+  initialFocus="[tabindex='0']"
   width={360}
 >
   <div class="heading">
@@ -115,11 +103,14 @@
   <form
     onsubmit={(event) => {
       event.preventDefault();
-      enterDate();
-      if (input.reportValidity() && validDate(value)) onchoose(value);
+      if (value) onchoose(value);
     }}
   >
     <div class="month-navigation">
+      <span aria-live="polite">{monthLabel}</span>
+      <button type="button" class="today" onclick={() => selectDate(today)}
+        >Today</button
+      >
       <button
         type="button"
         class="month-arrow"
@@ -134,7 +125,6 @@
           ><path d="m10 4-4 4 4 4" /></svg
         ></button
       >
-      <span aria-live="polite">{monthLabel}</span>
       <button
         type="button"
         class="month-arrow"
@@ -180,32 +170,11 @@
           >{/each}</tbody
       >
     </table>
-    <div class="date-entry">
-      <label for={`${id}-date`}>Selected date</label><button
-        type="button"
-        class="today"
-        onclick={() => selectDate(today)}>Today</button
-      >
-    </div>
-    <input
-      bind:this={input}
-      id={`${id}-date`}
-      type="text"
-      placeholder="YYYY-MM-DD"
-      required
-      maxlength="10"
-      autocomplete="off"
-      spellcheck="false"
-      bind:value
-      oninput={(event) => {
-        value = event.currentTarget.value;
-        enterDate();
-      }}
-    />
     <div class="actions">
       <Button onclick={onclose}>Cancel</Button><Button
         type="submit"
         variant="primary"
+        disabled={!value}
         ><svg viewBox="0 0 16 16" aria-hidden="true"
           ><path d="m3.5 8 3 3 6-6" /></svg
         >Set date</Button
@@ -258,9 +227,13 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
+    gap: 6px;
     margin-bottom: 12px;
     font-size: 13px;
     font-weight: 600;
+  }
+  .month-navigation > span {
+    margin-right: auto;
   }
   .month-arrow {
     display: grid;
@@ -325,46 +298,22 @@
     font-weight: 600;
     box-shadow: 0 1px 2px #182e4712;
   }
-  button:focus-visible,
-  input:focus-visible {
+  button:focus-visible {
     outline: 3px solid #f3b18480;
     outline-offset: 1px;
   }
-  .date-entry {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin: 18px 0 7px;
-  }
-  label {
-    font-size: 11px;
-    font-weight: 600;
-    color: var(--muted);
-  }
   .today {
-    padding: 0;
-    border: 0;
-    background: transparent;
+    padding: 6px 9px;
+    border: 1px solid #f3b18455;
+    border-radius: 6px;
+    background: #f3b18418;
     color: #a16032;
     font-size: 11px;
     font-weight: 600;
     cursor: pointer;
   }
   .today:hover {
-    text-decoration: underline;
-  }
-  input {
-    width: 100%;
-    height: 36px;
-    padding: 0 10px;
-    border: 1px solid var(--line);
-    border-radius: 6px;
-    color: var(--ink);
-    background: var(--surface);
-    font-size: 13px;
-  }
-  input::placeholder {
-    color: #9ca7b4;
+    background: #f3b18430;
   }
   .actions {
     display: flex;

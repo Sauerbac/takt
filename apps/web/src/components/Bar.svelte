@@ -1,7 +1,12 @@
 <script lang="ts">
   import type { Bar } from '../model/document';
   import type { Interval, GestureKind } from '../interaction/gesture';
-  import { FIRST_WEEK, BAR_INSET } from '../viewport';
+  import {
+    FIRST_WEEK,
+    barInset,
+    BAR_LABEL_WIDTH,
+    COMPACT_BAR_WIDTH,
+  } from '../viewport';
   let {
     bar,
     weekWidth,
@@ -40,10 +45,14 @@
     onmenu?: (event: MouseEvent, kind: 'bar', id: string) => void;
   } = $props();
   const position = $derived(tracking ?? bar);
+  const inset = $derived(barInset(weekWidth));
+  const paintedWidth = $derived(
+    Math.max(1, (position.end - position.start) * weekWidth - inset * 2),
+  );
   let input = $state<HTMLInputElement>();
   $effect(() => {
     if (editing && input) {
-      input.focus();
+      input.focus({ preventScroll: true });
       input.setSelectionRange(input.value.length, input.value.length);
     }
   });
@@ -59,6 +68,7 @@
   class:invalid
   class:tracking={!!tracking}
   class:editing
+  class:compact={paintedWidth < COMPACT_BAR_WIDTH}
   data-testid={`bar-${bar.id}`}
   data-start={bar.start}
   data-end={bar.end}
@@ -66,8 +76,9 @@
   style:--bar-fill={color?.fill}
   style:--bar-ink={color?.ink}
   style:top={`${top}px`}
-  style:left={`${(position.start - FIRST_WEEK) * weekWidth + BAR_INSET}px`}
-  style:width={`${Math.max(1, (position.end - position.start) * weekWidth - BAR_INSET * 2)}px`}
+  style:left={`${(position.start - FIRST_WEEK) * weekWidth + inset}px`}
+  style:width={`${paintedWidth}px`}
+  style:--handle-width={`${Math.min(10, Math.max(0.5, ((position.end - position.start) * weekWidth - inset * 2 - 2) / 3))}px`}
   title={`${invalid ? 'Cannot drop here · Move clear or hold to push · ' : ''}${bar.name || 'Unnamed bar'} · ${timing ?? `Weeks ${bar.start}–${bar.end - 1}`}`}
   oncontextmenu={(event) => onmenu?.(event, 'bar', bar.id)}
   onpointerdown={(event) => {
@@ -101,7 +112,7 @@
         }
       }}
     />
-  {:else}<span>{bar.name}</span>{/if}
+  {:else if paintedWidth >= BAR_LABEL_WIDTH}<span>{bar.name}</span>{/if}
   <button
     class="handle right"
     type="button"
@@ -136,7 +147,7 @@
     font-weight: 600;
     display: flex;
     align-items: center;
-    padding: 0 12px;
+    padding: 0 min(12px, var(--handle-width));
     transition:
       left var(--settlement) ease-out,
       width var(--settlement) ease-out,
@@ -181,11 +192,18 @@
     position: absolute;
     top: 0;
     bottom: 0;
-    width: 10px;
+    width: var(--handle-width);
     border: 0;
     padding: 0;
     background: transparent;
     cursor: ew-resize;
+  }
+  .compact {
+    cursor: zoom-in;
+  }
+  .compact .handle {
+    visibility: hidden;
+    pointer-events: none;
   }
   .handle:focus-visible {
     outline: none;

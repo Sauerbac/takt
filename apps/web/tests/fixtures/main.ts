@@ -6,6 +6,51 @@ import '../../src/tokens.css';
 
 // Named, deterministic component states. This entry is never part of the production build.
 const states: Record<string, ChartDocument> = {
+  ShortBars: {
+    ...emptyDocument(),
+    display: 'dates',
+    calendar: { week: 0, date: '2026-10-05' },
+    sections: [
+      { id: 'section-1', name: 'Compact work periods', color: 'apricot' },
+    ],
+    rows: [
+      { id: 'row-1', sectionId: 'section-1', name: 'Separated one-week bars' },
+      { id: 'row-2', sectionId: 'section-1', name: 'Adjacent one-week bars' },
+      { id: 'row-3', sectionId: 'section-1', name: 'Mixed durations' },
+    ],
+    bars: [
+      ...[-24, -8, 0, 2, 8, 16, 36, 60].map((start, index) => ({
+        id: `short-${index}`,
+        rowId: 'row-1',
+        start,
+        end: start + 1,
+        name: [
+          'Kickoff',
+          'Review',
+          'Workshop',
+          'Decision',
+          'Approval',
+          'Handoff',
+          'Release',
+          'Follow-up',
+        ][index],
+      })),
+      ...Array.from({ length: 8 }, (_, index) => ({
+        id: `adjacent-${index}`,
+        rowId: 'row-2',
+        start: index,
+        end: index + 1,
+        name: `Sprint ${index + 1}`,
+      })),
+      ...[
+        { start: -8, end: -7, name: 'Brief' },
+        { start: -4, end: 0, name: 'Discovery' },
+        { start: 2, end: 3, name: 'Review' },
+        { start: 6, end: 14, name: 'Implementation' },
+        { start: 16, end: 18, name: 'Delivery' },
+      ].map((bar, index) => ({ id: `mixed-${index}`, rowId: 'row-3', ...bar })),
+    ],
+  },
   CalendarColors: {
     ...emptyDocument(),
     display: 'dates',

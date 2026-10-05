@@ -1,11 +1,53 @@
 import { expect } from '@playwright/test';
 import type { Page, Locator } from '@playwright/test';
 
+export async function selectDate(page: Page, date: string) {
+  const grid = page.getByRole('grid');
+  const focused = grid.locator('button[tabindex="0"]');
+  const current = (await focused.getAttribute('data-date'))!;
+  const months =
+    (Number(date.slice(0, 4)) - Number(current.slice(0, 4))) * 12 +
+    Number(date.slice(5, 7)) -
+    Number(current.slice(5, 7));
+  await focused.focus();
+  for (let i = 0; i < Math.abs(months); i++) {
+    await page.keyboard.press(months < 0 ? 'PageUp' : 'PageDown');
+  }
+  await grid.locator(`[data-date="${date}"]`).click();
+}
+
+export async function chooseColor(page: Page, name: string) {
+  const quick = page.getByRole('menuitemradio', { name, exact: true });
+  if (await quick.count()) await quick.click();
+  else {
+    await page
+      .getByRole('menuitem', { name: 'More colors…', exact: true })
+      .click();
+    await page.getByRole('radio', { name, exact: true }).click();
+    await page
+      .getByRole('button', { name: 'Apply color', exact: true })
+      .click();
+  }
+}
+
 export async function chooseZoom(page: Page, scale: string) {
   await page.getByRole('combobox', { name: 'Zoom', exact: true }).click();
   await page
     .getByRole('option', { name: `${Number(scale) * 100}%`, exact: true })
     .click();
+}
+
+// Calendar-reference scenarios deliberately show individual dates around the
+// origin. Toolbar zoom preserves the center, so explicitly pan back to Week 0.
+export async function zoomToWeekZero(page: Page) {
+  await chooseZoom(page, '2');
+  const lane = page.getByTestId('lane').first();
+  const first = Number(await lane.getAttribute('data-first-week'));
+  const width = Number(await lane.getAttribute('data-week-width'));
+  const bounds = (await lane.boundingBox())!;
+  await page.mouse.move(bounds.x + 100, bounds.y + 22);
+  await page.mouse.wheel((-2 - first) * width, 0);
+  await expect(page.locator('[data-week="0"]')).toBeInViewport({ ratio: 1 });
 }
 
 export async function laneGeometry(page: Page, row = 0) {
@@ -37,6 +79,9 @@ export async function draw(
     await input.fill(name);
     await input.press('Enter');
   } else await input.press('Escape');
+  // Ordinary scenarios continue from the finished view transition. Dedicated
+  // overview motion tests drive creation and the animation clock directly.
+  await expect(page.locator('.viewport')).toHaveAttribute('aria-busy', 'false');
 }
 export async function interval(bar: Locator, start: number, end: number) {
   await expect(bar).toHaveAttribute('data-start', String(start));

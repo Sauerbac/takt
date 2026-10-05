@@ -1,3 +1,4 @@
+import { zoomToWeekZero } from '../helpers';
 import { test, expect } from '@playwright/test';
 import {
   beginBarDrag,
@@ -11,6 +12,7 @@ import {
 
 test.beforeEach(async ({ page }) => {
   await page.goto('/tests/fixtures/index.html?state=Empty');
+  await zoomToWeekZero(page);
 });
 
 test('a click and sub-threshold jitter create nothing; drawing either way keeps Week 0 fixed', async ({
@@ -87,6 +89,7 @@ test('draw previews push a chain right, reverse completely, and Escape creates n
   page,
 }) => {
   await page.goto('/tests/fixtures/index.html?state=Chain');
+  await zoomToWeekZero(page);
   const lane = await laneGeometry(page);
   await page.mouse.move(lane.x(-1), lane.y);
   await page.mouse.down();
@@ -114,6 +117,7 @@ test('creation commits all rightward pushes and its own undo restores the entire
   page,
 }) => {
   await page.goto('/tests/fixtures/index.html?state=Chain');
+  await zoomToWeekZero(page);
   await draw(page, -1, 1);
   await expectPosition(page, 'a', 1, 3);
   await expectPosition(page, 'b', 3, 5);
@@ -132,6 +136,7 @@ test('moving by the label previews and reverses right and left cascades with ato
   page,
 }) => {
   await page.goto('/tests/fixtures/index.html?state=Chain');
+  await zoomToWeekZero(page);
   const lane = await laneGeometry(page);
   const from = await beginBarDrag(page, 'a');
   await page.mouse.move(from.x + lane.width, from.y);
@@ -165,6 +170,7 @@ test('both resize edges preserve the opposite edge and stop at the one-week mini
   page,
 }) => {
   await page.goto('/tests/fixtures/index.html?state=Chain');
+  await zoomToWeekZero(page);
   const lane = await laneGeometry(page);
   let from = await beginBarDrag(page, 'a', 'right');
   await page.mouse.move(from.x - 3 * lane.width, from.y);
@@ -189,11 +195,12 @@ test('both resize edges preserve the opposite edge and stop at the one-week mini
 test('real pointer proposals resolve exact halfway ties toward the later boundary', async ({
   page,
 }) => {
-  // An integral 82px week width avoids platform subpixel input quantization at the tie.
-  await page.setViewportSize({ width: 1272, height: 800 });
+  // An integral 80px week width avoids platform subpixel input quantization at the tie.
+  await page.setViewportSize({ width: 1248, height: 800 });
   await page.goto('/tests/fixtures/index.html?state=Chain');
+  await zoomToWeekZero(page);
   const lane = await laneGeometry(page);
-  expect(lane.width).toBe(82);
+  expect(lane.width).toBe(80);
   await settled(page.getByTestId('bar-a'));
   const from = await beginBarDrag(page, 'a');
   await page.mouse.move(from.x - lane.width / 2, from.y);
@@ -216,6 +223,7 @@ test('extend, push, retract, and release commits only the last displayed preview
   page,
 }) => {
   await page.goto('/tests/fixtures/index.html?state=Chain');
+  await zoomToWeekZero(page);
   const lane = await laneGeometry(page);
   const from = await beginBarDrag(page, 'a', 'right');
   await page.mouse.move(from.x + 2 * lane.width, from.y);
@@ -239,6 +247,7 @@ test('pointer capture allows an outside release; pointer loss and window blur ca
   page,
 }) => {
   await page.goto('/tests/fixtures/index.html?state=Chain');
+  await zoomToWeekZero(page);
   const lane = await laneGeometry(page);
   const from = await beginBarDrag(page, 'a');
   await page.mouse.move(from.x + lane.width, from.y - 90);
@@ -276,6 +285,7 @@ test('selection clears on empty clicks, deletion is undoable, and narrow bars re
   page,
 }) => {
   await page.goto('/tests/fixtures/index.html?state=Narrow');
+  await zoomToWeekZero(page);
   const bar = page.getByTestId('bar-a');
   await expect(bar).toHaveAttribute('title', /A long label/);
   const lane = await laneGeometry(page);

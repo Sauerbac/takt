@@ -1,14 +1,12 @@
-import { chooseZoom } from '../helpers';
+import { chooseZoom, zoomToWeekZero } from '../helpers';
 import { test, expect } from '@playwright/test';
 import type { Page } from '@playwright/test';
-import { draw, interval, laneGeometry, settled } from '../helpers';
+import { draw, interval, laneGeometry, settled, selectDate } from '../helpers';
 
 const chart = (page: Page) =>
   page.getByRole('region', { name: 'Whole-week Gantt chart', exact: true });
 async function chooseDate(page: Page, date: string) {
-  await page
-    .getByRole('textbox', { name: 'Selected date', exact: true })
-    .fill(date);
+  await selectDate(page, date);
   await page.getByRole('button', { name: 'Set date', exact: true }).click();
   await expect(page.getByRole('dialog')).toHaveCount(0);
 }
@@ -35,10 +33,11 @@ test('calendar setup cancels cleanly, accepts user dates and preserves time/refe
   page,
 }) => {
   await page.goto('/tests/fixtures/index.html?state=CrossRows');
+  await zoomToWeekZero(page);
   const dates = page.getByRole('button', { name: 'Dates', exact: true });
   await dates.click();
   await expect(
-    page.getByRole('textbox', { name: 'Selected date', exact: true }),
+    page.getByRole('grid').locator('button[tabindex="0"]'),
   ).toBeFocused();
   await page.getByRole('button', { name: 'Cancel', exact: true }).click();
   await expect(dates).toHaveAttribute('aria-pressed', 'false');
@@ -60,8 +59,8 @@ test('calendar setup cancels cleanly, accepts user dates and preserves time/refe
   );
   await page.locator('[data-week="3"]').click();
   await expect(
-    page.getByRole('textbox', { name: 'Selected date', exact: true }),
-  ).toHaveValue('2026-10-28');
+    page.getByRole('grid').locator('td[aria-selected="true"] button'),
+  ).toHaveAttribute('data-date', '2026-10-28');
   await chooseDate(page, '2026-10-05');
   await expect(page.locator('[data-week="0"]')).toHaveAccessibleName(
     '14 Sept 2026 · Set date for Week 0',
@@ -85,16 +84,19 @@ test('calendar setup cancels cleanly, accepts user dates and preserves time/refe
   await interval(page.getByTestId('bar-a'), 0, 2);
 });
 
-test('a heading sets a reference in Weeks mode, Escape/outside dismissal and empty dates leave history untouched', async ({
+test('a heading switches to Dates atomically; Escape/outside dismissal and empty drafts leave history untouched', async ({
   page,
 }) => {
   await page.goto('/tests/fixtures/index.html?state=Empty');
+  await zoomToWeekZero(page);
   const heading = page.locator('[data-week="3"]');
   await heading.click();
   await expect(
-    page.getByRole('textbox', { name: 'Selected date', exact: true }),
-  ).toHaveValue('');
-  await page.getByRole('button', { name: 'Set date', exact: true }).click();
+    page.getByRole('grid').locator('td[aria-selected="true"]'),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole('button', { name: 'Set date', exact: true }),
+  ).toBeDisabled();
   await expect(page.getByRole('dialog')).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(heading).toBeFocused();
@@ -108,8 +110,7 @@ test('a heading sets a reference in Weeks mode, Escape/outside dismissal and emp
   await chooseDate(page, '2024-02-29');
   await expect(
     page.getByRole('button', { name: 'Weeks', exact: true }),
-  ).toHaveAttribute('aria-pressed', 'true');
-  await page.getByRole('button', { name: 'Dates', exact: true }).click();
+  ).toHaveAttribute('aria-pressed', 'false');
   await expect(page.locator('[data-week="3"]')).toHaveAccessibleName(
     '29 Feb 2024 · Set date for Week 3',
   );
@@ -121,7 +122,7 @@ test('a heading sets a reference in Weeks mode, Escape/outside dismissal and emp
   await page.locator('[data-week="3"]').click();
   await chooseDate(page, '2024-02-29');
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
-  // Saving an unchanged reference is a no-op, so Undo still reverses the display switch.
+  // Saving an unchanged reference is a no-op, so Undo reverses the reference and display together.
   await expect(
     page.getByRole('button', { name: 'Weeks', exact: true }),
   ).toHaveAttribute('aria-pressed', 'true');
@@ -164,7 +165,7 @@ test('toolbar and wheel zoom anchor time, clamp scale, and preserve redo with pi
   await page.mouse.wheel(0, 5000);
   await expect(
     page.getByRole('combobox', { name: 'Zoom', exact: true }),
-  ).toHaveText('50%');
+  ).toHaveText('12.5%');
   await page.keyboard.up('Control');
   expect((await page.locator('.row-label').boundingBox())!.x).toBeCloseTo(
     label.x,
@@ -181,10 +182,12 @@ for (const scale of ['0.5', '2']) {
     page,
   }) => {
     await page.goto('/tests/fixtures/index.html?state=Empty');
-    await chooseZoom(page, scale);
+    if (scale === '2') await zoomToWeekZero(page);
+    else await chooseZoom(page, scale);
     // Zoom anchors the view center: pick a visible interval at both extremes.
     await draw(page, 2, 3, 'Work');
     const bar = page.locator('.bar');
+    await expect(chart(page)).toHaveAttribute('aria-busy', 'false');
     await settled(bar);
     const before = (await bar.boundingBox())!;
     const lane = await laneGeometry(page);
@@ -210,7 +213,7 @@ for (const scale of ['0.5', '2']) {
     await interval(bar, 3, 4);
     await expect(
       page.getByRole('combobox', { name: 'Zoom', exact: true }),
-    ).toHaveText(`${Number(scale) * 100}%`);
+    ).toHaveText('200%');
   });
 }
 

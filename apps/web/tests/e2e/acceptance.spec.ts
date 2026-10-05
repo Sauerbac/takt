@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { draw, interval, laneGeometry } from '../helpers';
+import { draw, interval, laneGeometry, zoomToWeekZero } from '../helpers';
 
 test('a fresh production document has the agreed defaults, mixed deletion restores its hint, and refresh resets the editor', async ({
   page,
@@ -18,6 +18,7 @@ test('a fresh production document has the agreed defaults, mixed deletion restor
   await draw(page, 3, 5);
   await interval(page.locator('.bar'), 3, 5);
   await draw(page, -2, -1);
+  await zoomToWeekZero(page);
   await interval(page.locator('.bar').first(), 3, 5);
   await expect(page.locator('[data-week="0"]')).toHaveText('Week 0');
   const lane = await laneGeometry(page);

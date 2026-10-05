@@ -1,5 +1,11 @@
 import { test, expect } from '@playwright/test';
-import { beginBarDrag, interval, laneGeometry, settled } from '../helpers';
+import {
+  beginBarDrag,
+  interval,
+  laneGeometry,
+  pauseClock,
+  settled,
+} from '../helpers';
 
 for (const scenario of ['creation', 'rename']) {
   test(`one-week ${scenario} keeps its name input inside the bar while long text scrolls`, async ({
@@ -14,9 +20,20 @@ for (const scenario of ['creation', 'rename']) {
       await page.mouse.down();
       await page.mouse.move(lane.x(4), lane.y);
       await page.mouse.up();
-    } else await page.getByTestId('bar-a').dblclick();
+    } else {
+      await page.getByTestId('bar-a').click();
+      await expect(page.locator('.viewport')).toHaveAttribute(
+        'aria-busy',
+        'false',
+      );
+      await page.getByTestId('bar-a').dblclick();
+    }
     const input = page.getByRole('textbox', { name: 'Bar name' });
     await expect(input).toBeFocused();
+    await expect(page.locator('.viewport')).toHaveAttribute(
+      'aria-busy',
+      'false',
+    );
     const bar = page.locator('.bar');
     await settled(bar);
     const bounds = (await bar.boundingBox())!,
@@ -48,7 +65,7 @@ for (const scenario of ['creation', 'rename']) {
     const ending = await input.screenshot({ caret: 'hide' });
     expect(ending.equals(beginning)).toBe(false);
     await input.press('Enter');
-    await expect(bar.locator('span')).toHaveText(text);
+    await expect(bar).toHaveAttribute('title', new RegExp(text));
   });
 }
 
@@ -93,8 +110,8 @@ test('dragged bars and their snapped previews cannot cover the row-name column',
   page,
 }) => {
   await page.goto('/tests/fixtures/index.html?state=Chain');
+  await pauseClock(page);
   const lane = await laneGeometry(page);
-  await settled(page.getByTestId('bar-a'));
   const from = await beginBarDrag(page, 'a');
   await page.mouse.move(from.x - lane.width * 2.4, from.y);
   const covered = await page.evaluate(
