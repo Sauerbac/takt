@@ -34,7 +34,7 @@
     onrename: (id: string) => void;
     ondraft: (value: string) => void;
     onfinish: (commit: boolean) => void;
-    color?: { fill: string; ink: string };
+    color?: { fill: string; ink: string; labelInk?: string };
     timing?: string;
     onmenu?: (event: MouseEvent, kind: 'milestone', id: string) => void;
   } = $props();
@@ -62,6 +62,7 @@
   data-row={item.rowId}
   style:--bar-fill={color?.fill}
   style:--bar-ink={color?.ink}
+  style:--label-ink={color?.labelInk ?? color?.ink}
   style:left={`${((tracking ?? item.boundary) - FIRST_WEEK) * weekWidth}px`}
   style:width={`${item.name || editing ? 150 : 14}px`}
   style:top={`${top}px`}
@@ -114,7 +115,7 @@
     z-index: 2;
     font-size: 12px;
     font-weight: 600;
-    color: var(--bar-ink);
+    color: var(--label-ink, var(--bar-ink));
     transition:
       left var(--settlement) ease-out,
       top var(--settlement) ease-out;

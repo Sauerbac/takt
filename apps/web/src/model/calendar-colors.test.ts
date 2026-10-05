@@ -2,7 +2,13 @@ import { describe, expect, it } from 'vitest';
 import { assertDocument, copyDocument, emptyDocument } from './document';
 import type { ChartDocument } from './document';
 import { barTiming, dateAt, milestoneTiming, weekLabel } from './calendar';
-import { itemColor, recolor } from './colors';
+import {
+  palette,
+  colorRows,
+  colorLabelInk,
+  itemColor,
+  recolor,
+} from './colors';
 import { History } from './history';
 import { moveRow } from './structure';
 import { placeBar, placeMilestone } from './rules';
@@ -96,6 +102,37 @@ describe('color inheritance', () => {
     ],
     milestones: [{ id: 'm', rowId: 'row-1', boundary: 3, name: '' }],
   };
+  it.each(colorRows.flat())(
+    'supports %s for sections and item overrides through history and movement',
+    (color) => {
+      const history = new History(initial);
+      history.commit(
+        'color',
+        recolor(initial, 'section-1', color),
+        'section-1',
+      );
+      assertDocument(history.document);
+      expect(itemColor(history.document, history.document.bars[0])).toBe(color);
+      expect(itemColor(history.document, history.document.milestones[0])).toBe(
+        color,
+      );
+      expect(itemColor(history.document, history.document.bars[1])).toBe(
+        'rose',
+      );
+      history.commit('color', recolor(history.document, 'a', color), 'a');
+      const moved = moveRow(history.document, 'row-1', 'section-2', 0);
+      expect(itemColor(moved, moved.bars[0])).toBe(color);
+      expect(itemColor(moved, moved.milestones[0])).toBe('lavender');
+      history.undo();
+      expect(history.document.bars[0]).not.toHaveProperty('color');
+      history.undo();
+      expect(history.document).toEqual(initial);
+      history.redo();
+      expect(itemColor(history.document, history.document.bars[0])).toBe(color);
+      expect(palette[color].name).not.toMatch(/apricot/i);
+      expect(colorLabelInk(color)).not.toBe('#ffffff');
+    },
+  );
   it('changes inherited bars and milestones, preserves overrides, and resets overrides', () => {
     const doc = recolor(initial, 'section-1', 'sea-blue');
     expect(itemColor(doc, doc.bars[0])).toBe('sea-blue');

@@ -15,9 +15,14 @@ export const initialViewport = (): ViewportState => ({
   zoom: 1,
 });
 export const FIRST_WEEK = -2;
-export const WEEK_COUNT = 12;
+export const WEEK_COUNT = 24;
 export const BAR_INSET = 5;
+export const barInset = (weekWidth: number) =>
+  Math.min(BAR_INSET, weekWidth / 4);
 export const LABEL_WIDTH = 218;
+export const BAR_LABEL_WIDTH = 56;
+export const COMPACT_BAR_WIDTH = 32;
+export const OVERVIEW_ZOOM_DURATION = 150;
 
 // Removed objects still have a location. Keep that context from the command
 // snapshots so undoing creation and redoing deletion can reveal their result.
@@ -63,7 +68,7 @@ export function historyLocation(document: ChartDocument, command: Command) {
       : undefined,
   };
 }
-export const clampZoom = (zoom: number) => Math.max(0.5, Math.min(2, zoom));
+export const clampZoom = (zoom: number) => Math.max(0.125, Math.min(2, zoom));
 // Anchor is a distance in CSS pixels from the timeline's (possibly scrolled) left edge.
 export function zoomFirstWeek(
   firstWeek: number,
@@ -88,12 +93,15 @@ export function displayedInterval(
   firstWeek = FIRST_WEEK,
 ): { start: number; end: number } {
   const start = pointerWeek(
-    bounds.left - BAR_INSET,
+    bounds.left - barInset(weekWidth),
     laneLeft,
     weekWidth,
     firstWeek,
   );
-  return { start, end: start + (bounds.width + BAR_INSET * 2) / weekWidth };
+  return {
+    start,
+    end: start + (bounds.width + barInset(weekWidth) * 2) / weekWidth,
+  };
 }
 
 export interface VisibleTimeline {
