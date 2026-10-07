@@ -1,4 +1,4 @@
-import { zoomToWeekZero } from '../helpers';
+import { zoomToWeekZero, setHue } from '../helpers';
 import { chooseZoom } from '../helpers';
 import { test, expect } from '@playwright/test';
 import {
@@ -47,7 +47,7 @@ test('overview dates, spaced weeks and frozen headings preserve timeline context
   });
 });
 
-test('color picker shows coordinated shades and a draft preview in the shared overlay', async ({
+test('color picker shows a continuous muted hue range and a draft preview in the shared overlay', async ({
   page,
 }) => {
   await page.goto('/tests/fixtures/index.html?state=CalendarColors');
@@ -56,7 +56,7 @@ test('color picker shows coordinated shades and a draft preview in the shared ov
     .getByRole('menuitem', { name: 'More colors…', exact: true })
     .click();
   await expect(page).toHaveScreenshot('color-picker.png');
-  await page.getByRole('radio', { name: 'Deep sage', exact: true }).click();
+  await setHue(page, 145);
   await expect(page).toHaveScreenshot('color-picker-selected.png');
 });
 

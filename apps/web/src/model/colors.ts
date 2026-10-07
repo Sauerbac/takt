@@ -1,10 +1,14 @@
 import type { Bar, ChartDocument, Color, Milestone } from './document';
-import { palette } from './palette';
+import { colorAppearance, DEFAULT_COLOR } from './palette';
 
-export { palette, quickColors, colorRows } from './palette';
+export {
+  colorAppearance,
+  quickColors,
+  DEFAULT_COLOR,
+  hueGradient,
+} from './palette';
 export function colorLabelInk(color: Color): string {
-  const appearance = palette[color];
-  return 'labelInk' in appearance ? appearance.labelInk : appearance.ink;
+  return colorAppearance(color).ink;
 }
 export function itemColor(
   document: ChartDocument,
@@ -14,7 +18,7 @@ export function itemColor(
   return (
     item.color ??
     document.sections.find((section) => section.id === row?.sectionId)?.color ??
-    'apricot'
+    DEFAULT_COLOR
   );
 }
 export function recolor(

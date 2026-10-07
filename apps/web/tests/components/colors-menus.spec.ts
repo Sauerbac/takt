@@ -24,33 +24,33 @@ test('section colors update inherited items; overrides and inheritance resets ha
   const bar = page.getByTestId('bar-a');
   const override = page.getByTestId('bar-b');
   const milestone = page.getByTestId('milestone-m');
-  expect(await fill(bar)).toBe('#b5a2e0');
+  expect(await fill(bar)).toBe('#c3afea');
   await color(
     page,
     page.getByRole('button', { name: 'Research', exact: true }),
     'Sea blue',
   );
-  expect(await fill(bar)).toBe('#a0d4dd');
-  expect(await fill(milestone)).toBe('#a0d4dd');
-  expect(await fill(override)).toBe('#f3b184');
+  expect(await fill(bar)).toBe('#75cad9');
+  expect(await fill(milestone)).toBe('#75cad9');
+  expect(await fill(override)).toBe('#e8ab89');
   await color(page, bar, 'Rose');
-  expect(await fill(bar)).toBe('#b37976');
+  expect(await fill(bar)).toBe('#eca4a9');
   await bar.click({ button: 'right' });
-  await expect(page.getByRole('menu').locator('.color-label')).toContainText(
-    'Rose',
+  await expect(page.getByRole('menu').locator('.color-label')).toHaveText(
+    'Color',
   );
   await page
     .getByRole('menuitem', { name: 'Use section color', exact: true })
     .click();
-  expect(await fill(bar)).toBe('#a0d4dd');
+  expect(await fill(bar)).toBe('#75cad9');
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
-  expect(await fill(bar)).toBe('#b37976');
+  expect(await fill(bar)).toBe('#eca4a9');
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
-  expect(await fill(bar)).toBe('#a0d4dd');
+  expect(await fill(bar)).toBe('#75cad9');
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
-  expect(await fill(bar)).toBe('#b5a2e0');
+  expect(await fill(bar)).toBe('#c3afea');
   await page.getByRole('button', { name: 'Redo', exact: true }).click();
-  expect(await fill(bar)).toBe('#a0d4dd');
+  expect(await fill(bar)).toBe('#75cad9');
 });
 
 test('moving bars and milestones between sections adopts destination color while explicit overrides survive', async ({
@@ -61,17 +61,17 @@ test('moving bars and milestones between sections adopts destination color while
   await settled(page.getByTestId('bar-a'));
   const pickup = await beginBarDrag(page, 'a');
   await page.mouse.move(pickup.x, destination.y);
-  expect(await fill(page.getByTestId('bar-a'))).toBe('#a0d4dd');
+  expect(await fill(page.getByTestId('bar-a'))).toBe('#75cad9');
   await page.mouse.up();
   await expect(page.getByTestId('bar-a')).toHaveAttribute('data-row', 'row-2');
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
-  expect(await fill(page.getByTestId('bar-a'))).toBe('#b5a2e0');
+  expect(await fill(page.getByTestId('bar-a'))).toBe('#c3afea');
   await color(page, page.getByTestId('bar-a'), 'Rose');
   await settled(page.getByTestId('bar-a'));
   const again = await beginBarDrag(page, 'a');
   await page.mouse.move(again.x, destination.y);
   await page.mouse.up();
-  expect(await fill(page.getByTestId('bar-a'))).toBe('#b37976');
+  expect(await fill(page.getByTestId('bar-a'))).toBe('#eca4a9');
   const milestone = page.getByTestId('milestone-m');
   await settled(milestone);
   const point = (await milestone.boundingBox())!;
@@ -80,13 +80,13 @@ test('moving bars and milestones between sections adopts destination color while
   await page.mouse.move(point.x + 2, destination.y);
   await page.mouse.up();
   await expect(milestone).toHaveAttribute('data-row', 'row-2');
-  expect(await fill(milestone)).toBe('#a0d4dd');
+  expect(await fill(milestone)).toBe('#75cad9');
   await color(page, milestone, 'Slate');
-  expect(await fill(milestone)).toBe('#8290a3');
+  expect(await fill(milestone)).toBe('#9bbcf2');
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
-  expect(await fill(milestone)).toBe('#a0d4dd');
+  expect(await fill(milestone)).toBe('#75cad9');
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
-  expect(await fill(milestone)).toBe('#b5a2e0');
+  expect(await fill(milestone)).toBe('#c3afea');
 });
 
 test('moving a whole row preserves overridden colors, and hidden color history expands and reveals the result', async ({
@@ -107,9 +107,9 @@ test('moving a whole row preserves overridden colors, and hidden color history e
     'data-section',
     'section-2',
   );
-  expect(await fill(page.getByTestId('bar-a'))).toBe('#a0d4dd');
-  expect(await fill(page.getByTestId('bar-b'))).toBe('#f3b184');
-  expect(await fill(page.getByTestId('milestone-m'))).toBe('#a0d4dd');
+  expect(await fill(page.getByTestId('bar-a'))).toBe('#75cad9');
+  expect(await fill(page.getByTestId('bar-b'))).toBe('#e8ab89');
+  expect(await fill(page.getByTestId('milestone-m'))).toBe('#75cad9');
   await interval(page.getByTestId('bar-a'), 0, 2);
   await color(page, page.getByTestId('bar-a'), 'Rose');
   await page
@@ -118,7 +118,7 @@ test('moving a whole row preserves overridden colors, and hidden color history e
   await expect(page.getByTestId('bar-a')).toBeHidden();
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
   await expect(page.getByTestId('bar-a')).toBeVisible();
-  expect(await fill(page.getByTestId('bar-a'))).toBe('#a0d4dd');
+  expect(await fill(page.getByTestId('bar-a'))).toBe('#75cad9');
 });
 
 test('item context menus select, rename inline, reset inheritance and delete immediately with keyboard menu navigation', async ({

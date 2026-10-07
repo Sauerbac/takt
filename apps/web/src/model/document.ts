@@ -1,4 +1,4 @@
-import { palette } from './palette';
+import { isColor } from './palette';
 import type { Color } from './palette';
 export type { Color } from './palette';
 export interface CalendarReference {
@@ -77,7 +77,7 @@ export function assertDocument(document: ChartDocument): void {
     ...document.bars,
     ...document.milestones,
   ])
-    if (item.color !== undefined && !Object.hasOwn(palette, item.color))
+    if (item.color !== undefined && !isColor(item.color))
       throw new Error('Invalid color');
   const ids = new Set<string>();
   const rowIds = new Set<string>();

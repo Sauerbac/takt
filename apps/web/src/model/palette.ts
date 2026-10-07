@@ -1,79 +1,63 @@
-// Shared source of truth for document validation and all color controls.
-// Muted hue families each offer light, medium, and deep tones.
-export const palette = {
-  apricot: { name: 'Peach', fill: '#f3b184', ink: '#874327' },
-  lavender: { name: 'Lavender', fill: '#b5a2e0', ink: '#563c86' },
-  'sea-blue': { name: 'Sea blue', fill: '#a0d4dd', ink: '#2e626b' },
-  slate: { name: 'Slate', fill: '#8290a3', ink: '#182e47' },
-  rose: { name: 'Rose', fill: '#b37976', ink: '#442c2b' },
-  sage: { name: 'Sage', fill: '#abc4ad', ink: '#385b40' },
-  'light-peach': { name: 'Light peach', fill: '#f9d9c2', ink: '#874327' },
-  'light-lavender': { name: 'Light lavender', fill: '#ddd2f1', ink: '#563c86' },
-  'light-sea-blue': { name: 'Light sea blue', fill: '#cee9ed', ink: '#2e626b' },
-  'light-sage': { name: 'Light sage', fill: '#d7e5d8', ink: '#385b40' },
-  'light-rose': { name: 'Light rose', fill: '#e9cecc', ink: '#6c3e3b' },
-  'light-slate': { name: 'Light slate', fill: '#d0d7e0', ink: '#304761' },
-  'deep-peach': {
-    name: 'Deep peach',
-    fill: '#aa5935',
-    ink: '#ffffff',
-    labelInk: '#aa5935',
-  },
-  'deep-lavender': {
-    name: 'Deep lavender',
-    fill: '#74589e',
-    ink: '#ffffff',
-    labelInk: '#74589e',
-  },
-  'deep-sea-blue': {
-    name: 'Deep sea blue',
-    fill: '#437d88',
-    ink: '#ffffff',
-    labelInk: '#437d88',
-  },
-  'deep-sage': {
-    name: 'Deep sage',
-    fill: '#567b5d',
-    ink: '#ffffff',
-    labelInk: '#567b5d',
-  },
-  'deep-rose': {
-    name: 'Deep rose',
-    fill: '#945551',
-    ink: '#ffffff',
-    labelInk: '#945551',
-  },
-  'deep-slate': {
-    name: 'Deep slate',
-    fill: '#455970',
-    ink: '#ffffff',
-    labelInk: '#455970',
-  },
-} as const;
+// A color is a hue in degrees. Every hue shares the same perceptual lightness
+// and chroma; these values stay inside sRGB across the entire hue circle.
+export type Color = number;
+export const COLOR_LIGHTNESS = 0.79;
+export const COLOR_CHROMA = 0.085;
+export const DEFAULT_COLOR: Color = 50;
+export const quickColors = [
+  { name: 'Peach', color: DEFAULT_COLOR },
+  { name: 'Lavender', color: 300 },
+  { name: 'Sea blue', color: 210 },
+  { name: 'Sage', color: 145 },
+] as const;
 
-export type Color = keyof typeof palette;
-export const quickColors: readonly Color[] = [
-  'apricot',
-  'lavender',
-  'sea-blue',
-  'slate',
-];
-export const colorRows: readonly (readonly Color[])[] = [
-  [
-    'light-peach',
-    'light-lavender',
-    'light-sea-blue',
-    'light-sage',
-    'light-rose',
-    'light-slate',
-  ],
-  ['apricot', 'lavender', 'sea-blue', 'sage', 'rose', 'slate'],
-  [
-    'deep-peach',
-    'deep-lavender',
-    'deep-sea-blue',
-    'deep-sage',
-    'deep-rose',
-    'deep-slate',
-  ],
-];
+export function isColor(color: unknown): color is Color {
+  return (
+    typeof color === 'number' &&
+    Number.isFinite(color) &&
+    color >= 0 &&
+    color < 360
+  );
+}
+
+// Convert OKLCH to sRGB at the appearance boundary, so components, previews
+// and gradient stops use identical colors in every browser.
+function hex(lightness: number, chroma: number, hue: Color): string {
+  const angle = (hue * Math.PI) / 180;
+  const a = chroma * Math.cos(angle),
+    b = chroma * Math.sin(angle);
+  const l = (lightness + 0.3963377774 * a + 0.2158037573 * b) ** 3;
+  const m = (lightness - 0.1055613458 * a - 0.0638541728 * b) ** 3;
+  const s = (lightness - 0.0894841775 * a - 1.291485548 * b) ** 3;
+  const channels = [
+    4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s,
+    -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s,
+    -0.0041960863 * l - 0.7034186147 * m + 1.707614701 * s,
+  ];
+  return (
+    '#' +
+    channels
+      .map((channel) => {
+        const value =
+          channel <= 0.0031308
+            ? 12.92 * channel
+            : 1.055 * channel ** (1 / 2.4) - 0.055;
+        return Math.round(Math.max(0, Math.min(1, value)) * 255)
+          .toString(16)
+          .padStart(2, '0');
+      })
+      .join('')
+  );
+}
+
+export function colorAppearance(color: Color): { fill: string; ink: string } {
+  return {
+    fill: hex(COLOR_LIGHTNESS, COLOR_CHROMA, color),
+    ink: hex(0.35, 0.04, color),
+  };
+}
+
+export const hueGradient = `linear-gradient(to right, ${Array.from(
+  { length: 73 },
+  (_, index) => `${colorAppearance(index * 5).fill} ${(index / 72) * 100}%`,
+).join(', ')})`;

@@ -10,9 +10,7 @@ const states: Record<string, ChartDocument> = {
     ...emptyDocument(),
     display: 'dates',
     calendar: { week: 0, date: '2026-10-05' },
-    sections: [
-      { id: 'section-1', name: 'Compact work periods', color: 'apricot' },
-    ],
+    sections: [{ id: 'section-1', name: 'Compact work periods', color: 50 }],
     rows: [
       { id: 'row-1', sectionId: 'section-1', name: 'Separated one-week bars' },
       { id: 'row-2', sectionId: 'section-1', name: 'Adjacent one-week bars' },
@@ -56,8 +54,8 @@ const states: Record<string, ChartDocument> = {
     display: 'dates',
     calendar: { week: 3, date: '2026-10-05' },
     sections: [
-      { id: 'section-1', name: 'Research', color: 'lavender' },
-      { id: 'section-2', name: 'Delivery', color: 'sea-blue' },
+      { id: 'section-1', name: 'Research', color: 300 },
+      { id: 'section-2', name: 'Delivery', color: 210 },
     ],
     rows: [
       { id: 'row-1', sectionId: 'section-1', name: 'Discovery' },
@@ -71,7 +69,7 @@ const states: Record<string, ChartDocument> = {
         start: 2,
         end: 4,
         name: 'Review',
-        color: 'apricot',
+        color: 50,
       },
       { id: 'c', rowId: 'row-2', start: 3, end: 5, name: 'Implement' },
     ],

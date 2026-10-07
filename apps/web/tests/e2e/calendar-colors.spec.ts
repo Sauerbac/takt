@@ -29,7 +29,7 @@ test('production editor combines user calendar dates, navigation, inheritance an
   await page
     .getByRole('menuitemradio', { name: 'Lavender', exact: true })
     .click();
-  await expect(bar).toHaveCSS('background-color', 'rgb(181, 162, 224)');
+  await expect(bar).toHaveCSS('background-color', 'rgb(195, 175, 234)');
   const lane = await laneGeometry(page);
   await page.mouse.dblclick(lane.x(4.2), lane.y);
   await page
@@ -57,7 +57,7 @@ test('production editor combines user calendar dates, navigation, inheritance an
   await page.mouse.up();
   await page.keyboard.up('Space');
   await page.getByRole('button', { name: 'Redo', exact: true }).click();
-  await expect(bar).toHaveCSS('background-color', 'rgb(179, 121, 118)');
+  await expect(bar).toHaveCSS('background-color', 'rgb(236, 164, 169)');
   await interval(bar, 0, 2);
   await expect(
     page.getByRole('combobox', { name: 'Zoom', exact: true }),
@@ -66,7 +66,7 @@ test('production editor combines user calendar dates, navigation, inheritance an
   await page
     .getByRole('menuitem', { name: 'Use section color', exact: true })
     .click();
-  await expect(bar).toHaveCSS('background-color', 'rgb(181, 162, 224)');
+  await expect(bar).toHaveCSS('background-color', 'rgb(195, 175, 234)');
   await page.getByRole('button', { name: 'Weeks', exact: true }).click();
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
   await expect(

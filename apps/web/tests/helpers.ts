@@ -23,11 +23,23 @@ export async function chooseColor(page: Page, name: string) {
     await page
       .getByRole('menuitem', { name: 'More colors…', exact: true })
       .click();
-    await page.getByRole('radio', { name, exact: true }).click();
+    const hues: Record<string, number> = { Rose: 15, Slate: 260 };
+    if (!(name in hues)) throw new Error(`Unknown test color: ${name}`);
+    await setHue(page, hues[name]);
     await page
       .getByRole('button', { name: 'Apply color', exact: true })
       .click();
   }
+}
+
+export async function setHue(page: Page, hue: number) {
+  await page
+    .getByRole('slider', { name: 'Hue', exact: true })
+    .evaluate((node, value) => {
+      const slider = node as HTMLInputElement;
+      slider.value = String(value);
+      slider.dispatchEvent(new Event('input', { bubbles: true }));
+    }, hue);
 }
 
 export async function chooseZoom(page: Page, scale: string) {

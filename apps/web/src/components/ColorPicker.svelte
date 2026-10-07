@@ -1,7 +1,6 @@
 <script lang="ts">
-  import { tick } from 'svelte';
   import type { Color } from '../model/document';
-  import { palette, colorRows } from '../model/colors';
+  import { colorAppearance, hueGradient } from '../model/colors';
   import Button from './Button.svelte';
   import Dialog from './Dialog.svelte';
 
@@ -17,32 +16,37 @@
     onclose: () => void;
   } = $props();
   const id = $props.id();
-  const colors = colorRows.flat();
+  // Each opening seeds a draft; moving the slider never changes the chart.
   // svelte-ignore state_referenced_locally
   let value = $state(color);
-  let group: HTMLDivElement;
-  async function navigate(event: KeyboardEvent, current: Color) {
-    const index = colors.indexOf(current);
+  const appearance = $derived(colorAppearance(value));
+  function navigate(event: KeyboardEvent) {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      event.stopPropagation();
+      onchoose(value);
+      return;
+    }
     const offsets: Record<string, number> = {
       ArrowLeft: -1,
+      ArrowDown: -1,
       ArrowRight: 1,
-      ArrowUp: -6,
-      ArrowDown: 6,
+      ArrowUp: 1,
+      PageDown: -10,
+      PageUp: 10,
     };
     const next =
       event.key === 'Home'
         ? 0
         : event.key === 'End'
-          ? colors.length - 1
+          ? 359.9
           : event.key in offsets
-            ? (index + offsets[event.key] + colors.length) % colors.length
+            ? value + offsets[event.key]
             : null;
     if (next === null) return;
     event.preventDefault();
     event.stopPropagation();
-    value = colors[next];
-    await tick();
-    group.querySelector<HTMLButtonElement>(`[data-color="${value}"]`)?.focus();
+    value = Math.round(Math.max(0, Math.min(359.9, next)) * 10) / 10;
   }
 </script>
 
@@ -51,7 +55,7 @@
   descriptionId={`${id}-description`}
   {onclose}
   dismissOutside
-  initialFocus="[aria-checked='true']"
+  initialFocus="input[type='range']"
   width={360}
 >
   <div class="heading">
@@ -72,50 +76,53 @@
     >
     <div>
       <h2 id={`${id}-title`}>Choose color</h2>
-      <p id={`${id}-description`}>Choose a shade for “{name}”.</p>
+      <p id={`${id}-description`}>Choose a color for “{name}”.</p>
     </div>
   </div>
-  <div
-    class="swatches"
-    bind:this={group}
-    role="radiogroup"
-    aria-label="Timeline colors"
+  <form
+    onsubmit={(event) => {
+      event.preventDefault();
+      onchoose(value);
+    }}
   >
-    {#each colors as shade}
-      <button
-        type="button"
-        role="radio"
-        aria-label={palette[shade].name}
-        aria-checked={value === shade}
-        tabindex={value === shade ? 0 : -1}
-        data-color={shade}
-        title={palette[shade].name}
-        style:--fill={palette[shade].fill}
-        style:--text={palette[shade].ink}
-        onclick={() => (value = shade)}
-        onkeydown={(event) => void navigate(event, shade)}
+    <label for={`${id}-hue`}>Color</label>
+    <input
+      id={`${id}-hue`}
+      type="range"
+      min="0"
+      max="359.9"
+      step="0.1"
+      aria-label="Hue"
+      aria-valuetext={`Hue ${value} degrees`}
+      bind:value
+      style:--hue-gradient={hueGradient}
+      style:--selected-fill={appearance.fill}
+      onkeydown={navigate}
+    />
+    <div
+      class="preview"
+      aria-label="Color preview"
+      style:--fill={appearance.fill}
+      style:--text={appearance.ink}
+    >
+      <span class="preview-label">Preview</span>
+      <div class="preview-lane">
+        <span class="preview-bar">{name}</span><span
+          class="preview-milestone"
+          aria-hidden="true"
+        ></span>
+      </div>
+    </div>
+    <div class="actions">
+      <Button onclick={onclose}>Cancel</Button><Button
+        type="submit"
+        variant="primary"
+        ><svg viewBox="0 0 16 16" aria-hidden="true"
+          ><path d="m3.5 8 3 3 6-6" /></svg
+        >Apply color</Button
       >
-        {#if value === shade}<svg viewBox="0 0 16 16" aria-hidden="true"
-            ><path d="m4 8 2.5 2.5L12 5" /></svg
-          >{/if}
-      </button>
-    {/each}
-  </div>
-  <div
-    class="preview"
-    style:--fill={palette[value].fill}
-    style:--text={palette[value].ink}
-  >
-    <span class="preview-bar">Preview</span><span aria-live="polite"
-      >{palette[value].name}</span
-    >
-  </div>
-  <div class="actions">
-    <Button onclick={onclose}>Cancel</Button><Button
-      variant="primary"
-      onclick={() => onchoose(value)}>Apply color</Button
-    >
-  </div>
+    </div>
+  </form>
 </Dialog>
 
 <style>
@@ -123,7 +130,7 @@
     display: flex;
     align-items: center;
     gap: 12px;
-    margin-bottom: 24px;
+    margin-bottom: 22px;
   }
   .color-icon {
     display: grid;
@@ -137,13 +144,17 @@
     color: #ad6b3e;
   }
   svg {
-    width: 22px;
-    height: 22px;
+    width: 18px;
+    height: 18px;
     fill: none;
     stroke: currentColor;
     stroke-width: 1.7;
     stroke-linecap: round;
     stroke-linejoin: round;
+  }
+  .color-icon svg {
+    width: 22px;
+    height: 22px;
   }
   h2 {
     font-size: 16px;
@@ -157,60 +168,104 @@
     line-height: 1.5;
     overflow-wrap: anywhere;
   }
-  .swatches {
-    display: grid;
-    grid-template-columns: repeat(6, 1fr);
-    gap: 10px;
+  label {
+    display: block;
+    margin-bottom: 12px;
+    font-size: 13px;
+    font-weight: 600;
   }
-  .swatches button {
-    display: grid;
-    place-items: center;
-    height: 38px;
-    padding: 0;
-    border: 1px solid #182e4714;
-    border-radius: 6px;
-    color: var(--text);
-    background: var(--fill);
+  input {
+    display: block;
+    appearance: none;
+    width: 100%;
+    height: 28px;
+    margin: 0;
+    border-radius: 7px;
+    background: var(--hue-gradient);
     cursor: pointer;
   }
-  .swatches button:hover {
-    box-shadow: inset 0 0 0 1px var(--text);
+  input::-webkit-slider-runnable-track {
+    height: 28px;
+    border-radius: 7px;
   }
-  .swatches button[aria-checked='true'] {
-    outline: 2px solid var(--text);
-    outline-offset: 2px;
+  input::-moz-range-track {
+    height: 28px;
+    border-radius: 7px;
+    background: transparent;
   }
-  .swatches button:focus-visible {
-    outline: 2px solid var(--ink);
-    outline-offset: 3px;
-  }
-  .swatches svg {
+  input::-webkit-slider-thumb {
+    appearance: none;
     width: 18px;
-    height: 18px;
-    stroke-width: 2;
+    height: 34px;
+    margin-top: -3px;
+    border: 3px solid var(--surface);
+    border-radius: 6px;
+    background: var(--selected-fill);
+    box-shadow:
+      0 0 0 1px #182e4755,
+      0 2px 5px #182e4733;
+  }
+  input::-moz-range-thumb {
+    box-sizing: border-box;
+    width: 18px;
+    height: 34px;
+    border: 3px solid var(--surface);
+    border-radius: 6px;
+    background: var(--selected-fill);
+    box-shadow:
+      0 0 0 1px #182e4755,
+      0 2px 5px #182e4733;
+  }
+  input:focus-visible {
+    outline: 3px solid #f3b18480;
+    outline-offset: 5px;
   }
   .preview {
-    display: flex;
-    align-items: center;
-    gap: 14px;
     margin-top: 24px;
     padding: 14px;
     border: 1px solid var(--line);
     border-radius: 7px;
     background: var(--section-bg);
-    font-size: 12px;
-    color: var(--muted);
   }
-  .preview-bar {
+  .preview-label {
+    display: block;
+    color: var(--muted);
+    font-size: 11px;
+    margin-bottom: 10px;
+  }
+  .preview-lane {
     display: flex;
     align-items: center;
-    justify-content: center;
-    width: 104px;
+    gap: 22px;
+    min-height: 38px;
+    background: repeating-linear-gradient(
+      to right,
+      transparent 0 43px,
+      var(--line) 43px 44px
+    );
+  }
+  .preview-bar {
+    display: block;
+    box-sizing: border-box;
+    width: 74%;
     height: 28px;
+    padding: 6px 12px;
     border-radius: var(--bar-radius);
     background: var(--fill);
     color: var(--text);
+    font-size: 12px;
     font-weight: 600;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+  .preview-milestone {
+    width: 10px;
+    height: 10px;
+    flex-shrink: 0;
+    border-radius: 1px;
+    background: var(--fill);
+    transform: rotate(45deg);
   }
   .actions {
     display: flex;

@@ -2,13 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { assertDocument, copyDocument, emptyDocument } from './document';
 import type { ChartDocument } from './document';
 import { barTiming, dateAt, milestoneTiming, weekLabel } from './calendar';
-import {
-  palette,
-  colorRows,
-  colorLabelInk,
-  itemColor,
-  recolor,
-} from './colors';
+import { quickColors, colorLabelInk, itemColor, recolor } from './colors';
 import { History } from './history';
 import { moveRow } from './structure';
 import { placeBar, placeMilestone } from './rules';
@@ -94,15 +88,21 @@ describe('color inheritance', () => {
     ...emptyDocument(),
     sections: [
       { id: 'section-1', name: '' },
-      { id: 'section-2', name: '', color: 'lavender' },
+      { id: 'section-2', name: '', color: 300 },
     ],
     bars: [
       { id: 'a', rowId: 'row-1', start: 0, end: 2, name: '' },
-      { id: 'b', rowId: 'row-1', start: 2, end: 3, name: '', color: 'rose' },
+      { id: 'b', rowId: 'row-1', start: 2, end: 3, name: '', color: 15 },
     ],
     milestones: [{ id: 'm', rowId: 'row-1', boundary: 3, name: '' }],
   };
-  it.each(colorRows.flat())(
+  it.each([
+    ...quickColors.map((preset) => preset.color),
+    0,
+    87.4,
+    179.8,
+    359.9,
+  ])(
     'supports %s for sections and item overrides through history and movement',
     (color) => {
       const history = new History(initial);
@@ -116,62 +116,59 @@ describe('color inheritance', () => {
       expect(itemColor(history.document, history.document.milestones[0])).toBe(
         color,
       );
-      expect(itemColor(history.document, history.document.bars[1])).toBe(
-        'rose',
-      );
+      expect(itemColor(history.document, history.document.bars[1])).toBe(15);
       history.commit('color', recolor(history.document, 'a', color), 'a');
       const moved = moveRow(history.document, 'row-1', 'section-2', 0);
       expect(itemColor(moved, moved.bars[0])).toBe(color);
-      expect(itemColor(moved, moved.milestones[0])).toBe('lavender');
+      expect(itemColor(moved, moved.milestones[0])).toBe(300);
       history.undo();
       expect(history.document.bars[0]).not.toHaveProperty('color');
       history.undo();
       expect(history.document).toEqual(initial);
       history.redo();
       expect(itemColor(history.document, history.document.bars[0])).toBe(color);
-      expect(palette[color].name).not.toMatch(/apricot/i);
       expect(colorLabelInk(color)).not.toBe('#ffffff');
     },
   );
   it('changes inherited bars and milestones, preserves overrides, and resets overrides', () => {
-    const doc = recolor(initial, 'section-1', 'sea-blue');
-    expect(itemColor(doc, doc.bars[0])).toBe('sea-blue');
-    expect(itemColor(doc, doc.milestones[0])).toBe('sea-blue');
-    expect(itemColor(doc, doc.bars[1])).toBe('rose');
+    const doc = recolor(initial, 'section-1', 210);
+    expect(itemColor(doc, doc.bars[0])).toBe(210);
+    expect(itemColor(doc, doc.milestones[0])).toBe(210);
+    expect(itemColor(doc, doc.bars[1])).toBe(15);
     const reset = recolor(doc, 'b');
-    expect(itemColor(reset, reset.bars[1])).toBe('sea-blue');
+    expect(itemColor(reset, reset.bars[1])).toBe(210);
     expect(reset.bars[1]).not.toHaveProperty('color');
     expect(initial.sections[0]).not.toHaveProperty('color');
   });
   it('adopts destination section for row and item movement while preserving explicit colors', () => {
     const doc = moveRow(initial, 'row-1', 'section-2', 0);
-    expect(itemColor(doc, doc.bars[0])).toBe('lavender');
-    expect(itemColor(doc, doc.bars[1])).toBe('rose');
-    expect(itemColor(doc, doc.milestones[0])).toBe('lavender');
+    expect(itemColor(doc, doc.bars[0])).toBe(300);
+    expect(itemColor(doc, doc.bars[1])).toBe(15);
+    expect(itemColor(doc, doc.milestones[0])).toBe(300);
     const twoRows = {
       ...initial,
       rows: [...initial.rows, { id: 'r2', sectionId: 'section-2', name: '' }],
     };
     const bar = placeBar(twoRows, { ...twoRows.bars[0], rowId: 'r2' }, 'right');
-    expect(itemColor(bar, bar.bars[0])).toBe('lavender');
+    expect(itemColor(bar, bar.bars[0])).toBe(300);
     const milestone = placeMilestone(twoRows, {
       ...twoRows.milestones[0],
       rowId: 'r2',
-      color: 'rose',
+      color: 15,
     });
-    expect(itemColor(milestone, milestone.milestones[0])).toBe('rose');
+    expect(itemColor(milestone, milestone.milestones[0])).toBe(15);
     expect(doc.bars).toEqual(initial.bars);
   });
   it('undoes color changes and inheritance resets independently and clears redo on a new color', () => {
     const history = new History(initial);
-    history.commit('color', recolor(history.document, 'a', 'slate'), 'a');
+    history.commit('color', recolor(history.document, 'a', 260), 'a');
     history.commit('color', recolor(history.document, 'a'), 'a');
     history.undo();
-    expect(itemColor(history.document, history.document.bars[0])).toBe('slate');
+    expect(itemColor(history.document, history.document.bars[0])).toBe(260);
     history.undo();
     expect(history.document).toEqual(initial);
     history.redo();
-    history.commit('color', recolor(history.document, 'a', 'sea-blue'), 'a');
+    history.commit('color', recolor(history.document, 'a', 210), 'a');
     expect(history.canRedo).toBe(false);
   });
 });

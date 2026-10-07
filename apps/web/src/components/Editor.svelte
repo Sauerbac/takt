@@ -9,7 +9,8 @@
     milestoneTiming,
   } from '../model/calendar';
   import {
-    palette,
+    colorAppearance,
+    DEFAULT_COLOR,
     quickColors,
     colorLabelInk,
     itemColor,
@@ -221,7 +222,7 @@
     menu
       ? menu.kind === 'section'
         ? (document.sections.find((section) => section.id === menu!.id)
-            ?.color ?? 'apricot')
+            ?.color ?? DEFAULT_COLOR)
         : [...document.bars, ...document.milestones].find(
             (item) => item.id === menu!.id,
           )?.color
@@ -231,18 +232,18 @@
     const item = [...document.bars, ...document.milestones].find(
       (item) => item.id === menu?.id,
     );
-    return item ? itemColor(document, item) : (menuColor ?? 'apricot');
+    return item ? itemColor(document, item) : (menuColor ?? DEFAULT_COLOR);
   });
   const proposalColor = $derived.by(() => {
     const item = [...shown.bars, ...shown.milestones].find(
       (item) => item.id === gesture?.id,
     );
-    return palette[
+    return colorAppearance(
       itemColor(shown, {
         rowId: motion?.proposal?.rowId ?? item?.rowId ?? '',
         color: item?.color,
-      })
-    ];
+      }),
+    );
   });
   const carriesRow = (id: string) =>
     !!structural &&
@@ -1415,20 +1416,21 @@
 {#snippet colorPalette()}
   <div class="color-group" role="group" aria-label="Color palette">
     <div class="color-label">
-      <span>Color</span><span>{palette[menuEffectiveColor].name}</span>
+      <span>Color</span>
     </div>
     <div class="palette">
-      {#each quickColors as color}
+      {#each quickColors as preset}
+        {@const appearance = colorAppearance(preset.color)}
         <button
           role="menuitemradio"
-          aria-label={palette[color].name}
-          aria-checked={menuColor === color}
+          aria-label={preset.name}
+          aria-checked={menuColor === preset.color}
           type="button"
-          title={palette[color].name}
-          style:--swatch-fill={palette[color].fill}
-          style:--swatch-ink={palette[color].ink}
-          onclick={() => setColor(color)}
-          >{menuColor === color ? '✓' : ''}</button
+          title={preset.name}
+          style:--swatch-fill={appearance.fill}
+          style:--swatch-ink={appearance.ink}
+          onclick={() => setColor(preset.color)}
+          >{menuColor === preset.color ? '✓' : ''}</button
         >
       {/each}
       <button
@@ -1437,7 +1439,10 @@
         class="more-colors"
         aria-label="More colors…"
         title="More colors"
-        onclick={openColorPicker}>+</button
+        onclick={openColorPicker}
+        ><svg viewBox="0 0 16 16" aria-hidden="true"
+          ><path d="M8 3v10M3 8h10" /></svg
+        ></button
       >
     </div>
   </div>
@@ -1633,7 +1638,7 @@
               class="section-color"
               style:background={colorLabelInk(
                 document.sections.find((item) => item.id === section.id)
-                  ?.color ?? 'apricot',
+                  ?.color ?? DEFAULT_COLOR,
               )}
             ></span>
             {#if view.editingId === section.id}
@@ -1784,7 +1789,7 @@
                 ? { ...bar, ...motion.proposal }
                 : bar}
               {weekWidth}
-              color={palette[itemColor(shown, bar)]}
+              color={colorAppearance(itemColor(shown, bar))}
               timing={barTiming(shown, bar.start, bar.end)}
               onmenu={itemMenu}
               visible={rowVisible(bar.rowId)}
@@ -1818,7 +1823,7 @@
                   }
                 : item}
               {weekWidth}
-              color={palette[itemColor(shown, item)]}
+              color={colorAppearance(itemColor(shown, item))}
               timing={milestoneTiming(shown, item.boundary)}
               onmenu={itemMenu}
               visible={rowVisible(item.rowId)}
@@ -2692,6 +2697,8 @@
     gap: 8px;
   }
   .palette button {
+    display: grid;
+    place-items: center;
     width: 32px;
     height: 30px;
     padding: 0;
@@ -2720,8 +2727,15 @@
       #abc4ad44,
       #f3b18433
     );
-    font-size: 20px;
-    line-height: 1;
+  }
+  .more-colors svg {
+    display: block;
+    width: 16px;
+    height: 16px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.6;
+    stroke-linecap: round;
   }
   .palette .more-colors:focus-visible {
     outline-color: var(--accent);
