@@ -183,3 +183,33 @@ it('section preview carries a complete unit, reverses, and needs meaningful move
     72,
   );
 });
+
+it('section leading edges include every visible row, reverse across unequal groups and stay stable at rest', () => {
+  const before = initial(); // s1 = 160px; s2 = 116px; s3 = 72px.
+  const gesture = new StructureGesture(before, 'move-section', 's1', [], 18);
+  gesture.update(75, 0); // Bottom 217, just before s2 midpoint 218.
+  expect(gesture.preview).toEqual(before);
+  gesture.update(77, 1);
+  expect(gesture.preview.sections.map((section) => section.id)).toEqual([
+    's2',
+    's1',
+    's3',
+  ]);
+  gesture.update(77, 2);
+  expect(gesture.preview.sections.map((section) => section.id)).toEqual([
+    's2',
+    's1',
+    's3',
+  ]);
+  gesture.update(75, 3); // Top 57, back above s2's new midpoint 58.
+  expect(gesture.preview).toEqual(before);
+  gesture.update(350, 4);
+  expect(gesture.preview.sections.map((section) => section.id)).toEqual([
+    's2',
+    's3',
+    's1',
+  ]);
+  gesture.update(18, 5);
+  expect(gesture.preview).toEqual(before);
+  expect(gesture.cancel()).toEqual(before);
+});

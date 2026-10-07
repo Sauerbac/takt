@@ -8,7 +8,7 @@ export function colorLabelInk(color: Color): string {
 }
 export function itemColor(
   document: ChartDocument,
-  item: Bar | Milestone,
+  item: Pick<Bar | Milestone, 'rowId' | 'color'>,
 ): Color {
   const row = document.rows.find((row) => row.id === item.rowId);
   return (

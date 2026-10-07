@@ -17,8 +17,7 @@ test('compact overview bars hide clutter and zoom into readable inline naming', 
   await pauseClock(page);
   await expect(page.locator('main')).toHaveScreenshot('compact-overview.png');
   const bar = page.getByTestId('bar-short-2');
-  await bar.click({ button: 'right' });
-  await page.getByRole('menuitem', { name: 'Rename', exact: true }).click();
+  await bar.dblclick();
   await page.clock.runFor(64);
   await expect(page.locator('main')).toHaveScreenshot(
     'compact-zoom-intermediate.png',
@@ -299,6 +298,54 @@ test('Apricot invalid duplicate milestone drop', async ({ page }) => {
 test('Apricot empty editor', async ({ page }) => {
   await page.goto('/tests/fixtures/index.html?state=Empty');
   await expect(page.locator('main')).toHaveScreenshot('empty.png');
+});
+
+test('bar menu naming and inherited color previews follow the edited item', async ({
+  page,
+}) => {
+  await page.goto('/tests/fixtures/index.html?state=CalendarColors');
+  const bar = page.getByTestId('bar-a');
+  await bar.click({ button: 'right' });
+  await expect(page.getByRole('menu')).toHaveScreenshot('bar-menu-name.png');
+  await page.getByRole('textbox', { name: 'Bar name', exact: true }).click();
+  await expect(page.getByRole('menu')).toHaveScreenshot(
+    'bar-menu-name-focused.png',
+  );
+  await page.keyboard.press('Escape');
+  await pauseClock(page);
+  const pickup = await beginBarDrag(page, 'a');
+  await page.mouse.move(pickup.x + 15, pickup.y);
+  await expect(page.locator('main')).toHaveScreenshot(
+    'inherited-bar-preview.png',
+  );
+});
+
+test('carried row and section surfaces obscure surrounding timeline contents', async ({
+  page,
+}) => {
+  await page.goto('/tests/fixtures/index.html?state=Sections');
+  await pauseClock(page);
+  const grip = (await page
+    .getByRole('button', { name: 'Drag row Discovery', exact: true })
+    .boundingBox())!;
+  await page.mouse.move(grip.x + 5, grip.y + 12);
+  await page.mouse.down();
+  await page.mouse.move(grip.x + 5, grip.y + 42);
+  await expect(page.locator('main')).toHaveScreenshot(
+    'carried-row-overlap.png',
+  );
+  await page.keyboard.press('Escape');
+  await page.mouse.up();
+  await page.clock.runFor(200);
+  const section = (await page
+    .getByRole('button', { name: 'Drag section Research', exact: true })
+    .boundingBox())!;
+  await page.mouse.move(section.x + 5, section.y + 12);
+  await page.mouse.down();
+  await page.mouse.move(section.x + 5, section.y + 92);
+  await expect(page.locator('main')).toHaveScreenshot(
+    'carried-section-overlap.png',
+  );
 });
 
 test('Apricot pending collision is visibly invalid and activation retains the cascade preview', async ({

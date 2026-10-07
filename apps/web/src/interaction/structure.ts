@@ -71,17 +71,31 @@ export class StructureGesture {
     this.meaningful ||= Math.abs(pointer - this.pickup) >= 4;
     if (!this.meaningful) return;
     this.trackingTop = this.originalTop + pointer - this.pickup;
-    // Section pickup is on its heading. Use that structural position for
-    // midpoint crossings so a large carried group can reverse past a short one.
-    const center =
-      this.trackingTop +
-      (this.kind === 'move-section' ? SECTION_HEIGHT : ROW_HEIGHT) / 2;
+    const center = this.trackingTop + ROW_HEIGHT / 2;
     let layout = structureLayout(this.preview, this.collapsed);
     if (this.kind === 'move-section') {
-      const index = layout.sections.filter(
-        (section) =>
-          section.id !== this.id && center >= section.top + section.height / 2,
-      ).length;
+      let index = layout.sections.findIndex(
+        (section) => section.id === this.id,
+      );
+      const carried = layout.sections[index];
+      // Compare the complete carried block's leading edge with the adjacent
+      // slot midpoint. Recompute slots after each crossing, allowing large
+      // jumps and reversal without oscillating at a stationary pointer.
+      while (index < layout.sections.length - 1) {
+        const next = layout.sections[index + 1];
+        if (this.trackingTop + carried.height <= next.top + next.height / 2)
+          break;
+        index++;
+        this.preview = moveSection(this.before, this.id, index);
+        layout = structureLayout(this.preview, this.collapsed);
+      }
+      while (index > 0) {
+        const previous = layout.sections[index - 1];
+        if (this.trackingTop >= previous.top + previous.height / 2) break;
+        index--;
+        this.preview = moveSection(this.before, this.id, index);
+        layout = structureLayout(this.preview, this.collapsed);
+      }
       this.preview = moveSection(this.before, this.id, index);
       return;
     }

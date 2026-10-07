@@ -163,6 +163,35 @@ test('a whole section and its items track immediately while neighboring structur
   expect((await halfway(bar, 'top')).duration).toBe(150);
 });
 
+test('the complete section edge starts neighboring motion before its heading reaches that midpoint', async ({
+  page,
+}) => {
+  await page.goto('/tests/fixtures/index.html?state=Sections');
+  const section = page.getByTestId('section-section-1');
+  const neighbor = page.getByTestId('section-section-2');
+  const original = (await neighbor.boundingBox())!;
+  await freeze(page);
+  const point = await press(page, 'Research');
+  await page.mouse.move(point.x, point.y + 79);
+  expect((await neighbor.boundingBox())!.y).toBeCloseTo(original.y, 0);
+  await page.mouse.move(point.x, point.y + 81);
+  const flow = await halfway(neighbor, 'top');
+  expect(flow.duration).toBe(150);
+  expect(flow.top).toBeGreaterThan(original.y - 160);
+  expect(flow.top).toBeLessThan(original.y);
+  expect((await section.boundingBox())!.y).toBeCloseTo(
+    original.y - 160 + 81,
+    0,
+  );
+  await finish(neighbor);
+  await page.mouse.move(point.x, point.y + 79);
+  const reversal = await halfway(neighbor, 'top');
+  expect(reversal.top).toBeGreaterThan(original.y - 160);
+  expect(reversal.top).toBeLessThan(original.y);
+  await page.keyboard.press('Escape');
+  await page.mouse.up();
+});
+
 test('collapse and expansion animate row height and the surrounding layout', async ({
   page,
 }) => {

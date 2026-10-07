@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { Bar } from '../model/document';
   import type { Interval, GestureKind } from '../interaction/gesture';
+  import { nameDrag } from './name-drag';
   import {
     FIRST_WEEK,
     barInset,
@@ -18,6 +19,7 @@
     editing,
     draft,
     onstart,
+    onnamedrag,
     onrename,
     ondraft,
     onfinish,
@@ -36,6 +38,12 @@
     editing: boolean;
     draft: string;
     onstart: (event: PointerEvent, kind: GestureKind, id: string) => void;
+    onnamedrag: (
+      down: PointerEvent,
+      move: PointerEvent,
+      surface: HTMLElement,
+      id: string,
+    ) => void;
     onrename: (id: string) => void;
     ondraft: (value: string) => void;
     onfinish: (commit: boolean) => void;
@@ -82,8 +90,7 @@
   title={`${invalid ? 'Cannot drop here · Move clear or hold to push · ' : ''}${bar.name || 'Unnamed bar'} · ${timing ?? `Weeks ${bar.start}–${bar.end - 1}`}`}
   oncontextmenu={(event) => onmenu?.(event, 'bar', bar.id)}
   onpointerdown={(event) => {
-    if (!editing) onstart(event, 'move', bar.id);
-    else event.stopPropagation();
+    onstart(event, 'move', bar.id);
   }}
   ondblclick={() => onrename(bar.id)}
 >
@@ -99,6 +106,8 @@
   {#if editing}
     <input
       bind:this={input}
+      use:nameDrag={(down, move, surface) =>
+        onnamedrag(down, move, surface, bar.id)}
       aria-label="Bar name"
       value={draft}
       oninput={(event) => ondraft(event.currentTarget.value)}
@@ -177,7 +186,11 @@
   .bar.editing {
     z-index: 4;
   }
+  .bar.carried {
+    z-index: 7;
+  }
   input {
+    cursor: grab;
     width: 100%;
     min-width: 0;
     background: var(--bar-fill);

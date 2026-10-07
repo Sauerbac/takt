@@ -128,17 +128,17 @@ test('item context menus select, rename inline, reset inheritance and delete imm
   const bar = page.getByTestId('bar-a');
   await bar.click({ button: 'right' });
   await expect(bar).toHaveClass(/selected/);
-  const rename = page.getByRole('menuitem', { name: 'Rename', exact: true });
+  const input = page
+    .getByRole('menu')
+    .getByRole('textbox', { name: 'Bar name', exact: true });
   await expect(page.getByRole('menu')).toBeFocused();
   await page.keyboard.press('ArrowDown');
-  await expect(rename).toBeFocused();
-  await page.keyboard.press('ArrowDown');
+  await expect(input).toBeFocused();
+  await input.press('Tab');
   await expect(
     page.getByRole('menuitemradio', { name: 'Peach', exact: true }),
   ).toBeFocused();
   await page.keyboard.press('ArrowUp');
-  await page.keyboard.press('Enter');
-  const input = page.getByRole('textbox', { name: 'Bar name', exact: true });
   await expect(input).toBeFocused();
   expect(
     await input.evaluate((node) =>

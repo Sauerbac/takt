@@ -201,7 +201,6 @@ test('browser context menus remain available outside chart targets, in inline fi
 
   await page.getByTestId('bar-a').click({ button: 'right' });
   await expect(page.getByRole('menu')).toBeFocused();
-  await page.getByRole('menuitem', { name: 'Rename', exact: true }).click();
   const name = page.getByRole('textbox', { name: 'Bar name', exact: true });
   await name.click({ button: 'right' });
   await expect(page.locator('body')).toHaveAttribute(

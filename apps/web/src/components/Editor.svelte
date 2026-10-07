@@ -139,6 +139,8 @@
   } | null>(null);
   let menuElement = $state<HTMLDivElement>(null!);
   let menuUsingKeyboard = false;
+  let menuDraft = $state('');
+  let menuNameEditing = false;
   const menuName = $derived(
     menu
       ? menu.kind === 'lane' || menu.kind === 'calendar'
@@ -231,6 +233,17 @@
     );
     return item ? itemColor(document, item) : (menuColor ?? 'apricot');
   });
+  const proposalColor = $derived.by(() => {
+    const item = [...shown.bars, ...shown.milestones].find(
+      (item) => item.id === gesture?.id,
+    );
+    return palette[
+      itemColor(shown, {
+        rowId: motion?.proposal?.rowId ?? item?.rowId ?? '',
+        color: item?.color,
+      })
+    ];
+  });
   const carriesRow = (id: string) =>
     !!structural &&
     structuralMeaningful &&
@@ -303,20 +316,25 @@
     kind: GestureKind | 'milestone-move',
     id: string = crypto.randomUUID(),
     rowId = document.rows[0]?.id,
+    surface = event.currentTarget as HTMLElement,
   ) {
     if (spaceHeld) {
       startPan(event);
       return;
     }
+    const pressedBar = surface.closest('.bar, .milestone');
+    if (zooming && pressedBar?.classList.contains('editing'))
+      stopZoomAnimation();
     if (event.button !== 0 || busy || !event.isPrimary) return;
     event.preventDefault();
     event.stopPropagation();
     menu = null;
     notice = '';
-    const pressedBar = (event.currentTarget as HTMLElement).closest(
-      '.bar, .milestone',
-    );
-    if (kind === 'move' && pressedBar?.classList.contains('compact')) {
+    if (
+      kind === 'move' &&
+      pressedBar?.classList.contains('compact') &&
+      !pressedBar.classList.contains('editing')
+    ) {
       finishName(true);
       view.selectedId = id;
       viewport.focus({ preventScroll: true });
@@ -372,7 +390,7 @@
       validDrop: true,
     };
     // Capture on the pressed surface so clicks and double-clicks keep their bar target.
-    captureOwner = event.currentTarget as HTMLElement;
+    captureOwner = surface;
     captureOwner.setPointerCapture(event.pointerId);
   }
   function move(event: PointerEvent) {
@@ -386,6 +404,16 @@
     if (structural) updateStructure();
     else updateProposal();
     updateScrolling();
+  }
+  function startNameDrag(
+    down: PointerEvent,
+    movement: PointerEvent,
+    surface: HTMLElement,
+    id: string,
+  ) {
+    stopZoomAnimation();
+    start(down, 'move', id, undefined, surface);
+    move(movement);
   }
   function updateScrolling() {
     if (scrollVelocity() === 0 && verticalVelocity() === 0) stopScrolling();
@@ -609,7 +637,8 @@
     }
   }
   function rename(id: string) {
-    if (busy || view.editingId === id) return;
+    if ((busy && !zooming) || view.editingId === id) return;
+    stopZoomAnimation();
     const item = [
       ...history.document.sections,
       ...history.document.rows,
@@ -853,29 +882,32 @@
     if (!id) return;
     view.editingId = null;
     if (commit) {
-      const before = history.document;
-      history.commit(
-        'name',
-        {
-          ...before,
-          sections: before.sections.map((section) =>
-            section.id === id ? { ...section, name: draft } : section,
-          ),
-          bars: before.bars.map((bar) =>
-            bar.id === id ? { ...bar, name: draft } : bar,
-          ),
-          milestones: before.milestones.map((item) =>
-            item.id === id ? { ...item, name: draft } : item,
-          ),
-          rows: before.rows.map((row) =>
-            row.id === id ? { ...row, name: draft } : row,
-          ),
-        },
-        id,
-      );
-      syncHistory();
+      saveName(id, draft);
     }
     viewport?.focus({ preventScroll: true });
+  }
+  function saveName(id: string, name: string) {
+    const before = history.document;
+    history.commit(
+      'name',
+      {
+        ...before,
+        sections: before.sections.map((section) =>
+          section.id === id ? { ...section, name } : section,
+        ),
+        bars: before.bars.map((bar) =>
+          bar.id === id ? { ...bar, name } : bar,
+        ),
+        milestones: before.milestones.map((item) =>
+          item.id === id ? { ...item, name } : item,
+        ),
+        rows: before.rows.map((row) =>
+          row.id === id ? { ...row, name } : row,
+        ),
+      },
+      id,
+    );
+    syncHistory();
   }
   async function travel(direction: 'undo' | 'redo') {
     if (busy) return;
@@ -913,6 +945,22 @@
       }
     }
   }
+  function finishMenuName(commit: boolean) {
+    if (!menu || !menuNameEditing) return;
+    menuNameEditing = false;
+    if (commit) saveName(menu.id, menuDraft);
+  }
+  $effect(() => {
+    function dismissOutsideMenu(event: PointerEvent) {
+      if (menu && !menuElement.contains(event.target as Node)) {
+        finishMenuName(true);
+        menu = null;
+      }
+    }
+    window.addEventListener('pointerdown', dismissOutsideMenu, true);
+    return () =>
+      window.removeEventListener('pointerdown', dismissOutsideMenu, true);
+  });
   function keydown(event: KeyboardEvent) {
     if (
       event.target instanceof HTMLInputElement ||
@@ -1281,6 +1329,10 @@
     if (busy) return;
     finishName(true);
     view.selectedId = id;
+    menuDraft = [...document.bars, ...document.milestones].find(
+      (item) => item.id === id,
+    )!.name;
+    menuNameEditing = false;
     menu = {
       x: event.clientX,
       y: event.clientY,
@@ -1341,9 +1393,6 @@
     if (event.code === 'Space') spaceHeld = false;
   }}
   onblur={cancel}
-  onpointerdown={(event) => {
-    if (menu && !menuElement.contains(event.target as Node)) menu = null;
-  }}
 />
 
 {#snippet nameInput(kind: 'Row' | 'Section')}
@@ -1486,6 +1535,7 @@
   >
     <div
       class="chart"
+      class:structuralDragging={structuralMeaningful}
       bind:this={chart}
       style:height={`${54 + layout.height}px`}
     >
@@ -1681,6 +1731,8 @@
                   data-end={proposal.end}
                   data-row={proposal.rowId}
                   data-valid={motion.validDrop}
+                  style:--bar-fill={proposalColor.fill}
+                  style:--bar-ink={proposalColor.ink}
                   style:left={`${(proposal.start - FIRST_WEEK) * weekWidth + (gesture.kind === 'milestone-move' ? -7 : inset)}px`}
                   style:width={`${gesture.kind === 'milestone-move' ? 14 : (proposal.end - proposal.start) * weekWidth - inset * 2}px`}
                 ></div>
@@ -1692,13 +1744,40 @@
       <div
         class="items"
         class:changingScale
+        class:carrying={structuralMeaningful}
         style:width={`${laneWidth}px`}
-        style:height={`${structural ? Math.max(layout.height, structuralTop + 200) : layout.height}px`}
+        style:height={`${structural ? Math.max(layout.height, structuralTop + (structural.kind === 'move-section' ? layout.sections.find((section) => section.id === structural!.id)!.height : 44)) : layout.height}px`}
       >
         <div
           class="timeline-content"
           style:transform={`translateX(${timelineShift}px)`}
         >
+          {#if structural && structuralMeaningful}
+            {#if structural.kind === 'move-section'}
+              {@const section = layout.sections.find(
+                (section) => section.id === structural!.id,
+              )!}
+              <div
+                class="carried-surface section-surface"
+                style:left={`${-timelineShift}px`}
+                style:width={`${laneWidth}px`}
+                style:top={`${structuralTop}px`}
+                style:height={`${section.height}px`}
+              ></div>
+            {/if}
+            {#each renderedRows.filter( (row) => carriesRow(row.id) ) as row (row.id)}
+              <div
+                class="carried-surface"
+                style:left={`${-timelineShift}px`}
+                style:width={`${laneWidth}px`}
+                style:top={`${structureTop(row.id, row.top)}px`}
+              >
+                <svg class="week-grid" aria-hidden="true"
+                  ><path d={gridPath} /></svg
+                >
+              </div>
+            {/each}
+          {/if}
           {#each shown.bars as bar (bar.id)}
             <Bar
               bar={gesture?.id === bar.id && motion?.proposal
@@ -1723,6 +1802,7 @@
                 ? motion.tracking
                 : undefined}
               onstart={start}
+              onnamedrag={startNameDrag}
               onrename={rename}
               ondraft={(value) => (draft = value)}
               onfinish={finishName}
@@ -1778,6 +1858,11 @@
       style:top={`${menu.y}px`}
       onpointermove={(event) => {
         if (event.pointerType !== 'mouse') return;
+        if (
+          window.document.activeElement instanceof HTMLInputElement &&
+          menuElement.contains(window.document.activeElement)
+        )
+          return;
         menuUsingKeyboard = false;
         const item = (event.target as Element).closest<HTMLButtonElement>(
           'button',
@@ -1785,16 +1870,18 @@
         (item ?? menuElement).focus({ preventScroll: true });
       }}
       onpointerleave={(event) => {
+        if (menuNameEditing) return;
         if (event.pointerType === 'mouse' && !menuUsingKeyboard)
           menuElement.focus({ preventScroll: true });
       }}
       onkeydown={(event) => {
+        if (event.target instanceof HTMLInputElement) return;
         menuUsingKeyboard = true;
         const buttons = [
-          ...menuElement.querySelectorAll<HTMLButtonElement>('button'),
+          ...menuElement.querySelectorAll<HTMLElement>('input, button'),
         ];
         const index = buttons.indexOf(
-          window.document.activeElement as HTMLButtonElement,
+          window.document.activeElement as HTMLElement,
         );
         if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
           event.preventDefault();
@@ -1816,7 +1903,28 @@
             : menu.kind === 'calendar'
               ? 'Calendar reference'
               : menu.kind}</small
-        ><strong title={menuName}>{menuName}</strong>
+        >
+        {#if menu.kind === 'bar'}
+          <input
+            class="menu-name"
+            aria-label="Bar name"
+            placeholder="Unnamed bar"
+            value={menuDraft}
+            onfocus={() => {
+              menuNameEditing = true;
+            }}
+            oninput={(event) => (menuDraft = event.currentTarget.value)}
+            onblur={() => finishMenuName(true)}
+            onkeydown={(event) => {
+              if (event.key !== 'Enter' && event.key !== 'Escape') return;
+              event.preventDefault();
+              event.stopPropagation();
+              finishMenuName(event.key === 'Enter');
+              menu = null;
+              viewport.focus({ preventScroll: true });
+            }}
+          />
+        {:else}<strong title={menuName}>{menuName}</strong>{/if}
       </div>
       <hr />
       {#if menu.kind === 'calendar'}
@@ -1875,15 +1983,17 @@
           }}>Delete section…</MenuItem
         >
       {:else if menu.kind === 'bar' || menu.kind === 'milestone'}
-        <MenuItem
-          icon="rename"
-          onclick={() => {
-            const id = menu!.id;
-            menu = null;
-            rename(id);
-          }}>Rename</MenuItem
-        >
-        <hr />
+        {#if menu.kind === 'milestone'}
+          <MenuItem
+            icon="rename"
+            onclick={() => {
+              const id = menu!.id;
+              menu = null;
+              rename(id);
+            }}>Rename</MenuItem
+          >
+          <hr />
+        {/if}
         {@render colorPalette()}
         <MenuItem icon="inherit" onclick={() => setColor()}
           >Use section color</MenuItem
@@ -2297,6 +2407,21 @@
     overflow: clip;
     pointer-events: none;
   }
+  .items.carrying {
+    z-index: 7;
+  }
+  .carried-surface {
+    position: absolute;
+    height: 44px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--grid);
+    box-shadow: 0 4px 12px #182e471a;
+    z-index: 6;
+    pointer-events: auto;
+  }
+  .section-surface {
+    background: linear-gradient(var(--section-bg) 36px, var(--surface) 36px);
+  }
   .changingScale :global(.bar),
   .changingScale :global(.milestone) {
     transition: none;
@@ -2395,7 +2520,15 @@
     background: var(--surface);
   }
   .row.carried .row-label {
-    z-index: 6;
+    z-index: 9;
+  }
+  .structuralDragging .row-label,
+  .structuralDragging .section-label {
+    z-index: 8;
+  }
+  .section.carried,
+  .add-row-line.carried {
+    z-index: 9;
   }
   .add-row-line.carried {
     background: var(--surface);
@@ -2516,6 +2649,20 @@
     text-overflow: ellipsis;
     white-space: nowrap;
   }
+  .menu-name {
+    width: 100%;
+    min-width: 0;
+    border: 0;
+    outline: 0;
+    padding: 0;
+    background: transparent;
+    color: var(--ink);
+    font-size: 12px;
+    font-weight: 600;
+  }
+  .menu-name:focus {
+    box-shadow: 0 1px var(--line);
+  }
   .context-menu hr {
     border: 0;
     border-top: 1px solid var(--line);
@@ -2591,7 +2738,7 @@
     height: 34px;
     top: 5px;
     border: 1px dashed var(--bar-ink);
-    background: #f3b18430;
+    background: color-mix(in srgb, var(--bar-fill) 19%, transparent);
     border-radius: var(--bar-radius);
     pointer-events: none;
   }

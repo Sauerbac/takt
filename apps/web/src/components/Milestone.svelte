@@ -100,7 +100,7 @@
     visibility: hidden;
     pointer-events: none;
   }
-  .carried {
+  .milestone.carried {
     transition: none !important;
     z-index: 7;
   }

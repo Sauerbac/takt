@@ -27,8 +27,7 @@ for (const action of ['create', 'rename'] as const) {
       await page.mouse.move(initial.x(start + 1), initial.y);
       await page.mouse.up();
     } else {
-      await page.getByTestId('bar-short-2').click({ button: 'right' });
-      await page.getByRole('menuitem', { name: 'Rename', exact: true }).click();
+      await page.getByTestId('bar-short-2').dblclick();
     }
     const input = page.getByRole('textbox', { name: 'Bar name' });
     await expect(input).toBeFocused();

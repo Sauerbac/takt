@@ -2,7 +2,7 @@
 
 **Status:** Agreed UX direction, refined for the first implementation milestone.
 
-**Last updated:** October 5, 2026.
+**Last updated:** October 7, 2026.
 
 **Audience:** Product, design, and implementation collaborators.
 
@@ -177,7 +177,7 @@ At 100%, the timeline shows approximately 24 weeks (initially Week -2 through We
 4. Release to create the bar.
 5. Make its label editable inline.
 
-Enter finishes naming. Escape skips naming while retaining the newly created bar. A label is optional.
+Enter finishes naming. Escape skips naming while retaining the newly created bar. A label is optional. Dragging directly from the open bar-name input starts movement after 4 CSS pixels, committing any typed name first. A click without dragging keeps the editor open and places the caret. Creation, naming, and subsequent movement remain separate undoable actions.
 
 Dragging leftward across an interval creates the same bar as dragging rightward across it. A press and release without a meaningful drag creates nothing, preserving double-click as the milestone gesture.
 
@@ -199,11 +199,11 @@ The context menu also provides **“Add milestone here.”** It uses the same pl
 
 ### 7.4 Inline editing
 
-Clicking anywhere in a section's name area edits its name in place. Double-clicking a row name, bar label, or milestone label edits that text in place. A **“Rename”** context-menu action offers another route to the same editor. Opening any name editor places the caret at the end of the existing text without selecting it.
+Clicking anywhere in a section's name area edits its name in place. Double-clicking a row name, bar label, or milestone label edits that text in place. Row, section, and milestone menus offer **“Rename”**. A bar's context-menu heading contains its editable name directly, with an **“Unnamed bar”** placeholder when empty. Enter commits and dismisses the menu; focus loss commits; Escape discards the current name draft and dismisses the menu. Text undo remains native while the field is focused, and moving the pointer through menu actions does not steal its focus. Menu naming leaves the chart's zoom unchanged. Opening any name editor places the caret at the end of the existing text without selecting it.
 
 Inline naming retains the label's typography, color, background, and position. Section, row, and milestone editors have no visible input box, border, or focus outline. Bar text is vertically centered in both display and editing modes. Bars and milestones gain no selection border or outline, and focusing the chart does not add an outline around it. Bar resize handles remain visible regardless of selection or hover when the painted bar is at least 32 CSS pixels wide. Smaller bars hide their handles and use a zoom-in cursor. Selection still determines keyboard deletion; invalid-drop feedback remains visible during gestures.
 
-Dragging a label still moves its item; the label is not an area that blocks direct manipulation. Dedicated bar end handles remain resize targets.
+Dragging a label still moves its item; the label is not an area that blocks direct manipulation. The bar's inline name field shows the same grab-hand cursor as the bar body, including immediately after creation. Dedicated bar end handles remain resize targets. A valid snapped drop preview uses the item's effective color, including its explicit override or the destination section's inherited color. Invalid proposals retain their distinct warning outline and tint.
 
 Display labels appear only when the painted bar is at least 56 CSS pixels wide; longer labels are clipped. The complete name and timing remain available on hover. During inline editing, the input stays within the bar; long text scrolls inside the field.
 
@@ -246,7 +246,7 @@ Rows and section headings show a six-dot drag handle. Dragging the handle or nam
 
 Dragging a section heading reorders the section as a unit. Reordering rows or sections does not alter dates or relative weeks.
 
-The dragged row or section remains attached to the pointer as one visual object, including all contents that move with it. When it crosses the midpoint of a neighboring structural position, surrounding content animates to show the proposed insertion point. Moving back reverses that preview; release commits the arrangement currently shown.
+The dragged row or section remains attached to the pointer as one opaque visual object, above surrounding rows, grids, bars, and milestones, including all contents that move with it. A row's center crossing a neighboring row midpoint selects its insertion position. Section reordering uses the whole visible block (heading, expanded rows, and Add row control): its bottom edge crossing the next section's midpoint moves it down; its top edge crossing the previous section's midpoint moves it up. Collapsed sections use only their visible height. Surrounding content animates to show the proposed insertion point. Moving back reverses that preview; release commits the arrangement currently shown.
 
 Hovering a dragged row over a collapsed section for a short delay, initially around half a second, temporarily expands that section with animation. Leaving collapses it again if it was originally collapsed. Cancelling restores the original collapse states. Dropping the row into the section leaves the destination expanded so the result remains visible.
 

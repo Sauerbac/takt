@@ -47,6 +47,8 @@ Each row corresponds to a scenario in UX section 14. Related assertions may shar
 
 ## Contracts beyond the scenario table
 
+Drag and naming refinements are covered by `tests/components/drag-edit-regressions.spec.ts`: inherited and overridden ghosts, opaque carried rows, immediate movement from empty/typed bar-name inputs, separate creation/name/move history, menu-heading naming, cancellation and focus. `src/interaction/structure.test.ts` checks complete section leading edges, unequal heights, stationary proposals and reversal. `tests/components/structure-motion.spec.ts` and `tests/visual/states.spec.ts` cover the corresponding animated flow and appearance.
+
 | Contract                                                                                                        | Automated coverage                                                                                                                                        |
 | --------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | One-week minimum, four-pixel threshold, exact halfway ties, adjacency, duration preservation                    | `src/model/rules.test.ts`; `tests/components/editor.spec.ts`; generated interval cases check committed invariants.                                        |
