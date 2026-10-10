@@ -15,7 +15,7 @@ test.beforeEach(async ({ page }) => {
   await zoomToWeekZero(page);
 });
 
-test('a click and sub-threshold jitter create nothing; drawing either way keeps Week 0 fixed', async ({
+test('a click and sub-threshold jitter create nothing; drawing either way keeps Week 1 fixed', async ({
   page,
 }) => {
   const lane = await laneGeometry(page);
@@ -34,7 +34,7 @@ test('a click and sub-threshold jitter create nothing; drawing either way keeps 
   ).toBeVisible();
   await draw(page, 5, 3);
   await interval(page.locator('.bar'), 3, 5);
-  await expect(page.getByText('Week 0', { exact: true })).toBeVisible();
+  await expect(page.getByText('Week 1', { exact: true })).toBeVisible();
 });
 
 test('creation and inline naming are separate undo entries; Ctrl+Y restores both', async ({
@@ -50,6 +50,25 @@ test('creation and inline naming are separate undo entries; Ctrl+Y restores both
   await expect(page.locator('.bar span')).toHaveText('');
   await page.keyboard.press('Control+y');
   await expect(page.locator('.bar span')).toHaveText('Research');
+});
+
+test('a newly created bar opens its app context menu without first dismissing naming', async ({
+  page,
+}) => {
+  const lane = await laneGeometry(page);
+  await page.mouse.move(lane.x(0), lane.y);
+  await page.mouse.down();
+  await page.mouse.move(lane.x(2), lane.y, { steps: 5 });
+  await page.mouse.up();
+  const input = page.getByRole('textbox', { name: 'Bar name' });
+  await expect(input).toBeFocused();
+  await input.fill('New work');
+  await input.click({ button: 'right' });
+  await expect(page.getByRole('menu')).toBeVisible();
+  await expect(page.getByRole('menu')).toBeFocused();
+  await expect(page.getByRole('menu').getByRole('textbox')).toHaveValue(
+    'New work',
+  );
 });
 
 test('drawing starts at four pixels and has a one-week minimum', async ({

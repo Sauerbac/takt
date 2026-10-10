@@ -16,23 +16,54 @@ export function calendarBands(
   unit: 'month' | 'year',
 ) {
   const origin = Date.parse(dateAt(reference, 0));
+  return timeBands(origin, firstWeek, weekCount, unit, false);
+}
+
+// Relative calendar lengths use a synthetic January 1 of Year 1. This is
+// independent of the user's real calendar reference and includes Year 0.
+export function relativeBands(
+  firstWeek: number,
+  weekCount: number,
+  unit: 'month' | 'year',
+) {
+  return timeBands(Date.parse('0001-01-01'), firstWeek, weekCount, unit, true);
+}
+
+function monthStart(year: number, month: number) {
+  const date = new Date(0);
+  date.setUTCFullYear(year, month, 1);
+  return date;
+}
+
+function timeBands(
+  origin: number,
+  firstWeek: number,
+  weekCount: number,
+  unit: 'month' | 'year',
+  relative: boolean,
+) {
   const start = new Date(origin + firstWeek * WEEK);
   let year = start.getUTCFullYear();
   let month = unit === 'year' ? 0 : start.getUTCMonth();
   const bands: { start: number; end: number; label: string }[] = [];
   while (true) {
-    const date = new Date(Date.UTC(year, month, 1));
+    const date = monthStart(year, month);
     const from = (date.getTime() - origin) / WEEK;
     if (from >= firstWeek + weekCount) break;
-    const next = Date.UTC(
+    const next = monthStart(
       year + (unit === 'year' ? 1 : 0),
       month + (unit === 'month' ? 1 : 0),
-      1,
-    );
+    ).getTime();
     bands.push({
       start: from,
       end: (next - origin) / WEEK,
-      label: unit === 'year' ? String(year) : monthLabel.format(date),
+      label: relative
+        ? unit === 'year'
+          ? `Year ${year}`
+          : `Month ${month + 1}`
+        : unit === 'year'
+          ? String(year)
+          : monthLabel.format(date),
     });
     if (unit === 'year') year++;
     else if (++month === 12) {

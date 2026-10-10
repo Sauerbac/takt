@@ -96,7 +96,7 @@
       ></span
     >
     <div>
-      <h2 id={`${id}-title`}>Week {week} starts on</h2>
+      <h2 id={`${id}-title`}>Week {week + 1} starts on</h2>
       <p id={`${id}-description`}>Choose the first day of this week.</p>
     </div>
   </div>

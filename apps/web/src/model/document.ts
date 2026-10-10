@@ -27,7 +27,7 @@ export interface Section {
   readonly color?: Color;
 }
 
-// A milestone's boundary is the start of the following week (Week 2 ends at 3).
+// Coordinates are zero-based; boundary 3 marks the end of displayed Week 3.
 export interface Milestone {
   readonly id: string;
   readonly rowId: string;

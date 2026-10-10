@@ -52,6 +52,8 @@ test('a carried row hides other bars, milestones and grids beneath its surface',
   expect((await bar.boundingBox())!.y).toBeCloseTo(original.y + 30, 0);
   const surface = page.locator('.carried-surface');
   await expect(surface).toBeVisible();
+  await expect(surface).toHaveCSS('box-shadow', 'none');
+  await expect(row).toHaveCSS('box-shadow', 'none');
   const rowBox = (await row.boundingBox())!;
   const lane = await laneGeometry(page);
   const hit = await page.evaluate(
@@ -59,6 +61,40 @@ test('a carried row hides other bars, milestones and grids beneath its surface',
     { x: lane.x(10), y: rowBox.y + 22 },
   );
   expect(hit).toContain('carried-surface');
+});
+
+test('a carried section has one shadow at its bottom without shadows under the heading or interior rows', async ({
+  page,
+}) => {
+  await page.goto('/tests/fixtures/index.html?state=Sections');
+  await pauseClock(page);
+  const grip = (await page
+    .getByRole('button', { name: 'Drag section Research', exact: true })
+    .boundingBox())!;
+  await page.mouse.move(grip.x + 5, grip.y + 12);
+  await page.mouse.down();
+  await page.mouse.move(grip.x + 5, grip.y + 42);
+  for (const selector of [
+    '.section.carried',
+    '.row.carried',
+    '.carried-surface',
+  ]) {
+    const surfaces = page.locator(selector);
+    expect(await surfaces.count()).toBeGreaterThan(0);
+    for (const surface of await surfaces.all())
+      await expect(surface).toHaveCSS('box-shadow', 'none');
+  }
+  const bottom = page.locator('.add-row-line.carried');
+  await expect(bottom).not.toHaveCSS('box-shadow', 'none');
+  await expect(bottom).toHaveCSS('clip-path', 'inset(0px -12px -16px)');
+  const bottomBox = (await bottom.boundingBox())!;
+  const groupBox = (await page.locator('.section-surface').boundingBox())!;
+  expect(bottomBox.y + bottomBox.height).toBeCloseTo(
+    groupBox.y + groupBox.height,
+    0,
+  );
+  await page.keyboard.press('Escape');
+  await page.mouse.up();
 });
 
 for (const typed of [false, true]) {

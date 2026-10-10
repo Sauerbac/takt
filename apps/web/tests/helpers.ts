@@ -50,7 +50,7 @@ export async function chooseZoom(page: Page, scale: string) {
 }
 
 // Calendar-reference scenarios deliberately show individual dates around the
-// origin. Toolbar zoom preserves the center, so explicitly pan back to Week 0.
+// origin. Toolbar zoom preserves the center, so explicitly pan back to Week 1.
 export async function zoomToWeekZero(page: Page) {
   await chooseZoom(page, '2');
   const lane = page.getByTestId('lane').first();

@@ -163,9 +163,9 @@ test('edge speed increases toward the boundary and stops on leaving, outside the
   await expect(
     page.getByRole('button', { name: 'Undo', exact: true }),
   ).toBeDisabled();
-  // View changes persist after cancellation; Week 0's coordinates were never renumbered.
+  // View changes persist after cancellation; Week 1's coordinates were never renumbered.
   expect(before).not.toBe(-2);
-  await expect(page.getByText('Week 0', { exact: true })).toBeVisible();
+  await expect(page.getByText('Week 1', { exact: true })).toBeVisible();
   await page.clock.runFor(200);
   const pickup = await beginBarDrag(page, 'a');
   await page.mouse.move(edge.left + 8, pickup.y);

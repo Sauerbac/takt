@@ -2,10 +2,59 @@ import { describe, expect, it } from 'vitest';
 import { assertDocument, copyDocument, emptyDocument } from './document';
 import type { ChartDocument } from './document';
 import { barTiming, dateAt, milestoneTiming, weekLabel } from './calendar';
-import { quickColors, colorLabelInk, itemColor, recolor } from './colors';
+import {
+  quickColors,
+  documentColors,
+  colorLabelInk,
+  itemColor,
+  recolor,
+} from './colors';
 import { History } from './history';
 import { moveRow } from './structure';
 import { placeBar, placeMilestone } from './rules';
+
+it('numbers the origin, earlier weeks and timing labels consistently from one', () => {
+  const doc = emptyDocument();
+  expect([-2, -1, 0, 1].map((week) => weekLabel(doc, week))).toEqual([
+    'Week −1',
+    'Week 0',
+    'Week 1',
+    'Week 2',
+  ]);
+  expect(barTiming(doc, 0, 3)).toBe('Weeks 1–3');
+  expect(milestoneTiming(doc, 3)).toBe('End of Week 3');
+});
+
+it('offers every committed hue once and updates used colors through undo and redo', () => {
+  const doc: ChartDocument = {
+    ...emptyDocument(),
+    sections: [{ id: 'section-1', name: '', color: 87.4 }],
+    bars: [
+      { id: 'a', rowId: 'row-1', name: '', start: 0, end: 1, color: 87.4 },
+    ],
+    milestones: [
+      { id: 'm', rowId: 'row-1', name: '', boundary: 1, color: 25.1 },
+    ],
+  };
+  expect(documentColors(doc).map(({ color }) => color)).toEqual([
+    ...quickColors.map(({ color }) => color),
+    87.4,
+    25.1,
+  ]);
+  const history = new History(doc);
+  history.commit('color', recolor(doc, 'm', 50), 'm');
+  expect(
+    documentColors(history.document).map(({ color }) => color),
+  ).not.toContain(25.1);
+  history.undo();
+  expect(documentColors(history.document).map(({ color }) => color)).toContain(
+    25.1,
+  );
+  history.redo();
+  expect(
+    documentColors(history.document).map(({ color }) => color),
+  ).not.toContain(25.1);
+});
 
 describe('calendar weeks', () => {
   const calendar = { week: 3, date: '2026-10-05' };
@@ -17,8 +66,8 @@ describe('calendar weeks', () => {
     expect(weekLabel(doc, 3)).toBe('5 Oct 2026');
     expect(barTiming(doc, 3, 6)).toBe('5 Oct 2026–25 Oct 2026');
     expect(milestoneTiming(doc, 4)).toBe('11 Oct 2026');
-    expect(weekLabel({ ...doc, display: 'weeks' }, -2)).toBe('Week −2');
-    expect(milestoneTiming(emptyDocument(), 3)).toBe('End of Week 2');
+    expect(weekLabel({ ...doc, display: 'weeks' }, -2)).toBe('Week −1');
+    expect(milestoneTiming(emptyDocument(), 3)).toBe('End of Week 3');
   });
   it.each([
     ['2026-03-25', 1, '2026-04-01'],

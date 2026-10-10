@@ -66,7 +66,7 @@
   style:left={`${((tracking ?? item.boundary) - FIRST_WEEK) * weekWidth}px`}
   style:width={`${item.name || editing ? 150 : 14}px`}
   style:top={`${top}px`}
-  title={`${invalid ? 'Cannot drop here · A milestone already marks this boundary · ' : ''}${item.name || 'Unnamed milestone'} · ${timing ?? `End of Week ${item.boundary - 1}`}`}
+  title={`${invalid ? 'Cannot drop here · A milestone already marks this boundary · ' : ''}${item.name || 'Unnamed milestone'} · ${timing ?? `End of Week ${item.boundary}`}`}
   oncontextmenu={(event) => onmenu?.(event, 'milestone', item.id)}
   onpointerdown={(event) => {
     if (!editing) onstart(event, 'milestone-move', item.id);

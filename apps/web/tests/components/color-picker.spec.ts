@@ -124,6 +124,56 @@ test('slider keyboard controls, modal focus and dismissal preserve the document 
   }
 });
 
+test('slider-picked hues are reusable across sections, bars and milestones without duplicate swatches', async ({
+  page,
+}) => {
+  await page.goto('/tests/fixtures/index.html?state=CalendarColors');
+  const bar = page.getByTestId('bar-a');
+  await bar.click({ button: 'right' });
+  await page
+    .getByRole('menuitem', { name: 'More colors…', exact: true })
+    .click();
+  await setHue(page, 87.4);
+  await page.getByRole('button', { name: 'Apply color', exact: true }).click();
+  for (const target of [
+    page.getByTestId('bar-b'),
+    page.getByTestId('milestone-m'),
+    page.locator('.section-name').last(),
+  ]) {
+    await target.click({ button: 'right' });
+    const custom = page.getByRole('menuitemradio', {
+      name: 'Hue 87.4°',
+      exact: true,
+    });
+    await expect(custom).toHaveCount(1);
+    await expect(custom).toHaveCSS('background-color', rgb(87.4));
+    await custom.focus();
+    await page.keyboard.press('Enter');
+  }
+  await expect(page.getByTestId('bar-b')).toHaveCSS(
+    'background-color',
+    rgb(87.4),
+  );
+  await expect(page.getByTestId('milestone-m').locator('i')).toHaveCSS(
+    'background-color',
+    rgb(87.4),
+  );
+  await bar.click({ button: 'right' });
+  await expect(
+    page.getByRole('menuitemradio', { name: 'Hue 87.4°', exact: true }),
+  ).toHaveAttribute('aria-checked', 'true');
+  await expect(page.getByRole('menuitemradio')).toHaveCount(5);
+  await page
+    .getByRole('menuitem', { name: 'More colors…', exact: true })
+    .click();
+  await setHue(page, 99.9);
+  await page.getByRole('button', { name: 'Cancel', exact: true }).click();
+  await bar.click({ button: 'right' });
+  await expect(
+    page.getByRole('menuitemradio', { name: 'Hue 99.9°', exact: true }),
+  ).toHaveCount(0);
+});
+
 test('pointer dragging previews the spectrum, the plus is centered and presets use the same appearance', async ({
   page,
 }) => {

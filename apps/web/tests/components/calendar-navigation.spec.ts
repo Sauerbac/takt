@@ -47,10 +47,10 @@ test('calendar setup cancels cleanly, accepts user dates and preserves time/refe
   await dates.click();
   await chooseDate(page, '2026-10-07');
   await expect(page.locator('[data-week="0"]')).toHaveAccessibleName(
-    '7 Oct 2026 · Set date for Week 0',
+    '7 Oct 2026 · Set date for Week 1',
   );
   await expect(page.locator('[data-week="1"]')).toHaveAccessibleName(
-    '14 Oct 2026 · Set date for Week 1',
+    '14 Oct 2026 · Set date for Week 2',
   );
   await interval(page.getByTestId('bar-a'), 0, 2);
   await expect(page.getByTestId('milestone-m')).toHaveAttribute(
@@ -63,19 +63,19 @@ test('calendar setup cancels cleanly, accepts user dates and preserves time/refe
   ).toHaveAttribute('data-date', '2026-10-28');
   await chooseDate(page, '2026-10-05');
   await expect(page.locator('[data-week="0"]')).toHaveAccessibleName(
-    '14 Sept 2026 · Set date for Week 0',
+    '14 Sept 2026 · Set date for Week 1',
   );
   await expect(page.getByTestId('bar-a')).toHaveAttribute(
     'title',
     'Discovery · 14 Sept 2026–27 Sept 2026',
   );
   await page.getByRole('button', { name: 'Weeks', exact: true }).click();
-  await expect(page.locator('[data-week="3"]')).toHaveText('Week 3');
+  await expect(page.locator('[data-week="3"]')).toHaveText('Week 4');
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
   await expect(dates).toHaveAttribute('aria-pressed', 'true');
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
   await expect(page.locator('[data-week="0"]')).toHaveAccessibleName(
-    '7 Oct 2026 · Set date for Week 0',
+    '7 Oct 2026 · Set date for Week 1',
   );
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
   await expect(dates).toHaveAttribute('aria-pressed', 'false');
@@ -112,10 +112,10 @@ test('a heading switches to Dates atomically; Escape/outside dismissal and empty
     page.getByRole('button', { name: 'Weeks', exact: true }),
   ).toHaveAttribute('aria-pressed', 'false');
   await expect(page.locator('[data-week="3"]')).toHaveAccessibleName(
-    '29 Feb 2024 · Set date for Week 3',
+    '29 Feb 2024 · Set date for Week 4',
   );
   await expect(page.locator('[data-week="4"]')).toHaveAccessibleName(
-    '7 Mar 2024 · Set date for Week 4',
+    '7 Mar 2024 · Set date for Week 5',
   );
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
   await page.getByRole('button', { name: 'Redo', exact: true }).click();
@@ -311,6 +311,7 @@ test('Space activates focused standard chart controls and remains text input whi
   page,
 }) => {
   await page.goto('/tests/fixtures/index.html?state=Empty');
+  await zoomToWeekZero(page);
   await page.locator('.section-name').focus();
   await page.keyboard.press('Space');
   const name = page.getByRole('textbox', { name: 'Section name', exact: true });

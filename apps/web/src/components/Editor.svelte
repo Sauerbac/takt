@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onDestroy, tick } from 'svelte';
+  import taktMark from '../assets/takt-mark.svg';
   import { emptyDocument } from '../model/document';
   import type { ChartDocument, Color } from '../model/document';
   import {
@@ -7,11 +8,12 @@
     weekLabel,
     barTiming,
     milestoneTiming,
+    relativeWeekLabel,
   } from '../model/calendar';
   import {
     colorAppearance,
     DEFAULT_COLOR,
-    quickColors,
+    documentColors,
     colorLabelInk,
     itemColor,
     recolor,
@@ -55,6 +57,7 @@
   import MenuItem from './MenuItem.svelte';
   import {
     calendarBands,
+    relativeBands,
     headingStride,
     weekGridPath,
   } from '../timeline-headings';
@@ -160,26 +163,33 @@
   const compactDates = $derived(
     document.display === 'dates' && !!document.calendar && weekWidth < 60,
   );
+  const compactWeeks = $derived(document.display !== 'dates' && weekWidth < 60);
+  const monthHeadings = $derived(compactDates || compactWeeks);
   const stride = $derived(headingStride(weekWidth));
+  const paletteColors = $derived(documentColors(document));
   const months = $derived(
-    document.calendar
-      ? calendarBands(
-          document.calendar,
-          view.firstWeek,
-          laneWidth / weekWidth,
-          'month',
-        )
-      : [],
+    compactWeeks
+      ? relativeBands(view.firstWeek, laneWidth / weekWidth, 'month')
+      : document.calendar
+        ? calendarBands(
+            document.calendar,
+            view.firstWeek,
+            laneWidth / weekWidth,
+            'month',
+          )
+        : [],
   );
   const years = $derived(
-    document.calendar
-      ? calendarBands(
-          document.calendar,
-          view.firstWeek,
-          laneWidth / weekWidth,
-          'year',
-        )
-      : [],
+    document.display !== 'dates'
+      ? relativeBands(view.firstWeek, laneWidth / weekWidth, 'year')
+      : document.calendar
+        ? calendarBands(
+            document.calendar,
+            view.firstWeek,
+            laneWidth / weekWidth,
+            'year',
+          )
+        : [],
   );
   const timelineShift = $derived((FIRST_WEEK - view.firstWeek) * weekWidth);
   const gridPath = $derived(weekGridPath(view.firstWeek, weekWidth, laneWidth));
@@ -1324,7 +1334,7 @@
     kind: 'bar' | 'milestone',
     id: string,
   ) {
-    if ((event.target as Element).closest('input')) return;
+    if (kind !== 'bar' && (event.target as Element).closest('input')) return;
     event.preventDefault();
     event.stopPropagation();
     if (busy) return;
@@ -1419,7 +1429,7 @@
       <span>Color</span>
     </div>
     <div class="palette">
-      {#each quickColors as preset}
+      {#each paletteColors as preset}
         {@const appearance = colorAppearance(preset.color)}
         <button
           role="menuitemradio"
@@ -1470,8 +1480,7 @@
 <main class="shell">
   <header>
     <div class="brand" aria-label="Takt">
-      <span class="mark" aria-hidden="true"><i></i><i></i><i></i></span
-      >Takt<span class="dot">.</span>
+      <img class="mark" src={taktMark} alt="" />Takt<span class="dot">.</span>
     </div>
     <div class="toolbar" aria-label="Editor controls">
       <div class="history">
@@ -1547,20 +1556,21 @@
       <div class="chart-header">
         <div class="lane-heading">Sections &amp; rows</div>
         <div class="weeks" bind:clientWidth={laneWidth}>
-          {#if compactDates}
-            {#each years as band}
-              <div
-                class="year-band"
-                style:left={`${Math.max(0, (band.start - view.firstWeek) * weekWidth)}px`}
-                style:width={`${(Math.min(band.end, view.firstWeek + laneWidth / weekWidth) - Math.max(band.start, view.firstWeek)) * weekWidth}px`}
-              >
-                {band.label}
-              </div>
-            {/each}
+          {#each years as band}
+            <div
+              class="year-band"
+              style:left={`${Math.max(0, (band.start - view.firstWeek) * weekWidth)}px`}
+              style:width={`${(Math.min(band.end, view.firstWeek + laneWidth / weekWidth) - Math.max(band.start, view.firstWeek)) * weekWidth}px`}
+            >
+              {band.label}
+            </div>
+          {/each}
+          {#if monthHeadings}
             {#each months as band}
               <button
                 class="month-band"
                 data-month={band.label}
+                title={band.label}
                 aria-label={`${band.label} · Set reference at clicked week`}
                 disabled={busy}
                 style:left={`${Math.max(0, (band.start - view.firstWeek) * weekWidth)}px`}
@@ -1573,14 +1583,17 @@
                     event.detail
                       ? Math.floor(weekAt(event.clientX))
                       : Math.ceil(Math.max(band.start, view.firstWeek)),
-                  )}>{band.label}</button
+                  )}
+                >{compactWeeks && (band.end - band.start) * weekWidth < 60
+                  ? band.label.replace('Month ', 'M')
+                  : band.label}</button
               >
             {/each}
           {:else}
             {#each weeks as week}<button
                 class="week"
                 class:date-week={document.display === 'dates'}
-                aria-label={`${weekLabel(document, week)} · Set date for Week ${week}`}
+                aria-label={`${weekLabel(document, week)} · Set date for ${relativeWeekLabel(week)}`}
                 title={weekLabel(document, week)}
                 data-week={week}
                 disabled={busy}
@@ -1591,9 +1604,7 @@
               >
                 {#if document.display === 'dates'}
                   {@const label = weekLabel(document, week)}
-                  <span>{label.slice(0, -5)}</span><small
-                    >{label.slice(-4)}</small
-                  >
+                  <span>{label.slice(0, -5)}</span>
                 {:else if week % stride === 0}
                   <span
                     class="week-label"
@@ -2131,23 +2142,10 @@
     margin-left: -10px;
   }
   .mark {
-    display: flex;
-    align-items: flex-end;
-    gap: 3px;
+    display: block;
     width: 23px;
     height: 23px;
-  }
-  .mark i {
-    width: 5px;
-    background: var(--accent);
-    border-radius: 1px;
-    height: 13px;
-  }
-  .mark i:nth-child(2) {
-    height: 22px;
-  }
-  .mark i:nth-child(3) {
-    height: 17px;
+    flex-shrink: 0;
   }
   .toolbar,
   .history {
@@ -2256,12 +2254,13 @@
   }
   .week {
     position: absolute;
-    height: 100%;
+    top: 20px;
+    height: 33px;
     display: flex;
     align-items: center;
     justify-content: center;
     border-right: 1px solid var(--grid);
-    border-top: 0;
+    border-top: 1px solid var(--grid);
     border-left: 0;
     border-bottom: 0;
     background: transparent;
@@ -2272,8 +2271,6 @@
     font-weight: 500;
   }
   .date-week {
-    flex-direction: column;
-    gap: 2px;
     font-size: 11px;
   }
   .week-label {
@@ -2285,10 +2282,6 @@
     justify-content: center;
     white-space: nowrap;
     pointer-events: none;
-  }
-  .date-week small {
-    color: var(--muted);
-    font-size: 9px;
   }
   .year-band,
   .month-band {
@@ -2420,7 +2413,6 @@
     height: 44px;
     background: var(--surface);
     border-bottom: 1px solid var(--grid);
-    box-shadow: 0 4px 12px #182e471a;
     z-index: 6;
     pointer-events: auto;
   }
@@ -2516,7 +2508,6 @@
   .add-row-line.carried {
     transition: none;
     z-index: 6;
-    box-shadow: 0 4px 12px #182e471a;
   }
   .row.carried {
     /* Keep timeline items above the carried grid, with the label pinned
@@ -2537,6 +2528,9 @@
   }
   .add-row-line.carried {
     background: var(--surface);
+    /* The final strip supplies one shadow below the complete carried group. */
+    box-shadow: 0 4px 12px #182e471a;
+    clip-path: inset(0 -12px -16px);
   }
   .row-name,
   .section-name {
@@ -2692,7 +2686,8 @@
     outline-offset: 2px;
   }
   .palette {
-    display: flex;
+    display: grid;
+    grid-template-columns: repeat(5, 32px);
     justify-content: space-between;
     gap: 8px;
   }

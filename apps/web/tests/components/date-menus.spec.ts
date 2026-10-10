@@ -39,14 +39,14 @@ for (const entry of ['heading', 'heading menu']) {
     await expect(dates).toHaveAttribute('aria-pressed', 'true');
     const reference = page.locator('[data-week="3"]');
     await expect(reference).toHaveAccessibleName(
-      '12 Oct 2026 · Set date for Week 3',
+      '12 Oct 2026 · Set date for Week 4',
     );
     await page.getByRole('button', { name: 'Undo', exact: true }).click();
     await expect(weeks).toHaveAttribute('aria-pressed', 'true');
     await page.getByRole('button', { name: 'Redo', exact: true }).click();
     await expect(dates).toHaveAttribute('aria-pressed', 'true');
     await expect(reference).toHaveAccessibleName(
-      '12 Oct 2026 · Set date for Week 3',
+      '12 Oct 2026 · Set date for Week 4',
     );
     await interval(page.getByTestId('bar-a'), 0, 2);
   });
@@ -75,7 +75,7 @@ test('heading reference menus retain their week, cancel cleanly and clear/restor
   await page.getByRole('button', { name: 'Set date', exact: true }).click();
   await expect(dates).toHaveAttribute('aria-pressed', 'true');
   await expect(heading).toHaveAccessibleName(
-    '5 Oct 2026 · Set date for Week 3',
+    '5 Oct 2026 · Set date for Week 4',
   );
 
   await heading.click({ button: 'right' });
@@ -89,7 +89,7 @@ test('heading reference menus retain their week, cancel cleanly and clear/restor
   await page.keyboard.press('Escape');
   await expect(heading).toBeFocused();
   await expect(heading).toHaveAccessibleName(
-    '5 Oct 2026 · Set date for Week 3',
+    '5 Oct 2026 · Set date for Week 4',
   );
 
   await heading.click({ button: 'right' });
@@ -97,22 +97,22 @@ test('heading reference menus retain their week, cancel cleanly and clear/restor
   await selectDate(page, '2026-10-12');
   await page.getByRole('button', { name: 'Set date', exact: true }).click();
   await expect(page.locator('[data-week="0"]')).toHaveAccessibleName(
-    '21 Sept 2026 · Set date for Week 0',
+    '21 Sept 2026 · Set date for Week 1',
   );
   await heading.click({ button: 'right' });
   await page.keyboard.press('ArrowUp');
   await page.keyboard.press('Enter');
   await expect(dates).toHaveAttribute('aria-pressed', 'false');
-  await expect(heading).toHaveText('Week 3');
+  await expect(heading).toHaveText('Week 4');
   await interval(page.getByTestId('bar-a'), 0, 2);
   await expect(page.getByTestId('milestone-m')).toHaveAttribute(
     'title',
-    'Kickoff · End of Week 4',
+    'Kickoff · End of Week 5',
   );
   await undo.click();
   await expect(dates).toHaveAttribute('aria-pressed', 'true');
   await expect(heading).toHaveAccessibleName(
-    '12 Oct 2026 · Set date for Week 3',
+    '12 Oct 2026 · Set date for Week 4',
   );
   await redo.click();
   await dates.click();
@@ -121,11 +121,11 @@ test('heading reference menus retain their week, cancel cleanly and clear/restor
   await undo.click();
   await undo.click();
   await expect(heading).toHaveAccessibleName(
-    '5 Oct 2026 · Set date for Week 3',
+    '5 Oct 2026 · Set date for Week 4',
   );
 });
 
-test('Dates toolbar reference menu uses Week 0, restores focus, and preserves redo on dismissal', async ({
+test('Dates toolbar reference menu uses Week 1, restores focus, and preserves redo on dismissal', async ({
   page,
 }) => {
   await page.goto('/tests/fixtures/index.html?state=Empty');
@@ -156,7 +156,7 @@ test('Dates toolbar reference menu uses Week 0, restores focus, and preserves re
   ).toBeEnabled();
   await dates.click();
   await expect(page.locator('[data-week="0"]')).toHaveAccessibleName(
-    '7 Oct 2026 · Set date for Week 0',
+    '7 Oct 2026 · Set date for Week 1',
   );
 });
 

@@ -1,5 +1,5 @@
 import type { Bar, ChartDocument, Color, Milestone } from './document';
-import { colorAppearance, DEFAULT_COLOR } from './palette';
+import { colorAppearance, DEFAULT_COLOR, quickColors } from './palette';
 
 export {
   colorAppearance,
@@ -9,6 +9,22 @@ export {
 } from './palette';
 export function colorLabelInk(color: Color): string {
   return colorAppearance(color).ink;
+}
+// Derive reusable colors from committed objects, including collapsed sections.
+// Presets stay first and each custom hue appears only once.
+export function documentColors(document: ChartDocument) {
+  const colors: { name: string; color: Color }[] = [...quickColors];
+  const seen = new Set<Color>(colors.map(({ color }) => color));
+  for (const item of [
+    ...document.sections,
+    ...document.bars,
+    ...document.milestones,
+  ]) {
+    if (item.color === undefined || seen.has(item.color)) continue;
+    seen.add(item.color);
+    colors.push({ name: `Hue ${item.color}°`, color: item.color });
+  }
+  return colors;
 }
 export function itemColor(
   document: ChartDocument,

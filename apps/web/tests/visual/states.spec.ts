@@ -29,7 +29,7 @@ test('compact overview bars hide clutter and zoom into readable inline naming', 
   );
 });
 
-test('overview dates, spaced weeks and frozen headings preserve timeline context', async ({
+test('overview dates, relative months and frozen headings preserve timeline context', async ({
   page,
 }) => {
   await page.goto('/tests/fixtures/index.html?state=CalendarColors');
@@ -45,6 +45,44 @@ test('overview dates, spaced weeks and frozen headings preserve timeline context
   await expect(page).toHaveScreenshot('frozen-headings.png', {
     maxDiffPixelRatio: 0,
   });
+});
+
+test('used slider colors wrap into reusable swatches in the item palette', async ({
+  page,
+}) => {
+  await page.goto('/tests/fixtures/index.html?state=CalendarColors');
+  for (const [id, hue] of [
+    ['bar-a', 87.4],
+    ['bar-b', 99.9],
+    ['milestone-m', 260],
+  ] as const) {
+    await page.getByTestId(id).click({ button: 'right' });
+    await page
+      .getByRole('menuitem', { name: 'More colors…', exact: true })
+      .click();
+    await setHue(page, hue);
+    await page
+      .getByRole('button', { name: 'Apply color', exact: true })
+      .click();
+  }
+  await page.getByTestId('bar-b').click({ button: 'right' });
+  await expect(page.getByRole('menu')).toHaveScreenshot(
+    'used-color-palette.png',
+  );
+});
+
+test('detail headers keep years above both relative weeks and calendar dates', async ({
+  page,
+}) => {
+  await page.goto('/tests/fixtures/index.html?state=CalendarColors');
+  await zoomToWeekZero(page);
+  await expect(page.locator('.chart-header')).toHaveScreenshot(
+    'detail-dates.png',
+  );
+  await page.getByRole('button', { name: 'Weeks', exact: true }).click();
+  await expect(page.locator('.chart-header')).toHaveScreenshot(
+    'detail-weeks.png',
+  );
 });
 
 test('color picker shows a continuous muted hue range and a draft preview in the shared overlay', async ({

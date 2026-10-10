@@ -19,10 +19,12 @@ const formatter = new Intl.DateTimeFormat('en-GB', {
   timeZone: 'UTC',
 });
 export const formatDate = (date: string) => formatter.format(new Date(date));
+// Coordinates remain zero-based; relative labels start at one.
+export const relativeWeekLabel = (week: number) => `Week ${week + 1}`;
 export function weekLabel(document: ChartDocument, week: number): string {
   return document.display === 'dates' && document.calendar
     ? formatDate(dateAt(document.calendar, week))
-    : `Week ${week < 0 ? `−${-week}` : week}`;
+    : relativeWeekLabel(week).replace('-', '−');
 }
 export function barTiming(
   document: ChartDocument,
@@ -31,7 +33,7 @@ export function barTiming(
 ): string {
   return document.display === 'dates' && document.calendar
     ? `${formatDate(dateAt(document.calendar, start))}–${formatDate(dateAt(document.calendar, end - 1, 6))}`
-    : `Weeks ${start}–${end - 1}`;
+    : `Weeks ${start + 1}–${end}`;
 }
 export function milestoneTiming(
   document: ChartDocument,
@@ -39,5 +41,5 @@ export function milestoneTiming(
 ): string {
   return document.display === 'dates' && document.calendar
     ? formatDate(dateAt(document.calendar, boundary - 1, 6))
-    : `End of Week ${boundary - 1}`;
+    : `End of Week ${boundary}`;
 }

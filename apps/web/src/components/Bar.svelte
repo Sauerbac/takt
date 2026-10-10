@@ -87,7 +87,7 @@
   style:left={`${(position.start - FIRST_WEEK) * weekWidth + inset}px`}
   style:width={`${paintedWidth}px`}
   style:--handle-width={`${Math.min(10, Math.max(0.5, ((position.end - position.start) * weekWidth - inset * 2 - 2) / 3))}px`}
-  title={`${invalid ? 'Cannot drop here · Move clear or hold to push · ' : ''}${bar.name || 'Unnamed bar'} · ${timing ?? `Weeks ${bar.start}–${bar.end - 1}`}`}
+  title={`${invalid ? 'Cannot drop here · Move clear or hold to push · ' : ''}${bar.name || 'Unnamed bar'} · ${timing ?? `Weeks ${bar.start + 1}–${bar.end}`}`}
   oncontextmenu={(event) => onmenu?.(event, 'bar', bar.id)}
   onpointerdown={(event) => {
     onstart(event, 'move', bar.id);

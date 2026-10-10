@@ -5,6 +5,7 @@
     "apps/web"
   ],
   "scripts": {
+    "generate:icons": "node scripts/generate-icons.mjs",
     "dev": "npm run dev --workspace @takt/web",
     "build": "npm run build --workspace @takt/web",
     "preview": "npm run preview --workspace @takt/web",

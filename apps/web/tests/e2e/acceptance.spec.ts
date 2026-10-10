@@ -20,7 +20,7 @@ test('a fresh production document has the agreed defaults, mixed deletion restor
   await draw(page, -2, -1);
   await zoomToWeekZero(page);
   await interval(page.locator('.bar').first(), 3, 5);
-  await expect(page.locator('[data-week="0"]')).toHaveText('Week 0');
+  await expect(page.locator('[data-week="0"]')).toHaveText('Week 1');
   const lane = await laneGeometry(page);
   await page.mouse.dblclick(lane.x(2.2), lane.y);
   await page.getByRole('textbox', { name: 'Milestone name' }).press('Escape');

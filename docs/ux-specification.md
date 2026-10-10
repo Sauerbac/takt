@@ -2,13 +2,13 @@
 
 **Status:** Agreed UX direction, refined for the first implementation milestone.
 
-**Last updated:** October 7, 2026.
+**Last updated:** October 10, 2026.
 
 **Audience:** Product, design, and implementation collaborators.
 
 This document captures the agreed interaction model for Takt. It describes what the editor should let someone do and how those actions behave. It does not prescribe visual styling, an implementation framework, a storage architecture, or an export format.
 
-The final agreed origin is **Week 0**. References to Week 1 as the origin in the exploratory conversation are superseded.
+The fixed relative origin is **Week 1**, aligned with the beginning of **Month 1** and **Year 1** in the overview. Earlier weeks and years may use zero and negative numbers.
 
 ## 1. Purpose and scope
 
@@ -60,7 +60,7 @@ Small overlays are acceptable when they serve a specific interaction: choosing a
 | Row                | A named horizontal lane containing bars and milestones. It belongs to one section.                     |
 | Bar                | A period occupying one or more whole weeks. It has an optional label and may have a custom color.      |
 | Milestone          | A point marking the end of a particular week. It has an optional label and may have a custom color.    |
-| Relative week      | An integer position on the timeline, such as Week −2, Week 0, or Week 3.                               |
+| Relative week      | An integer position on the timeline, such as Week −1, Week 1, or Week 4.                               |
 | Calendar reference | A real date assigned to the beginning of one relative week. Other calendar labels are derived from it. |
 | Color override     | An explicit item color that takes precedence over the section's inherited color.                       |
 
@@ -76,12 +76,12 @@ A new document opens with:
 
 - One unnamed section.
 - One empty row within that section.
-- A relative timeline whose fixed origin is Week 0.
+- A relative timeline whose fixed origin is Week 1.
 - A short hint in the empty row: **“Drag to create a bar · Double-click for a milestone.”**
 
 The hint disappears while any bar or milestone exists. It returns whenever the document has no bars or milestones, including after deleting every item or undoing the first creation. Show it once in the first visible empty row rather than in every empty row.
 
-Week 0 exists before any item is created. The first bar does not define or shift the origin. Drawing a bar in Week 3 creates a bar in Week 3.
+Week 1 exists before any item is created. The first bar does not define or shift the origin. Drawing a bar in Week 4 creates a bar in Week 4.
 
 No document-name field is required for this draft. There is no setup form before the chart becomes usable.
 
@@ -91,7 +91,7 @@ No document-name field is required for this draft. There is no setup form before
 
 The timeline is an ordered sequence of whole weeks:
 
-**… Week −2, Week −1, Week 0, Week 1, Week 2 …**
+**… Week −1, Week 0, Week 1, Week 2, Week 3 …**
 
 The origin remains fixed. Adding an earlier item extends the usable timeline to the left without renumbering existing items.
 
@@ -99,32 +99,32 @@ All bar starts, bar ends, and milestone placements resolve to week boundaries. T
 
 For an unambiguous description, a bar starting at week `s` with duration `d` occupies weeks `s` through `s + d − 1`. Its left boundary is the start of week `s`; its right boundary is the start of week `s + d`.
 
-For example, a three-week bar starting at Week 0 occupies Weeks 0, 1, and 2. Its right edge meets the start of Week 3. A second bar starting at Week 3 is adjacent to it without overlap.
+For example, a three-week bar starting at Week 1 occupies Weeks 1, 2, and 3. Its right edge meets the start of Week 4. A second bar starting at Week 4 is adjacent to it without overlap.
 
 ### 5.2 Calendar display
 
 The user can select a timeline label and choose a real date representing the **start of that week**. All other week labels follow from that reference in seven-day increments.
 
-For example, assigning October 5, 2026 to the start of Week 3 makes:
+For example, assigning October 5, 2026 to the start of Week 4 makes:
 
 | Relative position | Starting date      |
 | ----------------- | ------------------ |
-| Week 0            | September 14, 2026 |
-| Week 2            | September 28, 2026 |
-| Week 3            | October 5, 2026    |
-| Week 4            | October 12, 2026   |
+| Week 1            | September 14, 2026 |
+| Week 3            | September 28, 2026 |
+| Week 4            | October 5, 2026    |
+| Week 5            | October 12, 2026   |
 
 The chosen date does not have to be a Monday. Each week is a seven-day period starting from the selected reference.
 
 Calendar mode labels weeks by their starting dates. Bars still occupy whole weeks. Switching between relative and calendar displays preserves their positions and the calendar reference.
 
-Selecting calendar mode before a reference exists opens a centered date-picker dialog with the same dimmed backdrop as deletion confirmation. Its custom calendar is visible immediately, with Monday-first weeks, month navigation and a Today shortcut beside the month controls; there is no separate selected-date field below the calendar. The selected date represents the start of Week 0. Choosing a day changes an uncommitted draft; **Set date** applies it. Cancel, Escape, or clicking the backdrop discards the draft and leaves relative-week mode selected. Selecting a week heading opens the same dialog to set or replace the date assigned to the start of that specific week; the remaining labels are derived in seven-day increments. Applying a reference from any entry point automatically selects Dates. The reference and display change are one undoable action; undo restores both previous values. Set date is disabled until a draft date is selected. The calendar initially shows the existing reference or today's month without selecting a default reference. Arrow keys navigate days, Home/End navigate within a week, and Page Up/Down navigate months. Dates in the chart use an English day–short-month–year format, for example **5 Oct 2026**; headings may put the year on a second line. The user chooses the date; the example is not a default reference.
+Selecting calendar mode before a reference exists opens a centered date-picker dialog with the same dimmed backdrop as deletion confirmation. Its custom calendar is visible immediately, with Monday-first weeks, month navigation and a Today shortcut beside the month controls; there is no separate selected-date field below the calendar. The selected date represents the start of Week 1. Choosing a day changes an uncommitted draft; **Set date** applies it. Cancel, Escape, or clicking the backdrop discards the draft and leaves relative-week mode selected. Selecting a week heading opens the same dialog to set or replace the date assigned to the start of that specific week; the remaining labels are derived in seven-day increments. Applying a reference from any entry point automatically selects Dates. The reference and display change are one undoable action; undo restores both previous values. Set date is disabled until a draft date is selected. The calendar initially shows the existing reference or today's month without selecting a default reference. Arrow keys navigate days, Home/End navigate within a week, and Page Up/Down navigate months. Dates in the chart use an English day–short-month–year format, for example **5 Oct 2026**; headings always show a shared year band above the dates or months. The user chooses the date; the example is not a default reference.
 
 Right-clicking a timeline heading opens a calendar-reference context menu. Without a reference, it offers **Set reference**. With a reference, it offers **Reset reference** and **Clear reference**. Set and Reset open the existing date picker for the clicked week, with Dates selected when the reference is applied. The draft remains uncommitted until Set date; cancellation preserves the reference and history. Clear removes the reference and switches to Weeks as one undoable action; undo restores both the previous reference and display mode. These actions preserve all item positions.
 
-The toolbar's **Dates** button also opens the calendar-reference context menu on right-click, using Week 0 for Set and Reset. Clearing, history, draft cancellation, and focus restoration follow the same behavior as the timeline-heading menu.
+The toolbar's **Dates** button also opens the calendar-reference context menu on right-click, using Week 1 for Set and Reset. Clearing, history, draft cancellation, and focus restoration follow the same behavior as the timeline-heading menu.
 
-App context menus are limited to chart targets (timeline headings, sections, rows, bars, milestones, and empty lanes) and the Dates toolbar button. Other surfaces, including the remaining toolbar controls, page margins, footer, inline text inputs, and dialogs, retain the browser's native context menu.
+App context menus are limited to chart targets (timeline headings, sections, rows, bars, milestones, and empty lanes) and the Dates toolbar button. Right-clicking a bar while its inline name editor is focused opens that bar's app context menu immediately and commits the current name draft. Other surfaces, including the remaining toolbar controls, page margins, footer, other inline text inputs, and dialogs, retain the browser's native context menu.
 
 ### 5.3 Milestone timing
 
@@ -165,7 +165,7 @@ Navigation must coexist with creation gestures. An ordinary drag in empty row sp
 
 The editor fills the available window width and height between its toolbar and footer. Scrolling stays inside the chart viewport. The timeline heading row stays fixed vertically, including the top-left corner, while section and row headings move vertically with their corresponding lanes. Content under the fixed header cannot receive pointer input. Horizontal scrolling moves only the timeline: week headings, grid lines, bars, and milestones. The section/row heading column, section names, row names, and their controls stay pinned on the left. They still move vertically with their corresponding rows and sections. Timeline content cannot paint or receive pointer input over that fixed column. This applies to ordinary horizontal scrolling, edge auto-scroll, and future panning.
 
-At 100%, the timeline shows approximately 24 weeks (initially Week -2 through Week 21); 200% shows approximately 12 weeks and 12.5% approximately 192. A narrow window may show fewer weeks because the chart retains its minimum width. The zoom range is 12.5% to 200%. At widths below 60 CSS pixels per week, Dates displays aligned calendar month bands below a year band; month boundaries follow actual calendar dates even within a week. Clicking or right-clicking a month band uses the week under the pointer; keyboard activation uses the first visible whole-week start in the band. Weeks displays spaced week labels at a power-of-two stride sufficient to give each label at least 60 CSS pixels. Its individual heading cells and lane grid remain one week wide, including unlabeled heading cells; selecting an unlabeled cell assigns a reference to that specific week. Grid lines and editing retain whole-week precision. Ctrl/Cmd plus mouse-wheel zoom preserves the time under the pointer; toolbar zoom preserves the time at the viewport center. Exact zoom steps and wheel sensitivity remain tunable implementation details.
+At 100%, the timeline shows approximately 24 weeks (initially Week −1 through Week 22); 200% shows approximately 12 weeks and 12.5% approximately 192. A narrow window may show fewer weeks because the chart retains its minimum width. The zoom range is 12.5% to 200%. Dates always displays a year band on top. Below it, individual week-start dates appear at widths of at least 60 CSS pixels per week, and aligned calendar month bands appear at smaller widths. Month boundaries follow actual calendar dates even within a week. Weeks displays spaced week labels at a power-of-two stride sufficient to give each label at least 60 CSS pixels. Weeks always shows relative years above its week labels. Below 60 CSS pixels per week, it switches to relative month bands below the year bands, using the same threshold and layout as Dates. Week 1, Month 1 and Year 1 start together; the relative overview uses Gregorian calendar lengths anchored to a synthetic January 1 of Year 1, independent of any real calendar reference. Month numbers restart at 1 each year, with short labels M1 through M12 where necessary. Earlier years include Year 0 and negative years. Clicking or right-clicking either kind of month band uses the week under the pointer; keyboard activation uses the first visible whole-week start in the band. Individual week headings, when shown, and the lane grid remain one week wide, including unlabeled heading cells; selecting an unlabeled cell assigns a reference to that specific week. Grid lines and editing retain whole-week precision. Ctrl/Cmd plus mouse-wheel zoom preserves the time under the pointer; toolbar zoom preserves the time at the viewport center. Exact zoom steps and wheel sensitivity remain tunable implementation details.
 
 ## 7. Creating and naming items
 
@@ -333,13 +333,13 @@ Affected bars must visibly glide to their displaced positions. They should not t
 
 When the pointer is released, the manipulated item settles smoothly into its whole-week result. Animation must preserve the final non-overlap rule and the duration of every pushed bar.
 
-The dragged bar, milestone, row, or section remains visually attached to the pointer without intentional animation delay. Surrounding content and final snapped settlement begin with a short transition of roughly 150 ms. Exact easing and per-operation timing remain tunable. Reduced-motion behavior is not required for the first milestone. Smoothness is not permission to introduce lag into direct pointer tracking.
+The dragged bar, milestone, row, or section remains visually attached to the pointer without intentional animation delay. Surrounding content and final snapped settlement begin with a short transition of roughly 150 ms. Exact easing and per-operation timing remain tunable. Reduced-motion behavior is not required for the first milestone. Smoothness is not permission to introduce lag into direct pointer tracking. Carried rows and sections use opaque surfaces. A carried section has one shadow beneath the bottom of its complete visible group, supplied by its final Add row strip; its heading and interior rows have no separate shadows.
 
 Holding a dragged object near a viewport edge automatically scrolls the chart. Timeline operations scroll horizontally; cross-row and structural operations may scroll vertically. Scrolling stops immediately when the pointer leaves the edge zone or the gesture ends.
 
 Horizontal edge scrolling begins after the drag reaches the 4 CSS px threshold. Each edge zone occupies 40 CSS px inside the visible timeline. Speed increases linearly from zero at the zone's inner boundary to 240 CSS px per second at the viewport edge. Holding the pointer still continues scrolling; the manipulated boundary or bar remains attached while its whole-week preview updates. Moving outside the chart stops scrolling. Release, Escape, and pointer/window interruption stop it immediately.
 
-The initial Week −2 through Week 9 view is a viewport, not a document boundary. Edge scrolling reveals earlier or later weeks indefinitely without renumbering Week 0 or existing items. Scrolling is outside history, persists after gesture cancellation, and does not clear redo.
+The initial Week −1 through Week 22 view is a viewport, not a document boundary. Edge scrolling reveals earlier or later weeks indefinitely without renumbering Week 1 or existing items. Scrolling is outside history, persists after gesture cancellation, and does not clear redo.
 
 ## 11. Sections, rows, and add controls
 
@@ -383,7 +383,7 @@ The inheritance rules are:
 - Moving an item or an entire row to another section adopts the destination color for items without overrides.
 - Explicit overrides survive movement between sections.
 
-Each color menu has four quick swatches (Peach, Lavender, Sea blue, Sage), sampled from the same continuous hue range as the picker. Its fifth slot is a centered plus icon opening a centered color-picker overlay inspired by the date picker, with the shared dimmed backdrop, header, preview, and Cancel/Apply actions. The menu shows only the Color label, without the current color's name. The picker provides a continuous hue slider across the color circle while perceptual lightness and vividness stay fixed, keeping every choice muted. There are no light/deep variants, saturation controls, or arbitrary custom-color entry. Dragging the slider updates only the draft bar and milestone preview; Apply color or Enter commits one undoable color action to the target retained when the picker opened. Cancel, Escape, or clicking the backdrop discards the draft and preserves redo. Focus returns to the chart on dismissal. The hue slider receives initial focus; Left/Down and Right/Up adjust by one degree, Page Down/Up by ten degrees, and Home/End select the range endpoints. Tab stays within the overlay. Inherited items open at their effective section hue, including non-preset colors; reopening preserves the selected hue. The original warm default is named Peach in preset labels. Existing palette values do not require backward compatibility.
+Each color menu has four quick swatches (Peach, Lavender, Sea blue, Sage), sampled from the same continuous hue range as the picker. Additional swatches show distinct non-preset hues currently used by sections, bars or milestones, including hidden contents. Applying a slider hue makes it immediately reusable from every color menu; inherited items share their section hue. Duplicate hues appear once. The swatches update with recoloring, deletion and undo/redo, and uncommitted drafts never enter the list. Swatches wrap into rows of five. A centered plus icon follows the swatches, opening a centered color-picker overlay inspired by the date picker, with the shared dimmed backdrop, header, preview, and Cancel/Apply actions. The menu shows only the Color label, without the current color's name. The picker provides a continuous hue slider across the color circle while perceptual lightness and vividness stay fixed, keeping every choice muted. There are no light/deep variants, saturation controls, or arbitrary custom-color entry. Dragging the slider updates only the draft bar and milestone preview; Apply color or Enter commits one undoable color action to the target retained when the picker opened. Cancel, Escape, or clicking the backdrop discards the draft and preserves redo. Focus returns to the chart on dismissal. The hue slider receives initial focus; Left/Down and Right/Up adjust by one degree, Page Down/Up by ten degrees, and Home/End select the range endpoints. Tab stays within the overlay. Inherited items open at their effective section hue, including non-preset colors; reopening preserves the selected hue. The original warm default is named Peach in preset labels. Existing palette values do not require backward compatibility.
 
 ## 13. Deletion and undo/redo
 
@@ -417,12 +417,12 @@ These are behavioral checks for the implementation. Every agreed interaction req
 
 | Scenario                                                        | Expected result                                                                                                     |
 | --------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
-| Open a new document                                             | One unnamed section, one empty row, relative weeks, fixed Week 0, and a creation hint are visible.                  |
-| Draw the first bar at Week 3                                    | It stays at Week 3; the origin is not reassigned.                                                                   |
-| Add content before Week 0                                       | Negative weeks are available; existing items retain their relative positions.                                       |
+| Open a new document                                             | One unnamed section, one empty row, relative weeks, fixed Week 1, and a creation hint are visible.                  |
+| Draw the first bar at Week 4                                    | It stays at Week 4; the origin is not reassigned.                                                                   |
+| Add content before Week 1                                       | Negative weeks are available; existing items retain their relative positions.                                       |
 | Drag across empty row space                                     | A whole-week bar is created and its label becomes editable inline.                                                  |
 | Use “Add bar here”                                              | A one-week bar is created at the context-menu location.                                                             |
-| Double-click empty space in Week 2                              | A milestone is created at the end of Week 2.                                                                        |
+| Double-click empty space in Week 3                              | A milestone is created at the end of Week 3.                                                                        |
 | Drag a bar by its label                                         | The bar moves; text does not block dragging.                                                                        |
 | Pass a bar through neighbors before their contact delay expires | Dropping into free space changes bar order without moving crossed neighbors.                                        |
 | Maintain snapped overlap with a neighbor for 300 ms             | The full collision cascade activates, including with a stationary pointer.                                          |
@@ -445,7 +445,7 @@ These are behavioral checks for the implementation. Every agreed interaction req
 | Reorder a section                                               | Its rows and items move together without changing time positions.                                                   |
 | Hover a row over a collapsed section                            | The section opens after a short delay, closes again on leave, and remains open after a successful drop.             |
 | Delete a populated section                                      | Confirmation explains the contents affected; cancellation changes nothing; confirmed deletion is undoable.          |
-| Assign a calendar date to Week 3                                | All calendar labels follow that week-start reference at seven-day intervals.                                        |
+| Assign a calendar date to Week 4                                | All calendar labels follow that week-start reference at seven-day intervals.                                        |
 | Switch back to relative weeks                                   | Positions and the calendar reference are preserved.                                                                 |
 | Undo a hidden-content change                                    | The containing section expands and the changed content is revealed.                                                 |
 | Delete every item                                               | The creation hint returns once in the first visible empty row.                                                      |

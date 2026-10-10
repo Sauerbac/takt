@@ -116,7 +116,7 @@ test('Today sits beside month navigation and chooses an uncommitted draft', asyn
   await page.getByRole('button', { name: 'Today', exact: true }).click();
   await page.getByRole('button', { name: 'Set date', exact: true }).click();
   await expect(page.locator('[data-week="0"]')).toHaveAccessibleName(
-    '4 Oct 2026 · Set date for Week 0',
+    '4 Oct 2026 · Set date for Week 1',
   );
 });
 
@@ -152,17 +152,17 @@ test('custom calendar opens centered with backdrop, confines focus and commits o
   await page.keyboard.press('Escape');
   await expect(heading).toBeFocused();
   await expect(heading).toHaveAccessibleName(
-    '5 Oct 2026 · Set date for Week 3',
+    '5 Oct 2026 · Set date for Week 4',
   );
   await heading.click();
   await page.getByRole('button', { name: '12 Oct 2026', exact: true }).click();
   await page.getByRole('button', { name: 'Set date', exact: true }).click();
   await expect(heading).toHaveAccessibleName(
-    '12 Oct 2026 · Set date for Week 3',
+    '12 Oct 2026 · Set date for Week 4',
   );
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
   await expect(heading).toHaveAccessibleName(
-    '5 Oct 2026 · Set date for Week 3',
+    '5 Oct 2026 · Set date for Week 4',
   );
 });
 
@@ -197,7 +197,7 @@ test('calendar handles leap-day keyboard navigation, month boundaries and select
   await expect(date).toHaveAttribute('data-date', '2024-01-29');
   await page.getByRole('button', { name: 'Set date', exact: true }).click();
   await expect(page.locator('[data-week="0"]')).toHaveAccessibleName(
-    '29 Jan 2024 · Set date for Week 0',
+    '29 Jan 2024 · Set date for Week 1',
   );
 });
 

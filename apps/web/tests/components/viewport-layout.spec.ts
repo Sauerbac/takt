@@ -102,7 +102,7 @@ test('overview creation stays weekly and tiny bars zoom into usable resize targe
   ).toHaveText('200%');
 });
 
-test('overview switches between spaced weeks and actual month/year bands; reference menus retain the clicked week', async ({
+test('overview switches between relative and actual month/year bands; reference menus retain the clicked week', async ({
   page,
 }) => {
   await page.goto('/tests/fixtures/index.html?state=CalendarColors');
@@ -122,10 +122,14 @@ test('overview switches between spaced weeks and actual month/year bands; refere
   await page.getByRole('button', { name: 'Set date', exact: true }).click();
   await zoomToWeekZero(page);
   await expect(page.locator('[data-week="3"]')).toHaveAccessibleName(
-    '12 Oct 2026 · Set date for Week 3',
+    '12 Oct 2026 · Set date for Week 4',
   );
   await chooseZoom(page, '0.125');
   await page.getByRole('button', { name: 'Weeks', exact: true }).click();
+  await expect(page.locator('.month-band')).not.toHaveCount(0);
+  await expect(page.locator('.year-band')).toContainText(['Year 0', 'Year 1']);
+  await expect(page.locator('.week')).toHaveCount(0);
+  await chooseZoom(page, '2');
   await expect(page.locator('.month-band')).toHaveCount(0);
   const headings = await page.locator('.week-label').evaluateAll((nodes) =>
     nodes.map((node) => ({
@@ -134,15 +138,90 @@ test('overview switches between spaced weeks and actual month/year bands; refere
     })),
   );
   expect(headings.every((heading) => heading.width >= 60)).toBe(true);
-  expect(headings[1].week - headings[0].week).toBe(16);
+  expect(headings[1].week - headings[0].week).toBe(1);
   await page.locator('[data-week="0"]').click();
   await selectDate(page, '2026-10-05');
   await page.getByRole('button', { name: 'Set date', exact: true }).click();
-  await expect(page.locator('.viewport')).toBeFocused();
+  await expect(page.locator('[data-week="0"]')).toBeFocused();
+  await chooseZoom(page, '0.125');
   await page.locator('.month-band').nth(2).click({ button: 'right' });
   await page
     .getByRole('menuitem', { name: 'Clear reference', exact: true })
     .click();
-  await expect(page.locator('.viewport')).toBeFocused();
-  await expect(page.locator('.month-band')).toHaveCount(0);
+  await expect(page.locator('.month-band').nth(2)).toBeFocused();
+  await expect(page.locator('.month-band')).not.toHaveCount(0);
+  await expect(page.locator('.year-band')).toContainText(['Year 0', 'Year 1']);
+});
+
+test('both modes keep years above weeks or months with identical layout and zoom thresholds', async ({
+  page,
+}) => {
+  await page.goto('/tests/fixtures/index.html?state=CalendarColors');
+  for (const mode of ['Dates', 'Weeks']) {
+    await page.getByRole('button', { name: mode, exact: true }).click();
+    for (const zoom of ['2', '1.5', '1', '0.5', '0.25', '0.125']) {
+      await chooseZoom(page, zoom);
+      const year = page.locator('.year-band').first();
+      await expect(year).toBeVisible();
+      const lower = page.locator('.week, .month-band').first();
+      expect(
+        (await year.boundingBox())!.y + (await year.boundingBox())!.height,
+      ).toBeLessThanOrEqual((await lower.boundingBox())!.y);
+      const width = Number(
+        await page.getByTestId('lane').first().getAttribute('data-week-width'),
+      );
+      if (width < 60) {
+        await expect(page.locator('.week')).toHaveCount(0);
+        await expect(page.locator('.month-band')).not.toHaveCount(0);
+      } else {
+        await expect(page.locator('.month-band')).toHaveCount(0);
+        await expect(page.locator('.week')).not.toHaveCount(0);
+      }
+      await expect(page.locator('.date-week small')).toHaveCount(0);
+    }
+  }
+});
+
+test('relative overview works without a calendar and its month commands target the pointed week', async ({
+  page,
+}) => {
+  await page.goto('/tests/fixtures/index.html?state=Empty');
+  await chooseZoom(page, '0.125');
+  await expect(page.locator('.year-band')).toContainText([
+    'Year 0',
+    'Year 1',
+    'Year 2',
+  ]);
+  await expect(page.locator('[data-month="Month 1"]')).not.toHaveCount(0);
+  const lane = await laneGeometry(page);
+  const header = (await page.locator('.weeks').boundingBox())!;
+  const x = header.x + 120;
+  const week = Math.floor(
+    Number(await page.getByTestId('lane').getAttribute('data-first-week')) +
+      (x - header.x) / lane.width,
+  );
+  await page.mouse.click(x, header.y + 35);
+  await expect(
+    page.getByRole('heading', {
+      name: `Week ${week + 1} starts on`,
+      exact: true,
+    }),
+  ).toBeVisible();
+  await page.getByRole('button', { name: 'Cancel', exact: true }).click();
+  const month = page.locator('.month-band').nth(2);
+  await month.focus();
+  const firstWeek = Number(
+    await page.getByTestId('lane').getAttribute('data-first-week'),
+  );
+  const box = (await month.boundingBox())!;
+  const keyboardWeek = Math.ceil(
+    firstWeek + (box.x - header.x) / lane.width - 0.000001,
+  );
+  await page.keyboard.press('Enter');
+  await expect(
+    page.getByRole('heading', {
+      name: `Week ${keyboardWeek + 1} starts on`,
+      exact: true,
+    }),
+  ).toBeVisible();
 });
