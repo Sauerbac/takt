@@ -25,3 +25,32 @@ test('Apricot persistent recovery warning', async ({ page }) => {
   await expect(page.getByRole('button', { name: 'Retry' })).toBeVisible();
   await expect(page).toHaveScreenshot('project-recovery-warning.png');
 });
+
+test('Home current project and narrow welcome layout', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: 'New project', exact: true }).click();
+  await page.getByLabel('Project title').fill('Autumn release');
+  await page.getByLabel('Project title').press('Enter');
+  await page.getByRole('button', { name: 'Home', exact: true }).click();
+  await expect(
+    page.getByRole('heading', { name: 'Current project' }),
+  ).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Resume draft' })).toHaveCount(
+    0,
+  );
+  await expect(page).toHaveScreenshot('project-home-current.png');
+  await page.setViewportSize({ width: 600, height: 800 });
+  await expect(page).toHaveScreenshot('project-home-narrow.png', {
+    fullPage: true,
+  });
+});
+
+test('File toolbar and dropdown fit a smaller desktop window', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 800, height: 800 });
+  await page.goto('/');
+  await page.getByRole('button', { name: 'New project', exact: true }).click();
+  await page.getByRole('button', { name: 'File', exact: true }).click();
+  await expect(page).toHaveScreenshot('project-file-menu-narrow.png');
+});

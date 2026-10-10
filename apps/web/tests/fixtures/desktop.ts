@@ -10,6 +10,7 @@ import type {
   Outcome,
   OpenedProject,
   SaveOutcome,
+  ProjectFileDrop,
 } from '../../src/project/platform';
 
 type Result = 'success' | 'cancelled' | 'failure' | 'conflict';
@@ -47,12 +48,19 @@ const saveCalls: {
   options?: { saveAs?: boolean; overwrite?: boolean };
 }[] = [];
 let closeHandler: (() => Promise<boolean>) | undefined;
+let dropHandler: ((event: ProjectFileDrop) => void) | undefined;
 let deferredOpen = false;
 let resolvePending: (() => void) | undefined;
 let deferredRemove = false;
 let resolveRemove: (() => void) | undefined;
 const adapter: PlatformAdapter = {
   kind: 'desktop',
+  onFileDrop(handler) {
+    dropHandler = handler;
+    return () => {
+      dropHandler = undefined;
+    };
+  },
   async open(path): Promise<Outcome<OpenedProject>> {
     const outcome = opens.shift() ?? 'success';
     if (deferredOpen) {
@@ -131,6 +139,9 @@ const adapter: PlatformAdapter = {
   },
 };
 export const controls = {
+  fileDrop(event: ProjectFileDrop) {
+    dropHandler?.(event);
+  },
   queueSave(result: Result) {
     saves.push(result);
   },

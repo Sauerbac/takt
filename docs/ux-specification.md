@@ -493,10 +493,13 @@ Desktop projects are ordinary files in user-selected folders, including shared f
 
 - Launch shows Home rather than automatically opening the last chart.
 - Home offers **New project** and **Open .takt**. New opens the existing empty editor immediately.
+- Both platforms accept a single `.takt` file dropped onto Home or the editor. Home has a visible drop zone that also opens the picker on click or keyboard activation; dragging a file over the editor shows a drop prompt. Leaving the window or cancelling the drag clears the feedback. Drops follow the existing Open validation and replacement guard. Desktop preserves the dropped path and revision for subsequent Save and recent history; browser drops open file contents for editing/download.
+- Multiple-file drops ask for one `.takt` file and leave current work untouched. Other file extensions are rejected with a useful message; `.takt` is case-insensitive. Invalid bytes preserve the current chart and recovery. Drops during an open/save operation or a modal dialog are ignored, and browser file drops never navigate away from the application. Text drags retain ordinary browser behavior.
 - Browser Home also offers **Resume draft** when a local draft exists; it has no recent-file list in this milestone.
 - Desktop Home includes the recent-file list in section 17.6 and recovery when applicable.
 - There is one active chart per browser tab or desktop window, with no internal document tabs. Recovery ownership follows section 17.10.
-- The Takt logo is the Home action. The header shows the editable document title beside it and a compact File menu, preserving the existing chart controls and visual language.
+- The Takt logo is the Home action; its hit area ends at the logo, leaving the surrounding header space inactive. The header keeps the editable document title between the logo and controls. The compact File menu belongs to the right-hand toolbar with undo/redo, zoom, and Weeks/Dates.
+- Home groups New/Open under Start and current work, recovery, and desktop recents in a neighboring column. Empty Home explains where projects/drafts appear; a brief gesture guide introduces drawing, milestones, and resizing. Narrow windows stack the columns. Recent entries show compact filename/folder rows, with removal available on hover or keyboard focus.
 - A new document is titled **Untitled**. The title is stored inside the file and supplies the suggested download filename. Changing the title does not silently rename an existing desktop file.
 
 | Platform | File menu                | Ctrl+S                                               |

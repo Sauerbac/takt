@@ -3,6 +3,7 @@
   let {
     icon,
     destructive = false,
+    disabled = false,
     shortcut,
     onclick,
     children,
@@ -18,7 +19,13 @@
       | 'above'
       | 'below'
       | 'calendar'
-      | 'reset';
+      | 'reset'
+      | 'new'
+      | 'open'
+      | 'save'
+      | 'download'
+      | 'home';
+    disabled?: boolean;
     destructive?: boolean;
     shortcut?: string;
     onclick: () => void;
@@ -36,10 +43,15 @@
     below: 'M3 2h12v3H3zM9 8v8m-3-3 3 3 3-3',
     calendar: 'M3 4h12v12H3zM6 2v4m6-4v4M3 8h12',
     reset: 'M3 8a6 6 0 1 1 1 6M3 3v5h5',
+    new: 'M4 2h7l3 3v11H4zM11 2v4h3M9 8v5m-2-2.5h4',
+    open: 'M2 5h5l2-2h6v4M2 5v11h13l2-8H5l-3 8',
+    save: 'M3 2h10l3 3v11H3zM6 2v5h7V2M6 16v-6h7v6',
+    download: 'M9 2v9m-3-3 3 3 3-3M3 12v4h12v-4',
+    home: 'm2 8 7-6 7 6M4 7v9h10V7M7 16v-5h4v5',
   };
 </script>
 
-<button type="button" role="menuitem" class:destructive {onclick}>
+<button type="button" role="menuitem" class:destructive {disabled} {onclick}>
   <svg viewBox="0 0 18 18" aria-hidden="true"><path d={paths[icon]} /></svg>
   <span>{@render children()}</span>
   {#if shortcut}<small aria-hidden="true">{shortcut}</small>{/if}

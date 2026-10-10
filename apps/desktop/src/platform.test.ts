@@ -4,6 +4,7 @@ const mocks = vi.hoisted(() => ({
   invoke: vi.fn(),
   close: vi.fn(),
   destroy: vi.fn(),
+  drop: vi.fn(),
 }));
 vi.mock('@tauri-apps/api/core', () => ({ invoke: mocks.invoke }));
 vi.mock('@tauri-apps/api/window', () => ({
@@ -12,9 +13,55 @@ vi.mock('@tauri-apps/api/window', () => ({
     destroy: mocks.destroy,
   }),
 }));
+vi.mock('@tauri-apps/api/webview', () => ({
+  getCurrentWebview: () => ({ onDragDropEvent: mocks.drop }),
+}));
 import { desktopAdapter } from './platform';
 beforeEach(() => vi.resetAllMocks());
 describe('native adapter boundary', () => {
+  it('forwards native file paths and clears hover on cancellation', async () => {
+    const release = vi.fn();
+    const handler = vi.fn();
+    mocks.drop.mockResolvedValue(release);
+    const dispose = desktopAdapter.onFileDrop!(handler);
+    const dispatch = mocks.drop.mock.calls[0][0];
+    dispatch({ payload: { type: 'enter', paths: ['C:\\Plans\\launch.takt'] } });
+    dispatch({ payload: { type: 'over', position: { x: 80, y: 100 } } });
+    dispatch({ payload: { type: 'leave' } });
+    dispatch({ payload: { type: 'drop', paths: ['C:\\Plans\\launch.takt'] } });
+    expect(handler.mock.calls.map(([event]) => event)).toEqual([
+      { type: 'enter', paths: ['C:\\Plans\\launch.takt'] },
+      { type: 'leave' },
+      { type: 'drop', paths: ['C:\\Plans\\launch.takt'] },
+    ]);
+    await Promise.resolve();
+    dispose();
+    dispatch({ payload: { type: 'drop', paths: ['late.takt'] } });
+    expect(handler).toHaveBeenCalledTimes(3);
+    expect(release).toHaveBeenCalledTimes(1);
+  });
+  it('releases a drag subscription that finishes after unmount and reports subscription failures', async () => {
+    let finish!: (release: () => void) => void;
+    mocks.drop.mockReturnValue(
+      new Promise<() => void>((resolve) => {
+        finish = resolve;
+      }),
+    );
+    const release = vi.fn();
+    const dispose = desktopAdapter.onFileDrop!(vi.fn());
+    dispose();
+    finish(release);
+    await Promise.resolve();
+    expect(release).toHaveBeenCalledTimes(1);
+    const handler = vi.fn();
+    mocks.drop.mockRejectedValue(new Error('Listener unavailable'));
+    desktopAdapter.onFileDrop!(handler);
+    await vi.waitFor(() =>
+      expect(handler).toHaveBeenCalledWith(
+        expect.objectContaining({ type: 'failure' }),
+      ),
+    );
+  });
   it('passes source and claimed IDs for native lease rollback', async () => {
     const source = {
       id: 'source',

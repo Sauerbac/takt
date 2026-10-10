@@ -68,12 +68,14 @@
     initialView,
     onchange,
     fileControls,
+    fileMenuControls,
     onhome,
   }: {
     initial?: ChartDocument;
     initialView?: ProjectView;
     onchange?: (document: ChartDocument, view: ProjectView) => void;
     fileControls?: Snippet;
+    fileMenuControls?: Snippet;
     onhome?: () => void;
   } = $props();
   // The initial document seeds this editor instance once; remount to open another document.
@@ -1546,6 +1548,10 @@
       </div>{/if}
     {#if fileControls}{@render fileControls()}{/if}
     <div class="toolbar" aria-label="Editor controls">
+      {#if fileMenuControls}
+        {@render fileMenuControls()}
+        <span class="divider"></span>
+      {/if}
       <div class="history">
         <IconButton
           label="Undo"
@@ -2195,10 +2201,7 @@
   .with-files header {
     position: relative;
     display: grid;
-    grid-template-columns: minmax(160px, 1fr) minmax(100px, 300px) minmax(
-        380px,
-        1fr
-      );
+    grid-template-columns: minmax(90px, 1fr) minmax(80px, 300px) auto;
     gap: 20px;
   }
   .with-files .toolbar {
@@ -2213,6 +2216,7 @@
     letter-spacing: -1px;
   }
   .home-brand {
+    justify-self: start;
     background: transparent;
     border: 0;
     padding: 0;
@@ -2236,6 +2240,14 @@
   }
   .toolbar {
     gap: 13px;
+  }
+  @media (max-width: 900px) {
+    .with-files header {
+      gap: 14px;
+    }
+    .with-files .toolbar {
+      gap: 8px;
+    }
   }
   .divider {
     width: 1px;

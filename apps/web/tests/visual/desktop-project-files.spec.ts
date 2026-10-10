@@ -1,4 +1,16 @@
 import { test, expect } from '@playwright/test';
+test('desktop recovery and native File menu', async ({ page }) => {
+  await page.goto('/tests/fixtures/desktop.html?recovery');
+  await expect(
+    page.getByRole('heading', { name: 'Recover unsaved work' }),
+  ).toBeVisible();
+  await expect(page).toHaveScreenshot('desktop-home-recovery.png', {
+    fullPage: true,
+  });
+  await page.getByRole('button', { name: 'New project', exact: true }).click();
+  await page.getByRole('button', { name: 'File', exact: true }).click();
+  await expect(page).toHaveScreenshot('desktop-file-menu.png');
+});
 test('desktop Home recent files and expanded history', async ({ page }) => {
   await page.goto('/tests/fixtures/desktop.html');
   await expect(page.locator('.recent-entry')).toHaveCount(10);

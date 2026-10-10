@@ -3,6 +3,8 @@
   import Editor from './components/Editor.svelte';
   import Dialog from './components/Dialog.svelte';
   import Button from './components/Button.svelte';
+  import MenuItem from './components/MenuItem.svelte';
+  import ProjectIcon from './components/ProjectIcon.svelte';
   import taktMark from './assets/takt-mark.svg';
   import { browserAdapter } from './project/browser';
   import { newProject, contentKey } from './project/format';
@@ -12,6 +14,7 @@
     PlatformAdapter,
     RecentFile,
     RecoveryRecord,
+    ProjectFileDrop,
   } from './project/platform';
   import { ProjectSession } from './project/session';
   let { adapter = browserAdapter }: { adapter?: PlatformAdapter } = $props();
@@ -45,8 +48,25 @@
   let reloadRequest = 0;
   let commandRequest = 0;
   let operation = $state(false);
+  let fileDrag = $state(false);
+  let dragDepth = 0;
   let recents = $state<RecentFile[]>([]);
   let showAll = $state(false);
+  const availableDrafts = $derived(
+    current.drafts.filter(
+      (record) => !current.snapshot || record.id !== session.recoveryId,
+    ),
+  );
+  const hasProjects = $derived(
+    !!current.snapshot ||
+      availableDrafts.length > 0 ||
+      (adapter.kind === 'desktop' && recents.length > 0),
+  );
+  const modifier =
+    typeof navigator !== 'undefined' &&
+    /Mac|iPhone|iPad/.test(navigator.platform)
+      ? '⌘'
+      : 'Ctrl';
   let pending: (() => void) | undefined;
   let recoveryClaim: {
     claimed: RecoveryRecord;
@@ -54,13 +74,17 @@
   } | null = null;
   let closeResolve: ((allowed: boolean) => void) | undefined;
   let missing = $state<RecentFile | null>(null);
+  const dropBlocked = $derived(
+    operation || guard || conflict || reloadConfirm || missing !== null,
+  );
   const saveLabel = $derived(
     adapter.kind === 'web' ? 'Download .takt' : 'Save',
   );
   onMount(() => {
     void session.initialize();
     void adapter.listRecents?.().then((value) => (recents = value));
-    return adapter.onCloseRequested?.(
+    const disposeDrop = adapter.onFileDrop?.(nativeFileDrop);
+    const disposeClose = adapter.onCloseRequested?.(
       () =>
         new Promise((resolve) => {
           prepare();
@@ -73,6 +97,10 @@
           pending = () => void session.discard().then(resolve);
         }),
     );
+    return () => {
+      disposeDrop?.();
+      disposeClose?.();
+    };
   });
   function prepare() {
     fileMenu = false;
@@ -182,7 +210,8 @@
       revision++;
     }
   }
-  async function open(path?: string, locatePath?: string) {
+  async function open(source?: string | File, locatePath?: string) {
+    const path = typeof source === 'string' ? source : undefined;
     void abandonClaim();
     prepare();
     const generation = session.generation;
@@ -190,7 +219,13 @@
     session.cancelReplacement();
     operation = true;
     try {
-      const result = await adapter.open(path);
+      const result =
+        source instanceof File
+          ? ((await adapter.openFile?.(source)) ?? {
+              status: 'failure' as const,
+              message: 'Use Open .takt file to open this project.',
+            })
+          : await adapter.open(path);
       if (session.generation !== generation || request !== commandRequest)
         return;
       if (result.status === 'success')
@@ -357,9 +392,79 @@
   function focusFileMenu(node: HTMLElement) {
     node.querySelector<HTMLButtonElement>('button')?.focus();
   }
+  function clearFileDrag() {
+    dragDepth = 0;
+    fileDrag = false;
+  }
+  function canDrop() {
+    return !dropBlocked && !document.querySelector('dialog[open]');
+  }
+  function dropError(message: string) {
+    session.error = message;
+    revision++;
+  }
+  function acceptsDroppedFiles(names: string[]) {
+    if (names.length !== 1) {
+      dropError('Drop one .takt file at a time.');
+      return false;
+    }
+    if (!/\.takt$/i.test(names[0])) {
+      dropError('Drop a .takt project file.');
+      return false;
+    }
+    return true;
+  }
+  function nativeFileDrop(event: ProjectFileDrop) {
+    if (event.type === 'enter') {
+      fileDrag = canDrop();
+    } else if (event.type === 'drop') {
+      clearFileDrag();
+      if (!canDrop()) return;
+      if (acceptsDroppedFiles(event.paths)) void open(event.paths[0]);
+    } else if (event.type === 'failure') {
+      clearFileDrag();
+      dropError(event.message);
+    } else clearFileDrag();
+  }
+  function fileTransfer(event: DragEvent) {
+    return Array.from(event.dataTransfer?.types ?? []).includes('Files');
+  }
+  function dragEnter(event: DragEvent) {
+    if (!fileTransfer(event)) return;
+    event.preventDefault();
+    if (adapter.kind !== 'web' || !canDrop()) return;
+    dragDepth++;
+    fileDrag = true;
+  }
+  function dragOver(event: DragEvent) {
+    if (!fileTransfer(event)) return;
+    event.preventDefault();
+    if (event.dataTransfer)
+      event.dataTransfer.dropEffect = canDrop() ? 'copy' : 'none';
+    if (adapter.kind === 'web' && canDrop()) fileDrag = true;
+  }
+  function dragLeave(event: DragEvent) {
+    if (!fileTransfer(event)) return;
+    dragDepth = Math.max(0, dragDepth - 1);
+    if (dragDepth === 0) fileDrag = false;
+  }
+  function dropFile(event: DragEvent) {
+    if (!fileTransfer(event)) return;
+    event.preventDefault();
+    clearFileDrag();
+    if (adapter.kind !== 'web' || !canDrop()) return;
+    const files = Array.from(event.dataTransfer?.files ?? []);
+    if (acceptsDroppedFiles(files.map((file) => file.name)))
+      void open(files[0]);
+  }
 </script>
 
 <svelte:window
+  ondragenter={dragEnter}
+  ondragover={dragOver}
+  ondragleave={dragLeave}
+  ondrop={dropFile}
+  onblur={clearFileDrag}
   onkeydown={keyboard}
   onclick={(event) => {
     if (!(event.target as HTMLElement)?.closest('.file-menu-wrap'))
@@ -375,67 +480,173 @@
 />
 {#if current.home}
   <main class="home">
-    <div class="home-brand">
-      <img src={taktMark} alt="" />Takt<span>.</span>
-    </div>
+    <header class="home-header">
+      <div class="home-brand">
+        <img src={taktMark} alt="" />Takt<span>.</span>
+      </div>
+      <span class="home-caption">A place for your plans</span>
+    </header>
     <section class="welcome">
-      <p class="eyebrow">MAKE ROOM FOR YOUR PLANS</p>
-      <h1>A clear view of what’s ahead.</h1>
-      <p>
-        Build a chart, shape your timeline, and keep your plans in a .takt file.
-      </p>
-      <div class="actions">
-        <Button variant="primary" onclick={create} disabled={operation}
-          >New project</Button
-        ><Button onclick={() => void open()} disabled={operation}
-          >Open .takt file</Button
+      <h1>Welcome to Takt</h1>
+      <p>Give your next idea a timeline.</p>
+    </section>
+    <div class="home-columns">
+      <section class="start" aria-labelledby="start-heading">
+        <h2 id="start-heading">Start</h2>
+        <button
+          class="start-action"
+          onclick={create}
+          disabled={operation}
+          aria-label="New project"
         >
+          <span class="action-icon"><ProjectIcon name="new" /></span>
+          <span class="action-text"
+            ><strong>New project</strong><small
+              >A blank canvas for your plan</small
+            ></span
+          >
+          <kbd aria-hidden="true">{modifier} N</kbd>
+        </button>
+        <button
+          class="start-action"
+          onclick={() => void open()}
+          disabled={operation}
+          aria-label="Open .takt file"
+        >
+          <span class="action-icon"><ProjectIcon name="open" /></span>
+          <span class="action-text"
+            ><strong>Open .takt file</strong><small
+              >Pick up where you left off</small
+            ></span
+          >
+          <kbd aria-hidden="true">{modifier} O</kbd>
+        </button>
+        <p class="local-note">
+          Your files stay on your device.<br />No account needed.
+        </p>
+        <button
+          class="drop-zone"
+          class:drag-active={fileDrag}
+          disabled={dropBlocked}
+          onclick={() => void open()}
+          aria-label="Open a project by dropping a .takt file or browsing"
+        >
+          <ProjectIcon name="drop" />
+          <strong>Drop a .takt file here</strong>
+          <small>or click to browse</small>
+        </button>
+      </section>
+      <div class="continue">
+        {#if current.snapshot}<section class="drafts">
+            <h2>Current project</h2>
+            <button
+              class="draft"
+              onclick={() => {
+                session.home = false;
+                revision++;
+              }}
+              ><span class="list-icon"><ProjectIcon name="file" /></span><span
+                class="project-text"
+                ><strong>{current.snapshot.title}</strong><small
+                  >Resume project</small
+                ></span
+              ><span class="resume-arrow"><ProjectIcon name="arrow" /></span
+              ></button
+            >
+          </section>{/if}
+        {#if availableDrafts.length}<section class="drafts">
+            <h2>
+              {adapter.kind === 'web' ? 'Resume draft' : 'Recover unsaved work'}
+            </h2>
+            {#each availableDrafts as record}<button
+                class="draft"
+                disabled={operation}
+                onclick={() => resume(record)}
+                ><span class="list-icon"><ProjectIcon name="clock" /></span
+                ><span class="project-text"
+                  ><strong>{record.snapshot.title}</strong><small
+                    >{new Date(record.updatedAt).toLocaleString()}</small
+                  ></span
+                ><span class="resume-arrow"><ProjectIcon name="arrow" /></span
+                ></button
+              >{/each}
+          </section>{/if}
+        {#if adapter.kind === 'desktop' && recents.length}<section
+            class="drafts"
+          >
+            <h2>Recent files</h2>
+            {#each showAll ? recents : recents.slice(0, 10) as recent}<div
+                class="recent-entry"
+              >
+                <button
+                  class="draft"
+                  disabled={operation}
+                  title={recent.path}
+                  onclick={() => void open(recent.path)}
+                  ><span class="list-icon"><ProjectIcon name="file" /></span
+                  ><span class="project-text"
+                    ><strong>{recent.name}</strong><small>{recent.folder}</small
+                    ></span
+                  ></button
+                ><button
+                  class="remove-recent"
+                  disabled={operation}
+                  title="Remove from recents"
+                  aria-label={`Remove ${recent.name} from recents`}
+                  onclick={() =>
+                    void adapter
+                      .removeRecent?.(recent.path)
+                      .then(() => adapter.listRecents?.())
+                      .then((value) => (recents = value ?? []))}
+                  ><ProjectIcon name="close" /></button
+                >
+              </div>{/each}{#if recents.length > 10}<button
+                class="show-recents"
+                onclick={() => (showAll = !showAll)}
+                >{showAll ? 'Show latest ten' : 'Show all recent files'}</button
+              >{/if}
+          </section>{/if}
+        {#if !hasProjects}
+          <section class="empty-projects" aria-labelledby="empty-heading">
+            <div class="mini-timeline" aria-hidden="true">
+              <i></i><i></i><i></i><b></b>
+            </div>
+            <h2 id="empty-heading">Room for what’s next</h2>
+            <p>
+              {adapter.kind === 'desktop'
+                ? 'Your recent projects will appear here.'
+                : 'Create a project or open a .takt file to get started.'}
+            </p>
+            <small
+              >{adapter.kind === 'desktop'
+                ? 'Unsaved work can be recovered here, too.'
+                : 'Locally retained drafts will be available here.'}</small
+            >
+          </section>
+        {/if}
+      </div>
+    </div>
+    <section class="quick-guide" aria-labelledby="guide-heading">
+      <h2 id="guide-heading">A few simple moves</h2>
+      <div class="guide-items">
+        <div>
+          <span class="gesture-mark bar-mark" aria-hidden="true"></span><strong
+            >Draw your plan</strong
+          >
+          <p>Drag across a row to create a bar.</p>
+        </div>
+        <div>
+          <span class="gesture-mark milestone-mark" aria-hidden="true"
+          ></span><strong>Mark a moment</strong>
+          <p>Double-click a row to add a milestone.</p>
+        </div>
+        <div>
+          <span class="gesture-mark adjust-mark" aria-hidden="true"
+          ></span><strong>Make it yours</strong>
+          <p>Drag bars to move. Drag their ends to resize.</p>
+        </div>
       </div>
     </section>
-    {#if current.snapshot}<section class="drafts">
-        <h2>Current project</h2>
-        <button
-          class="draft"
-          onclick={() => {
-            session.home = false;
-            revision++;
-          }}>{current.snapshot.title}<span>Resume project</span></button
-        >
-      </section>{/if}
-    {#if current.drafts.length}<section class="drafts">
-        <h2>
-          {adapter.kind === 'web' ? 'Resume draft' : 'Recover unsaved work'}
-        </h2>
-        {#each current.drafts.filter((record) => !current.snapshot || record.id !== session.recoveryId) as record}<button
-            class="draft"
-            disabled={operation}
-            onclick={() => resume(record)}
-            >{record.snapshot.title}<span
-              >{new Date(record.updatedAt).toLocaleString()}</span
-            ></button
-          >{/each}
-      </section>{/if}
-    {#if adapter.kind === 'desktop' && recents.length}<section class="drafts">
-        <h2>Recent files</h2>
-        {#each showAll ? recents : recents.slice(0, 10) as recent}<div
-            class="recent-entry"
-          >
-            <button class="draft" onclick={() => void open(recent.path)}
-              >{recent.name}<span>{recent.folder}</span></button
-            ><button
-              class="remove-recent"
-              aria-label={`Remove ${recent.name} from recents`}
-              onclick={() =>
-                void adapter
-                  .removeRecent?.(recent.path)
-                  .then(() => adapter.listRecents?.())
-                  .then((value) => (recents = value ?? []))}>×</button
-            >
-          </div>{/each}{#if recents.length > 10}<Button
-            onclick={() => (showAll = !showAll)}
-            >{showAll ? 'Show latest ten' : 'Show all recent files'}</Button
-          >{/if}
-      </section>{/if}
   </main>
 {/if}
 {#if current.snapshot}
@@ -486,72 +697,125 @@
                   title="Modified">●</span
                 >{/if}
             </div>
-            <div class="file-menu-wrap">
-              <button
-                class="file-trigger"
-                aria-label="File"
-                bind:this={fileButton}
-                aria-haspopup="menu"
-                aria-expanded={fileMenu}
-                onclick={() => (fileMenu = !fileMenu)}
+          </div>
+        {/snippet}
+        {#snippet fileMenuControls()}
+          <div class="file-menu-wrap">
+            <button
+              class="file-trigger"
+              aria-label="File"
+              bind:this={fileButton}
+              aria-haspopup="menu"
+              aria-expanded={fileMenu}
+              title="File commands"
+              disabled={operation}
+              onclick={() => (fileMenu = !fileMenu)}
+              onkeydown={(event) => {
+                if (event.key === 'ArrowDown') {
+                  event.preventDefault();
+                  fileMenu = true;
+                }
+              }}
+              >File <svg
+                class:expanded={fileMenu}
+                viewBox="0 0 16 16"
+                aria-hidden="true"><path d="m4 6 4 4 4-4" /></svg
+              ></button
+            >
+            {#if fileMenu}<div
+                class="file-menu"
+                use:focusFileMenu
+                role="menu"
+                tabindex="-1"
+                onpointermove={(event) => {
+                  const item = (
+                    event.target as HTMLElement
+                  ).closest<HTMLButtonElement>('button');
+                  if (item && !item.disabled) item.focus();
+                }}
                 onkeydown={(event) => {
-                  if (event.key === 'ArrowDown') {
+                  if (event.key === 'Escape') {
                     event.preventDefault();
-                    fileMenu = true;
+                    event.stopPropagation();
+                    fileMenu = false;
+                    fileButton?.focus();
                   }
-                }}>File <span>⌄</span></button
+                  if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+                    event.preventDefault();
+                    const buttons = Array.from(
+                      event.currentTarget.querySelectorAll<HTMLButtonElement>(
+                        'button:not(:disabled)',
+                      ),
+                    );
+                    const index = buttons.indexOf(
+                      document.activeElement as HTMLButtonElement,
+                    );
+                    buttons[
+                      (index +
+                        (event.key === 'ArrowDown' ? 1 : buttons.length - 1)) %
+                        buttons.length
+                    ]?.focus();
+                  }
+                  if (event.key === 'Tab') {
+                    fileMenu = false;
+                    fileButton?.focus();
+                  }
+                  if (event.key === 'Home' || event.key === 'End') {
+                    event.preventDefault();
+                    const buttons =
+                      event.currentTarget.querySelectorAll<HTMLButtonElement>(
+                        'button:not(:disabled)',
+                      );
+                    buttons[
+                      event.key === 'Home' ? 0 : buttons.length - 1
+                    ]?.focus();
+                  }
+                }}
               >
-              {#if fileMenu}<div
-                  class="file-menu"
-                  use:focusFileMenu
-                  role="menu"
-                  tabindex="-1"
-                  onkeydown={(event) => {
-                    if (event.key === 'Escape') {
-                      fileMenu = false;
-                      fileButton?.focus();
-                    }
-                    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
-                      event.preventDefault();
-                      const buttons = Array.from(
-                        event.currentTarget.querySelectorAll('button'),
-                      );
-                      const index = buttons.indexOf(
-                        document.activeElement as HTMLButtonElement,
-                      );
-                      buttons[
-                        (index +
-                          (event.key === 'ArrowDown'
-                            ? 1
-                            : buttons.length - 1)) %
-                          buttons.length
-                      ]?.focus();
-                    }
-                  }}
+                <div class="menu-heading">Project</div>
+                <MenuItem
+                  icon="new"
+                  disabled={operation}
+                  shortcut={`${modifier} N`}
+                  onclick={create}>New project</MenuItem
                 >
-                  <button role="menuitem" disabled={operation} onclick={create}
-                    >New project <span>Ctrl N</span></button
-                  ><button
-                    role="menuitem"
+                <MenuItem
+                  icon="open"
+                  disabled={operation}
+                  shortcut={`${modifier} O`}
+                  onclick={() => void open()}>Open .takt file</MenuItem
+                >
+                <div class="menu-divider" role="separator"></div>
+                <MenuItem
+                  icon={adapter.kind === 'web' ? 'download' : 'save'}
+                  disabled={operation}
+                  shortcut={`${modifier} S`}
+                  onclick={() => void save()}>{saveLabel}</MenuItem
+                >
+                {#if adapter.kind === 'desktop'}<MenuItem
+                    icon="save"
                     disabled={operation}
-                    onclick={() => void open()}
-                    >Open .takt file <span>Ctrl O</span></button
-                  ><button
-                    role="menuitem"
-                    disabled={operation}
-                    onclick={() => void save()}
-                    >{saveLabel}<span>Ctrl S</span></button
-                  >{#if adapter.kind === 'desktop'}<button
-                      role="menuitem"
-                      disabled={operation}
-                      onclick={() => void save(true)}>Save As…</button
-                    >{/if}<button role="menuitem" onclick={home}>Home</button>
-                </div>{/if}
-            </div>
+                    shortcut={`${modifier} ⇧ S`}
+                    onclick={() => void save(true)}>Save As…</MenuItem
+                  >{/if}
+                <div class="menu-divider" role="separator"></div>
+                <MenuItem icon="home" disabled={operation} onclick={home}
+                  >Home</MenuItem
+                >
+              </div>{/if}
           </div>
         {/snippet}
       </Editor>
     {/key}
+  </div>
+{/if}
+{#if fileDrag && !current.home && !dropBlocked}
+  <div class="drop-overlay" role="status">
+    <div class="drop-prompt">
+      <ProjectIcon name="drop" />
+      <h2>Drop to open your project</h2>
+      <p>Open a .takt file</p>
+    </div>
   </div>
 {/if}
 {#if current.warning}<div class="warning" role="status">
@@ -675,22 +939,17 @@
     visibility: hidden;
     pointer-events: none;
   }
-  .recent-entry {
+  .home {
+    max-width: 1080px;
+    margin: auto;
+    padding: 0 34px 54px;
+  }
+  .home-header {
+    height: 88px;
     display: flex;
     align-items: center;
-    gap: 8px;
-  }
-  .remove-recent {
-    border: 0;
-    background: transparent;
-    color: var(--muted);
-    font-size: 20px;
-    cursor: pointer;
-  }
-  .home {
-    max-width: 960px;
-    margin: auto;
-    padding: 40px 34px 70px;
+    justify-content: space-between;
+    border-bottom: 1px solid var(--line);
   }
   .home-brand {
     display: flex;
@@ -707,69 +966,373 @@
     color: var(--accent);
     margin-left: -10px;
   }
-  .welcome {
-    margin: 80px 0 56px;
-    max-width: 600px;
+  .home-caption {
+    color: var(--muted);
+    font-size: 12px;
   }
-  .eyebrow {
-    color: var(--accent);
-    font-size: 11px;
-    font-weight: 700;
-    letter-spacing: 2px;
+  .welcome {
+    margin: 54px 0 40px;
   }
   h1 {
-    font-size: 44px;
-    line-height: 1.15;
-    letter-spacing: -1.5px;
-    margin: 18px 0;
+    font-size: 36px;
+    line-height: 1.2;
+    font-weight: 600;
+    letter-spacing: -1.1px;
+    margin: 0 0 10px;
   }
   p {
     color: var(--muted);
     line-height: 1.6;
   }
-  .actions {
-    display: flex;
-    gap: 12px;
-    margin-top: 28px;
+  .welcome p {
+    margin: 0;
+    font-size: 16px;
   }
   h2 {
     font-size: 18px;
     margin: 0 0 16px;
   }
-  .drafts {
-    margin-top: 28px;
+  .home h2 {
+    font-size: 15px;
+    font-weight: 600;
+    margin: 0 0 18px;
+  }
+  .home-columns {
+    display: grid;
+    grid-template-columns: 320px minmax(0, 1fr);
+    gap: 70px;
+    min-height: 270px;
+  }
+  .start-action {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    gap: 12px;
+    padding: 13px 10px;
+    margin: 0 0 4px -10px;
+    border: 0;
+    border-radius: 7px;
+    text-align: left;
+    background: transparent;
+    cursor: pointer;
+  }
+  .start-action:hover:enabled {
+    background: #e9edf2;
+  }
+  .action-icon {
+    display: grid;
+    place-items: center;
+    color: var(--accent);
+    width: 36px;
+    height: 36px;
+    background: #f8e9de;
+    border-radius: 7px;
+  }
+  .action-text {
+    flex: 1;
+  }
+  .action-text strong {
+    display: block;
+    color: var(--accent);
+    font-size: 14px;
+    font-weight: 600;
+  }
+  .action-text small {
+    display: block;
+    color: var(--muted);
+    font-size: 12px;
+    margin-top: 4px;
+  }
+  kbd {
+    font-family: inherit;
+    font-size: 10px;
+    color: var(--muted);
+    white-space: nowrap;
+  }
+  .local-note {
+    font-size: 12px;
+    margin: 24px 0 0;
+    line-height: 1.8;
+  }
+  .drop-zone {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    width: 100%;
+    min-height: 114px;
+    margin-top: 22px;
+    padding: 18px;
+    border: 1px dashed #b9c3ce;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--muted);
+    cursor: pointer;
+  }
+  .drop-zone strong {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--ink);
+  }
+  .drop-zone small {
+    font-size: 11px;
+  }
+  .drop-zone:hover:enabled,
+  .drop-zone.drag-active {
+    border-color: var(--accent);
+    background: #f8e9de;
+    color: var(--accent);
+  }
+  .drop-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 40;
+    display: grid;
+    place-items: center;
+    background: #182e471f;
+    pointer-events: none;
+    padding: 24px;
+  }
+  .drop-prompt {
+    width: min(420px, 100%);
+    padding: 42px 28px;
+    text-align: center;
+    border: 2px dashed var(--accent);
+    border-radius: 12px;
+    background: #fffaf5;
+    box-shadow: 0 12px 36px #182e471f;
+    color: var(--accent);
+  }
+  .drop-prompt h2 {
+    margin: 18px 0 8px;
+    font-size: 18px;
+    color: var(--ink);
+  }
+  .drop-prompt p {
+    margin: 0;
+    font-size: 13px;
+  }
+  .continue {
+    min-width: 0;
+  }
+  .drafts + .drafts {
+    margin-top: 26px;
+  }
+  .drafts h2 {
+    margin-bottom: 10px;
   }
   .draft {
     display: flex;
+    align-items: center;
     width: 100%;
+    min-width: 0;
+    gap: 12px;
     text-align: left;
-    justify-content: space-between;
-    padding: 18px 20px;
+    padding: 10px;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    cursor: pointer;
+  }
+  .draft:hover:enabled,
+  .recent-entry:hover {
+    background: #e9edf2;
+  }
+  .list-icon {
+    display: flex;
+    color: #7e8c9b;
+  }
+  .project-text {
+    min-width: 0;
+    flex: 1;
+  }
+  .project-text strong,
+  .project-text small {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .project-text strong {
+    font-size: 13px;
+    font-weight: 500;
+  }
+  .project-text small {
+    margin-top: 3px;
+    color: var(--muted);
+    font-size: 11px;
+  }
+  .resume-arrow {
+    display: flex;
+    color: var(--muted);
+  }
+  .recent-entry {
+    display: flex;
+    align-items: center;
+    border-radius: 6px;
+  }
+  .recent-entry .draft {
+    padding-block: 8px;
+  }
+  .recent-entry .project-text {
+    display: flex;
+    align-items: baseline;
+    gap: 18px;
+  }
+  .recent-entry .project-text strong {
+    flex: 0 1 45%;
+  }
+  .recent-entry .project-text small {
+    flex: 1;
+    margin-top: 0;
+  }
+  .remove-recent {
+    flex: none;
+    display: grid;
+    place-items: center;
+    width: 28px;
+    height: 28px;
+    margin-right: 8px;
+    padding: 0;
+    border: 0;
+    border-radius: 4px;
+    background: transparent;
+    color: var(--muted);
+    opacity: 0;
+    cursor: pointer;
+  }
+  .recent-entry:hover .remove-recent,
+  .recent-entry:focus-within .remove-recent {
+    opacity: 1;
+  }
+  .remove-recent:hover:enabled {
+    background: var(--surface);
+  }
+  .show-recents {
+    margin: 14px 0 0 10px;
+    padding: 2px 0;
+    border: 0;
+    background: transparent;
+    color: var(--accent);
+    font-size: 12px;
+    cursor: pointer;
+  }
+  .show-recents:hover {
+    text-decoration: underline;
+  }
+  .empty-projects {
+    padding: 6px 0 20px;
+  }
+  .empty-projects h2 {
+    margin: 22px 0 8px;
+  }
+  .empty-projects p {
+    font-size: 13px;
+    margin: 0 0 6px;
+  }
+  .empty-projects small {
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .mini-timeline {
+    position: relative;
+    width: 240px;
+    height: 98px;
     border: 1px solid var(--line);
     border-radius: 6px;
-    background: var(--surface);
-    margin: 8px 0;
-    cursor: pointer;
+    background:
+      repeating-linear-gradient(
+        90deg,
+        transparent 0 39px,
+        var(--grid) 39px 40px
+      ),
+      var(--surface);
+  }
+  .mini-timeline i {
+    position: absolute;
+    height: 13px;
+    border-radius: 3px;
+  }
+  .mini-timeline i:nth-child(1) {
+    top: 18px;
+    left: 16px;
+    width: 94px;
+    background: var(--bar-fill);
+  }
+  .mini-timeline i:nth-child(2) {
+    top: 42px;
+    left: 70px;
+    width: 92px;
+    background: var(--lavender);
+  }
+  .mini-timeline i:nth-child(3) {
+    top: 66px;
+    left: 133px;
+    width: 76px;
+    background: var(--sea-blue);
+  }
+  .mini-timeline b {
+    position: absolute;
+    top: 19px;
+    left: 178px;
+    width: 11px;
+    height: 11px;
+    background: var(--accent);
+    transform: rotate(45deg);
+    border-radius: 1px;
+  }
+  .quick-guide {
+    margin-top: 46px;
+    padding-top: 26px;
+    border-top: 1px solid var(--line);
+  }
+  .quick-guide h2 {
+    margin-bottom: 22px;
+    color: var(--muted);
+    font-size: 12px;
+  }
+  .guide-items {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 28px;
+  }
+  .guide-items strong {
+    font-size: 12px;
     font-weight: 600;
   }
-  .draft span {
+  .guide-items p {
     font-size: 12px;
-    font-weight: 400;
-    color: var(--muted);
+    margin: 6px 0 0;
+  }
+  .gesture-mark {
+    display: inline-block;
+    width: 26px;
+    height: 10px;
+    margin-right: 10px;
+    border-radius: 2px;
+    background: var(--bar-fill);
+    vertical-align: middle;
+  }
+  .milestone-mark {
+    width: 9px;
+    height: 9px;
+    margin: 0 18px 0 7px;
+    background: var(--lavender);
+    transform: rotate(45deg);
+  }
+  .adjust-mark {
+    background: var(--sea-blue);
+    border-left: 2px solid #547e84;
+    border-right: 2px solid #547e84;
   }
   .file-controls {
     display: flex;
-    align-items: center;
-    gap: 14px;
-    margin: 0;
-    flex: 1;
     justify-content: center;
     min-width: 0;
   }
   .title-wrap {
     position: relative;
-    max-width: 300px;
-    min-width: 100px;
     width: 100%;
   }
   .title-wrap input {
@@ -788,15 +1351,10 @@
   }
   .modified {
     position: absolute;
-    right: -14px;
+    right: -12px;
     top: 11px;
     font-size: 10px;
     color: var(--accent);
-  }
-  .file-menu-wrap {
-    position: absolute;
-    left: 110px;
-    top: 24px;
   }
   .title-pencil {
     position: absolute;
@@ -809,48 +1367,101 @@
     stroke-width: 1.25;
     pointer-events: none;
   }
+  .file-menu-wrap {
+    position: relative;
+    flex-shrink: 0;
+  }
   .file-trigger {
-    border: 0;
-    background: transparent;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    height: 34px;
+    padding: 0 10px;
+    border: 1px solid var(--line);
+    border-radius: 7px;
+    background: var(--surface);
+    box-shadow: 0 1px 2px #182e4708;
     font-size: 13px;
-    padding: 10px;
+    font-weight: 600;
     cursor: pointer;
   }
-  .file-trigger span {
-    margin-left: 8px;
+  .file-trigger:hover:enabled,
+  .file-trigger[aria-expanded='true'] {
+    background: var(--soft);
+    border-color: #b9c3ce;
+  }
+  .file-trigger svg {
+    width: 14px;
+    height: 14px;
+    fill: none;
+    stroke: var(--muted);
+    stroke-width: 1.6;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    transition: transform 150ms ease;
+  }
+  .file-trigger svg.expanded {
+    transform: rotate(180deg);
   }
   .file-menu {
     position: absolute;
-    top: 40px;
-    left: 0;
-    min-width: 240px;
+    top: calc(100% + 8px);
+    right: 0;
+    width: 252px;
     z-index: 30;
     background: var(--surface);
-    padding: 6px;
+    padding: 5px;
     border: 1px solid var(--line);
-    border-radius: 7px;
-    box-shadow: 0 8px 24px #182e471f;
+    border-radius: 8px;
+    box-shadow:
+      0 10px 30px #182e471f,
+      0 2px 6px #182e470a;
   }
-  .file-menu button {
-    display: flex;
-    justify-content: space-between;
-    width: 100%;
-    border: 0;
-    border-radius: 4px;
-    background: transparent;
-    padding: 10px;
-    text-align: left;
-    font-size: 13px;
-    cursor: pointer;
-  }
-  .file-menu button:hover,
-  .file-menu button:focus {
-    background: var(--soft);
-  }
-  .file-menu button span {
+  .menu-heading {
+    padding: 8px 9px 7px;
+    font-size: 10px;
+    font-weight: 600;
     color: var(--muted);
-    font-size: 11px;
-    margin-left: 20px;
+  }
+  .menu-divider {
+    height: 1px;
+    background: var(--line);
+    margin: 5px 4px;
+  }
+  @media (max-width: 900px) {
+    .home-columns {
+      grid-template-columns: 280px minmax(0, 1fr);
+      gap: 36px;
+    }
+    .guide-items {
+      gap: 18px;
+    }
+  }
+  @media (max-width: 680px) {
+    .home {
+      padding-inline: 24px;
+    }
+    .home-columns {
+      grid-template-columns: 1fr;
+      gap: 36px;
+    }
+    .start-action {
+      max-width: 340px;
+    }
+    .welcome {
+      margin-top: 36px;
+    }
+    h1 {
+      font-size: 30px;
+    }
+    .home-caption {
+      display: none;
+    }
+    .guide-items {
+      grid-template-columns: 1fr;
+      gap: 20px;
+    }
   }
   .warning,
   .error {

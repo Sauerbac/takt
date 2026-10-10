@@ -1,5 +1,6 @@
 import { invoke } from '@tauri-apps/api/core';
 import { getCurrentWindow } from '@tauri-apps/api/window';
+import { getCurrentWebview } from '@tauri-apps/api/webview';
 import {
   encodeProject,
   parseProject,
@@ -22,6 +23,34 @@ const failure = (error: unknown) => ({
 });
 export const desktopAdapter: PlatformAdapter = {
   kind: 'desktop',
+  onFileDrop(handler) {
+    let disposed = false;
+    let unlisten: (() => void) | undefined;
+    const subscription = getCurrentWebview().onDragDropEvent(({ payload }) => {
+      if (disposed) return;
+      if (payload.type === 'enter' || payload.type === 'drop')
+        handler({ type: payload.type, paths: payload.paths });
+      else if (payload.type === 'leave') handler({ type: 'leave' });
+    });
+    void subscription
+      .then((release) => {
+        if (disposed) release();
+        else unlisten = release;
+      })
+      .catch(() => {
+        if (!disposed)
+          handler({
+            type: 'failure',
+            message:
+              'Could not enable file dropping. Use Open .takt file to open your project.',
+          });
+      });
+    return () => {
+      disposed = true;
+      unlisten?.();
+      unlisten = undefined;
+    };
+  },
   async open(path) {
     try {
       const file = await invoke<NativeFile | null>('open_project', { path });

@@ -87,7 +87,7 @@ test('Home, title, dirty baseline, guarded replacement, retained Home history an
 }) => {
   await page.goto('/');
   await expect(
-    page.getByRole('heading', { name: 'A clear view of what’s ahead.' }),
+    page.getByRole('heading', { name: 'Welcome to Takt' }),
   ).toBeVisible();
   await page.getByRole('button', { name: 'New project', exact: true }).click();
   await expect(page.getByLabel('Project title')).toHaveValue('Untitled');

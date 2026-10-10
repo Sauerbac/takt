@@ -377,6 +377,10 @@ The required desktop artifact is an unbundled executable with embedded frontend 
 
 ### 17.4 Acceptance extensions
 
+File drops stay outside the chart interaction engine. The shared shell handles browser `DataTransfer` events, suppresses file navigation, and uses an enter/leave depth counter for stable highlighting across nested elements. `PlatformAdapter.openFile` reads dropped browser `File` objects through the same codec used by the picker; optional `onFileDrop` forwards native enter/drop/leave events and paths. Desktop subscribes to [Tauri Webview drag/drop events](https://v2.tauri.app/reference/javascript/api/namespacewebview/#ondragdropevent), retains native drag/drop handling, and opens dropped paths through its existing native adapter to preserve file identity. Both sources flow through the same asynchronous Open/guard logic. Modal or busy states reject new drops; subscription disposal handles late registration without duplicate cleanup. Drop feedback appears immediately without adding transitions.
+
+The shared shell keeps title and File controls in separate optional editor snippets: the title occupies the center header column, and File renders inside the right-hand toolbar. The Home logo button sizes to its content so empty grid space cannot navigate. File reuses `MenuItem` for icons, shortcut hints, and focus styling; pointer movement and keyboard navigation share a single focused action. Its chevron uses the same 150 ms transition as Zoom. Home uses a responsive Start/continue layout with compact project rows and decorative CSS timeline marks, preserving the platform/session boundaries.
+
 Retain the four existing test layers and the root check sequence. Extend coverage rather than relaxing editor baselines or replacing pointer/motion acceptance with mocked internals.
 
 - **Codec/rules:** round trips, negative weeks and boundary semantics, inherited/overridden colors, reordered/empty structure, invalid shapes and references, version handling, and title/content-versus-view dirty comparison.

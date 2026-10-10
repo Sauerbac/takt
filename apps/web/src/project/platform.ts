@@ -26,11 +26,17 @@ export interface RecentFile {
   name: string;
   folder: string;
 }
+export type ProjectFileDrop =
+  | { type: 'enter' | 'drop'; paths: string[] }
+  | { type: 'leave' }
+  | { type: 'failure'; message: string };
 /** Native and browser I/O lives behind this boundary; session code has no platform imports. */
 export interface PlatformAdapter {
   kind: 'web' | 'desktop';
   recoveryWarning?: string;
   open(path?: string): Promise<Outcome<OpenedProject>>;
+  openFile?(file: File): Promise<Outcome<OpenedProject>>;
+  onFileDrop?(handler: (event: ProjectFileDrop) => void): () => void;
   save(
     snapshot: ProjectSnapshot,
     file?: FileIdentity,

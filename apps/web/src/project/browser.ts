@@ -62,21 +62,24 @@ export const browserAdapter: PlatformAdapter = {
           resolve({ status: 'cancelled' });
           return;
         }
-        try {
-          resolve({
-            status: 'success',
-            value: { snapshot: parseProject(await file.text()) },
-          });
-        } catch (error) {
-          resolve({
-            status: 'failure',
-            message:
-              error instanceof Error ? error.message : 'Could not open file.',
-          });
-        }
+        resolve(await browserAdapter.openFile!(file));
       });
       input.click();
     });
+  },
+  async openFile(file) {
+    try {
+      return {
+        status: 'success',
+        value: { snapshot: parseProject(await file.text()) },
+      };
+    } catch (error) {
+      return {
+        status: 'failure',
+        message:
+          error instanceof Error ? error.message : 'Could not open file.',
+      };
+    }
   },
   async save(snapshot) {
     try {
