@@ -1,14 +1,14 @@
 # Takt implementation decisions
 
-**Status:** Agreed direction for the first implementation milestone.
+**Status:** Editor, browser project files/recovery, and Windows desktop implemented; section 17 records their shared architecture and automated acceptance.
 
 **Last updated:** October 10, 2026.
 
 **Related sources:** The [functional UX specification](ux-specification.md) is authoritative for product behavior. The [Apricot prototype](../ui-prototype/index.html) is the visual reference. This document records the technical direction, testing contract, implementation sequence, and interaction decisions made while preparing for implementation.
 
-## 1. First milestone
+## 1. Completed editor milestone
 
-The first milestone is a working in-browser editor that implements the behavior in the UX specification. It is statically deployable and opens directly into the editor. It does not save its contents across refreshes and does not include document management, persistence, accounts, export, or a home screen.
+The original first milestone proved the in-browser editor without persistence or Home. The current application remains statically deployable and adds the project-file, Home, recovery, and desktop behavior described in UX section 17. The implementation boundaries are recorded in section 17 below.
 
 The milestone is intended to prove the editor itself: direct manipulation, reversible previews, collision handling, structural reordering, motion, inline editing, and complete undo/redo. Features outside that milestone can be designed around the working editor later.
 
@@ -24,9 +24,9 @@ The editor is currently one static, client-side screen. It does not need routing
 
 ### Repository shape
 
-Place the browser application under `apps/web`. Keep the repository shape capable of accepting a future sibling desktop application, such as `apps/desktop`, without implementing or designing around Tauri now.
+The browser application lives under `apps/web`. The agreed Windows milestone adds a sibling Tauri application under `apps/desktop`, sharing the editor and file format.
 
-The future desktop possibility should affect only this high-level placement. It must not introduce a premature shared-package structure, desktop abstractions, Tauri APIs, or constraints on the web implementation. Extract shared packages only when a real second consumer exists and the useful boundary is known.
+Keep platform file operations outside the shared editor and document lifecycle. The web milestone does not require a Tauri dependency or a speculative package hierarchy. Extract shared packages when the desktop consumer makes the useful boundary concrete; preserve one implementation of chart behavior and the file codec. Section 17 supersedes the original instruction to defer all desktop design.
 
 ### Supported environment
 
@@ -322,6 +322,68 @@ The discussion resolved the interaction gaps required to start implementation, b
 - final animation easing and whether timings differ by operation;
 - the precise collapsed-section hover delay around the initial half-second value;
 - the concrete unstyled primitive library, if any, after evaluating current Svelte support;
-- persistence, document management, export, a home screen, and desktop packaging.
+- future wire-format migrations and additional Windows targets, when a demonstrated requirement justifies them.
 
 These choices must not silently change the agreed interaction semantics. Record a product decision in the UX specification when a remaining choice affects observable behavior; record implementation-only choices near the code or in an appropriate architectural note.
+
+## 17. Project files and desktop implementation
+
+**Decision date:** October 10, 2026. **Status:** implemented; see the acceptance reconciliation for automated coverage. Product behavior is authoritative in [UX section 17](ux-specification.md#17-project-files-home-and-desktop). The [file-format document](takt-file-format.md) records the frozen v1 wire contract and schema. The [orchestrator handoff](project-files-orchestrator-handoff.md) is the execution entry point.
+
+### 17.1 Boundaries
+
+Keep these responsibilities separate:
+
+| Responsibility      | Contract                                                                                                                                                                |
+| ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Portable file codec | Pure encode/decode/validation of versioned `.takt` bytes and persisted content/view. No file paths, browser APIs, or Tauri dependencies.                                |
+| Document session    | Active document, title, persisted view, saved-content baseline, modified state, pending New/Open/close transitions, and recovery coordination.                          |
+| Editor              | Existing chart commands, history, gestures, and view rendering. Publishes committed edits and settled view snapshots; file actions must not serialize gesture previews. |
+| Application UI      | Home, header/title, File menu, replacement/conflict/recovery dialogs, and recents. Calls the session contract.                                                          |
+| Browser adapter     | Local file input, download, and browser-local recovery storage.                                                                                                         |
+| Desktop adapter     | Native dialogs, file reads/writes, file revision checks, application-data recovery/recents, and platform lifecycle hooks.                                               |
+
+These are module responsibilities, not a mandate for a particular class hierarchy or directory layout. The orchestrator chooses concrete interfaces before workers depend on them and records those choices locally. Share the editor, codec, and lifecycle; isolate the actual platform differences at the adapter boundary.
+
+Current integration points: `apps/web/src/main.ts` mounts `Editor` directly; `components/Editor.svelte` seeds its history from `initial` once and documents remounting to open another document. Introduce the application shell and an explicit session/editor boundary without routing file operations through the gesture engine. Keep exactly one owner for edits to `Editor.svelte` during concurrent work.
+
+### 17.2 Persistence and modification tracking
+
+Model saved content separately from persisted view. A content baseline includes the title and semantic chart fields, including the calendar and display mode; zoom, scrolling, and collapse state are excluded from dirty comparison. Comparing content to the saved baseline allows undo back to the saved content to become clean. A save captures both content and view, but only acknowledges the snapshot actually written: edits arriving during an asynchronous write remain modified.
+
+Decode external input from `unknown`, validate structure and semantic invariants, and only then replace a live session. `model/document.ts:assertDocument` validates internal invariants; it is not a complete decoder for arbitrary JSON. Validate IDs/references, ordered collections, integer intervals, nonoverlap, milestone uniqueness, dates, colors, and view values. Existing editor-generated IDs must remain collision-free after opening an arbitrary valid file.
+
+Recovery is a separate, versioned local record containing the portable snapshot plus session/platform metadata such as original path, revision token, saved baseline, and recovery time. Paths and recents never enter the portable `.takt` document. Use browser-local storage appropriate for structured records (IndexedDB is the recommended implementation) and the platform's per-user application-data directory on desktop. Recovery failure and multi-instance policies follow UX section 17.10.
+
+The implementation freezes the shared portable boundary in `apps/web/src/project/format.ts` (`ProjectSnapshot`, `ProjectView`, encode/decode, and content comparison), and the asynchronous platform boundary in `project/platform.ts`. Platform operations distinguish success, cancellation, failure, and save conflict. The shared application accepts a platform adapter; desktop must reuse that application and editor rather than implement a second chart or lifecycle. UX section 17.10 records the lifecycle choices made under the user's explicit authorization to use best judgment.
+
+Browser recovery uses versioned records in localStorage, with per-tab identity in sessionStorage and held Web Locks for recovery-record ownership. A live tab's record is copied; an abandoned tab's record is claimed under the original ID so deliberate discard removes it. Locks have no background-timer expiry and are released on page exit or removal. This is a deliberate refinement of the IndexedDB recommendation: synchronous storage writes provide a clear completed-storage boundary before replacement or navigation, without a pending database transaction at page unload. Storage or ownership APIs can be unavailable, or storage can exceed its quota; failures produce the UX warning and Retry, and explicit downloads remain available. Serve the browser app over HTTPS or localhost for the secure-context ownership API. Recovery is best-effort local data, not a promise of unlimited storage or a filesystem save.
+
+Desktop recovery uses process-held operating-system locks in per-user app data. A record held by another live process is copied to a separate ID when recovered; an abandoned record is claimed under its original ID so deliberate discard removes that recovery permanently. Process termination releases ownership without timer leases or PID-reuse heuristics. Native tests include terminating a child process and then claiming its record. Explicit file saves use a SHA-256 revision, a flushed temporary sibling, a final revision check before Windows replacement, and readback of the installed bytes. A separate writer can still change the file between the final check and replacement; this is detection, not a distributed lock on project files.
+
+External week coordinates and the effective first-week view are bounded to ±1,000,000. Merely accepting any finite value is unsafe: values outside JavaScript's date range can crash calendar rendering or prevent timeline-band iteration from terminating. Imported snapshots strip unknown fields and preserve ordered semantic collections; unsupported versions are rejected rather than partially imported.
+
+Cancellation, stale asynchronous completions, and write failures must not replace a newer document, clear newer edits, or advance a pending close/switch. Serialize or identify session operations so results apply only to their originating document. Persist committed data, not live pointer previews, temporary hover-expanded sections, or uncommitted dialog drafts. Define how inline title/item edits finish and active gestures are handled when file commands are invoked.
+
+Desktop writes should replace a complete file safely, preserving the last valid file on failed writes. Check revisions immediately before writing and after successful saves; timestamp-only detection can miss changes. Choose a suitable content fingerprint/revision strategy and test both local and shared-folder failure paths. External-change detection is not a distributed file lock; document remaining concurrent-writer limitations.
+
+### 17.3 Delivery and orchestration
+
+Implement the web milestone first, beginning with one integrated New → edit → Download → Open round trip. Add recovery and the full shell around that functioning path. Build desktop against the established interfaces in the second milestone, adding `apps/desktop` without forking editor behavior.
+
+Use an orchestrator and focused workers. Workers choose implementation details within assigned interfaces and file ownership; the orchestrator owns product semantics, shared contracts, integration, and final acceptance. Each worker owns its tests. A separate review can inspect an integrated result; it does not substitute for automated acceptance. Parallelize only tasks whose interfaces are stable and whose file ownership does not overlap. Schedule shared-file changes explicitly and preserve other contributors' work.
+
+The required desktop artifact is an unbundled executable with embedded frontend assets, not merely an installer. Tauri's [`build --no-bundle`](https://v2.tauri.app/distribute/) and [unbundled executable distribution](https://github.com/tauri-apps/tauri-action#inputs) support this direction. The Windows WebView2 dependency and delivery caveats are explained in the [research note](research/project-files-and-desktop.md). Confirm the supported environment before claiming release readiness.
+
+### 17.4 Acceptance extensions
+
+Retain the four existing test layers and the root check sequence. Extend coverage rather than relaxing editor baselines or replacing pointer/motion acceptance with mocked internals.
+
+- **Codec/rules:** round trips, negative weeks and boundary semantics, inherited/overridden colors, reordered/empty structure, invalid shapes and references, version handling, and title/content-versus-view dirty comparison.
+- **Session/adapters:** cancellation/failure, asynchronous save races, invalid-open preservation, recovery lifecycle, complete recent-history retention beyond ten, missing files, and external revisions. Use deterministic adapters for these state sequences.
+- **Real browsers:** Home/editor transitions, title and File menu, keyboard shortcuts, actual file input/download payload, refresh/recovery, and replacement dialogs in supported browsers. Browser storage/download limitations must be exercised according to the resolved UX policy.
+- **Visual/motion:** Apricot Home/header/menu/dialog states and any new transitions, while retaining existing editor screenshots and motion checks. Baseline changes require deliberate design review.
+- **Production integration:** real exported bytes reopen correctly; the former production assertion that refresh resets everything must change to the agreed Home/recovery flow, without losing its editor-default checks.
+- **Desktop:** add automated native file/dialog/lifecycle and real filesystem checks as needed, plus a packaged executable launch test on the declared Windows/WebView2 target. Mocked adapters alone do not establish EXE acceptance. Record reproducible commands in README and the coverage reconciliation.
+
+Update [acceptance coverage](acceptance-coverage.md) with actual test references when implemented. Keep planned cases separate from completed coverage and report any unverified desktop packaging or platform behavior explicitly.

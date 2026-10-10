@@ -10,6 +10,8 @@ The [UX specification](docs/ux-specification.md) records the agreed behavior, de
 
 The [implementation decisions](docs/implementation-decisions.md) record the selected Svelte/Vite foundation, component and interaction architecture, automated testing contract, and implementation sequence.
 
+Project files, Home, and draft recovery extend the shared editor, with a Windows Tauri application in `apps/desktop`. The [orchestrator handoff](docs/project-files-orchestrator-handoff.md) records the delivery plan; [UX section 17](docs/ux-specification.md#17-project-files-home-and-desktop) defines behavior and the [`.takt` format](docs/takt-file-format.md) defines the portable file contract. See the desktop commands below for building and verifying the direct executable.
+
 The fixed timeline origin is **Week 1**. Time is measured in whole weeks, with an optional calendar-date display anchored to a selected week.
 
 ## Selected UI design
@@ -26,7 +28,7 @@ The complete design exploration is preserved in [archive/ui-prototypes](archive/
 
 ## Browser application
 
-The browser app lives in `apps/web`, built with Svelte 5, Vite, and TypeScript. It supports drawing, inline naming, moving and resizing bars in one row, reversible collision previews, cancellation, and atomic undo/redo. Moving waits 300 ms of continuous snapped contact before pushing, allowing passage through neighbors to change their order; an early overlapping drop cancels. Activated pushes continue for any distance. Moving forward above 1,000 CSS px/second allows overtaking and restores the pushed bars to their original positions; retraction brings the chain back with the dragged bar at any speed. Drawing and resizing still push immediately. Horizontal edge auto-scroll reveals earlier and later weeks during those gestures, with speed increasing toward each edge. Section/row labels stay pinned horizontally. Week 1 remains fixed and viewport changes stay outside history. Contents reset on refresh.
+The browser app lives in `apps/web`, built with Svelte 5, Vite, and TypeScript. It supports drawing, inline naming, moving and resizing bars in one row, reversible collision previews, cancellation, and atomic undo/redo. Moving waits 300 ms of continuous snapped contact before pushing, allowing passage through neighbors to change their order; an early overlapping drop cancels. Activated pushes continue for any distance. Moving forward above 1,000 CSS px/second allows overtaking and restores the pushed bars to their original positions; retraction brings the chain back with the dragged bar at any speed. Drawing and resizing still push immediately. Horizontal edge auto-scroll reveals earlier and later weeks during those gestures, with speed increasing toward each edge. Section/row labels stay pinned horizontally. Week 1 remains fixed and viewport changes stay outside history. Refresh returns to Home, where locally retained work is available through Resume draft.
 
 Use Node.js 22.12+ and npm. From the repository root:
 
@@ -79,8 +81,35 @@ The calendar/navigation/color slice adds user-selected week-start dates, the und
 
 Right-click sections, bars, or milestones to choose a quick color; the centered plus opens a continuous muted hue picker inspired by the date dialog with a draft preview and Apply color action. Items inherit their section unless overridden; Use section color removes the override. Inherited items adopt destination colors when an item or row moves between sections. Bar menus edit the name directly in their heading; milestone menus provide Rename. Both offer undoable deletion. New bars can be dragged directly from their open name input, committing any typed name before movement. Carried rows and sections have opaque surfaces above surrounding items; section reorder thresholds use their full visible group. Snapped previews follow effective item colors. The additional `?state=CalendarColors` fixture exposes these states. Automated coverage includes date/color rules and history, real-browser controls and menus in all three browsers, motion/cancellation checks, production integration, and visual comparisons.
 
-The first implementation milestone is complete. The [acceptance reconciliation](docs/acceptance-coverage.md) maps every UX acceptance scenario and the additional interaction contracts to automated coverage. History also reveals the affected location when undo removes a newly created object or redo deletes one, expanding and scrolling its surviving context without selecting another item. The `TallEmpty` fixture covers the hint following the first visible empty row. Persistence, export, arbitrary custom colors, and desktop packaging remain deferred. Reference setup always switches to Dates atomically; the calendar has a Today shortcut beside month navigation. Rows and sections show six-dot drag handles.
+The first implementation milestone is complete. The [acceptance reconciliation](docs/acceptance-coverage.md) maps every UX acceptance scenario and the additional interaction contracts to automated coverage. History also reveals the affected location when undo removes a newly created object or redo deletes one, expanding and scrolling its surviving context without selecting another item. The `TallEmpty` fixture covers the hint following the first visible empty row. Project files, browser recovery, and desktop packaging are covered by the additional milestone below; arbitrary custom color appearance remains deferred. Reference setup always switches to Dates atomically; the calendar has a Today shortcut beside month navigation. Rows and sections show six-dot drag handles.
 
 The editor fills the window between the toolbar and footer. Timeline headings stay fixed vertically; section and row labels stay pinned horizontally. Dates keeps years above its date or month labels at every zoom. Weeks also keeps years on top and switches from week labels to relative month bands at the same zoom threshold, starting Week 1, Month 1 and Year 1 together with calendar-length months and years. The weekly grid and editing precision remain unchanged. Slider-picked hues appear in every color menu while used in the chart. Carried sections show a single shadow beneath the complete group. Browser context menus remain available outside chart targets and the Dates button, and inside text fields and dialogs. Reference menus are available on timeline headings and the Dates toolbar button; Dates uses Week 1.
 
 Zoom uses 24 weeks across the full timeline at 100%, 12 at 200%, and 192 at 12.5%. The `ShortBars` fixture shows separated and adjacent one-week bars plus mixed durations. The selected compact-bar behavior is B: hide unreadable labels, click tiny bars to animate to 200% in 150 ms, then edit with normal drag handles. Tiny-bar creation and renaming also zoom for readable inline naming. The A/B/C comparison is preserved on local branch `codex/compact-bars-prototypes-2026-10-05`; the fixture now renders the production behavior.
+
+## Project files and Windows desktop
+
+Launch opens Home. New project opens the existing empty editor; Open reads a local `.takt` file. The editable title and File menu sit beside the logo, and the logo returns Home. Zoom, scrolling, and collapse are saved with the chart but do not mark it modified. Opening starts fresh chart history; returning to browser Home retains the current editor and its history.
+
+In the browser, Ctrl/Cmd+S downloads a copy rather than overwriting the opened file. A successfully dispatched download clears the indicator for the captured content; Takt cannot verify that the browser retained it on disk. Download and continue requires explicit acknowledgement before replacement. Local draft recovery remains available on Home after refresh. Recovery uses browser-local storage, can fail or be cleared by the browser/user, and reports failures with Retry. Separate tabs keep separate records. Recovering a live tab's draft creates a copy; an abandoned draft is claimed so Discard removes it. Recovery ownership uses Web Locks: serve over HTTPS or localhost, and use the current supported desktop browsers. If storage or ownership is unavailable, the warning explains that recovery is unavailable while file operations remain usable.
+
+Desktop shares the application, editor, codec, and session with the browser. It uses native Open/Save/Save As, ordinary user-selected paths, SHA-256 external-change checks, safe file replacement, full retained recent-file history, and per-user app-data recovery. Save As switches the active path. Removing a recent entry never deletes a project. Save conflicts offer Reload, Save another file, Overwrite, and Cancel; the check cannot eliminate a writer race between checking and replacing a shared file.
+
+The initial executable target is **Windows 11 x64 with Microsoft Edge WebView2 Evergreen Runtime installed**. The EXE includes its frontend and runs directly without installing Takt. It is not a self-contained WebView2 distribution. Startup failures show a native prerequisite/error message. Other Windows versions/architectures, signing, installers, associations, and updates are outside this acceptance target.
+
+Build prerequisites: Node.js 22.12+, npm, Rust with the MSVC x64 toolchain, Visual Studio C++ build tools and Windows SDK, and WebView2. Use the root lockfile and `apps/desktop/src-tauri/Cargo.lock` for reproducible dependencies. From the repository root:
+
+```sh
+npm ci
+npm run format:check
+npm run check
+npm run build
+npm test
+npm run desktop:test
+npm run desktop:build
+npm run desktop:test:launch
+```
+
+`npm run check` checks both frontend workspaces; `npm run build` builds both frontend bundles. `npm test` runs the four browser/editor layers. `desktop:test` adds native filesystem and adapter checks, `desktop:build` produces an unbundled release executable, and `desktop:test:launch` starts that EXE against isolated acceptance data and checks rendered Home/editor plus real native file, recovery, recents, and conflict operations. The launch check requires an interactive Windows session and WebView2. Native build/test may require sandbox escalation for Cargo caches, compiler processes, and dependency downloads.
+
+The direct artifact is `apps/desktop/src-tauri/target/release/takt.exe`. Keep its embedded frontend current by rebuilding the EXE after shared UI changes. Close a window launched from this output before rebuilding it; Windows prevents replacing an executable in use. Use `npm run desktop:dev` for the native development window. Desktop project data stays at chosen paths; application data normally lives in `%APPDATA%/de.takt.editor`, not beside the EXE.

@@ -13,6 +13,7 @@ test('production editor: entering above from the right pushes left after contact
   page,
 }) => {
   await page.goto('/');
+  await page.getByRole('button', { name: 'New project', exact: true }).click();
   await zoomToWeekZero(page);
   await draw(page, 2, 3);
   const neighbor = page.locator('.bar').first();
@@ -66,6 +67,7 @@ test('production editor: inserting the lower bar between two upper bars opens sp
   page,
 }) => {
   await page.goto('/');
+  await page.getByRole('button', { name: 'New project', exact: true }).click();
   await draw(page, 0, 4);
   const left = page.locator('.bar').first();
   await draw(page, 4, 6);
@@ -116,6 +118,7 @@ test('production editor: add and name a row, move a bar, create a milestone, and
   const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(error.message));
   await page.goto('/');
+  await page.getByRole('button', { name: 'New project', exact: true }).click();
   await draw(page, 0, 2, 'Discovery');
   await page
     .getByRole('button', { name: 'Add row to Unnamed section', exact: true })
@@ -153,6 +156,10 @@ test('production editor: add and name a row, move a bar, create a milestone, and
   await expect(item.locator('span')).toHaveText('Approved');
   expect(errors).toEqual([]);
   await page.reload();
+  await expect(
+    page.getByRole('heading', { name: 'Resume draft' }),
+  ).toBeVisible();
+  await page.getByRole('button', { name: 'New project', exact: true }).click();
   await expect(page.getByTestId('lane')).toHaveCount(1);
   await expect(page.locator('.bar, .milestone')).toHaveCount(0);
 });

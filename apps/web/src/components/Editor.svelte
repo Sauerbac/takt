@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { onDestroy, tick } from 'svelte';
+  import { onDestroy, onMount, tick, untrack, type Snippet } from 'svelte';
+  import type { ProjectView } from '../project/format';
   import taktMark from '../assets/takt-mark.svg';
   import { emptyDocument } from '../model/document';
   import type { ChartDocument, Color } from '../model/document';
@@ -62,7 +63,19 @@
     weekGridPath,
   } from '../timeline-headings';
 
-  let { initial = emptyDocument() }: { initial?: ChartDocument } = $props();
+  let {
+    initial = emptyDocument(),
+    initialView,
+    onchange,
+    fileControls,
+    onhome,
+  }: {
+    initial?: ChartDocument;
+    initialView?: ProjectView;
+    onchange?: (document: ChartDocument, view: ProjectView) => void;
+    fileControls?: Snippet;
+    onhome?: () => void;
+  } = $props();
   // The initial document seeds this editor instance once; remount to open another document.
   // svelte-ignore state_referenced_locally
   const history = new History(initial);
@@ -73,7 +86,13 @@
   let sectionIds = $state(
     history.document.sections.map((section) => section.id),
   );
-  let view = $state(initialViewport());
+  // svelte-ignore state_referenced_locally
+  let view = $state({
+    ...initialViewport(),
+    ...(initialView
+      ? { zoom: initialView.zoom, firstWeek: initialView.firstWeek }
+      : {}),
+  });
   let calendarPicker = $state<{
     week: number;
     date: string;
@@ -102,7 +121,10 @@
   } | null>(null);
   let draft = $state('');
   let structural = $state.raw<StructureGesture | null>(null);
-  let collapsed = $state<readonly string[]>([]);
+  // svelte-ignore state_referenced_locally
+  let collapsed = $state<readonly string[]>(
+    initialView?.collapsedSectionIds ?? [],
+  );
   let structuralTop = $state(0);
   let structuralMeaningful = $state(false);
   let hoverTimer: ReturnType<typeof setTimeout> | null = null;
@@ -133,6 +155,7 @@
   let destinationRow = '';
   let lastScrollTop = 0;
   let visibleScrollTop = $state(0);
+  let visibleScrollLeft = $state(0);
   let menu = $state<{
     x: number;
     y: number;
@@ -158,7 +181,7 @@
       : '',
   );
   let notice = $state('');
-  const weekWidth = $derived((laneWidth / WEEK_COUNT) * view.zoom);
+  const weekWidth = $derived((Math.max(1, laneWidth) / WEEK_COUNT) * view.zoom);
   const inset = $derived(barInset(weekWidth));
   const compactDates = $derived(
     document.display === 'dates' && !!document.calendar && weekWidth < 60,
@@ -290,6 +313,38 @@
     stopHoverTimer();
     if (scaleFrame !== null) cancelAnimationFrame(scaleFrame);
   });
+  onMount(() => {
+    if (initialView && viewport) viewport.scrollTop = initialView.scrollTop;
+  });
+  const projectView = (): ProjectView => ({
+    zoom: view.zoom,
+    firstWeek: view.firstWeek + (viewport?.scrollLeft ?? 0) / weekWidth,
+    scrollTop: viewport?.scrollTop ?? 0,
+    collapsedSectionIds: (structural?.originalCollapsed ?? collapsed).filter(
+      (id) => history.document.sections.some((section) => section.id === id),
+    ),
+  });
+  $effect(() => {
+    const committed = history.document;
+    // document is also a preview: observe it, but publish only committed history.
+    void document;
+    void visibleScrollTop;
+    void visibleScrollLeft;
+    void collapsed;
+    void view.zoom;
+    void view.firstWeek;
+    const savedView = projectView();
+    untrack(() => onchange?.(committed, savedView));
+  });
+  export function prepareFile() {
+    finishMenuName(true);
+    finishName(true);
+    cancel();
+    calendarPicker = null;
+    colorPicker = null;
+    confirmation = null;
+    return { document: history.document, view: projectView() };
+  }
 
   function syncHistory() {
     document = history.document;
@@ -484,6 +539,7 @@
   }
   function viewportScrolled() {
     visibleScrollTop = viewport.scrollTop;
+    visibleScrollLeft = viewport.scrollLeft;
     if (!gesture && !structural) return;
     if (structural) updateStructure();
     else updateProposal();
@@ -1477,11 +1533,18 @@
   </button>
 {/snippet}
 
-<main class="shell">
+<main class="shell" class:with-files={!!fileControls}>
   <header>
-    <div class="brand" aria-label="Takt">
-      <img class="mark" src={taktMark} alt="" />Takt<span class="dot">.</span>
-    </div>
+    {#if onhome}<button
+        class="brand home-brand"
+        aria-label="Home"
+        onclick={onhome}
+        ><img class="mark" src={taktMark} alt="" />Takt<span class="dot">.</span
+        ></button
+      >{:else}<div class="brand" aria-label="Takt">
+        <img class="mark" src={taktMark} alt="" />Takt<span class="dot">.</span>
+      </div>{/if}
+    {#if fileControls}{@render fileControls()}{/if}
     <div class="toolbar" aria-label="Editor controls">
       <div class="history">
         <IconButton
@@ -2129,6 +2192,18 @@
     align-items: center;
     justify-content: space-between;
   }
+  .with-files header {
+    position: relative;
+    display: grid;
+    grid-template-columns: minmax(160px, 1fr) minmax(100px, 300px) minmax(
+        380px,
+        1fr
+      );
+    gap: 20px;
+  }
+  .with-files .toolbar {
+    justify-self: end;
+  }
   .brand {
     display: flex;
     align-items: center;
@@ -2136,6 +2211,12 @@
     font-size: 26px;
     font-weight: 700;
     letter-spacing: -1px;
+  }
+  .home-brand {
+    background: transparent;
+    border: 0;
+    padding: 0;
+    cursor: pointer;
   }
   .dot {
     color: var(--accent);

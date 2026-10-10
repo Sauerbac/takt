@@ -2,21 +2,26 @@
   "name": "takt",
   "private": true,
   "workspaces": [
-    "apps/web"
+    "apps/web",
+    "apps/desktop"
   ],
   "scripts": {
     "generate:icons": "node scripts/generate-icons.mjs",
     "dev": "npm run dev --workspace @takt/web",
-    "build": "npm run build --workspace @takt/web",
+    "build": "npm run build --workspace @takt/web && npm run build --workspace @takt/desktop",
     "preview": "npm run preview --workspace @takt/web",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "check": "npm run check --workspace @takt/web",
+    "check": "npm run check --workspace @takt/web && npm run check --workspace @takt/desktop",
     "test:rules": "npm run test:rules --workspace @takt/web",
     "test:components": "npm run test:components --workspace @takt/web",
     "test:e2e": "npm run test:e2e --workspace @takt/web",
     "test:visual": "npm run test:visual --workspace @takt/web",
-    "test": "npm run test:rules && npm run test:components && npm run test:e2e && npm run test:visual"
+    "test": "npm run test:rules && npm run test:components && npm run test:e2e && npm run test:visual",
+    "desktop:dev": "npm exec --workspace @takt/desktop -- tauri dev",
+    "desktop:build": "npm exec --workspace @takt/desktop -- tauri build --no-bundle",
+    "desktop:test": "npm run test:native --workspace @takt/desktop && npm run test:adapter --workspace @takt/desktop",
+    "desktop:test:launch": "node scripts/desktop-launch-test.mjs"
   },
   "devDependencies": {
     "prettier": "^3.6.2",

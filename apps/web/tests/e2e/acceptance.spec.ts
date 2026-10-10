@@ -1,10 +1,11 @@
 import { test, expect } from '@playwright/test';
 import { draw, interval, laneGeometry, zoomToWeekZero } from '../helpers';
 
-test('a fresh production document has the agreed defaults, mixed deletion restores its hint, and refresh resets the editor', async ({
+test('a fresh production document has the agreed defaults, mixed deletion restores its hint, and refresh retains a draft before starting a fresh editor', async ({
   page,
 }) => {
   await page.goto('/');
+  await page.getByRole('button', { name: 'New project', exact: true }).click();
   await expect(page.locator('.section-name')).toHaveText('Unnamed section');
   await expect(page.locator('.row-name')).toHaveText('Unnamed row');
   await expect(page.getByTestId('lane')).toHaveCount(1);
@@ -14,7 +15,7 @@ test('a fresh production document has the agreed defaults, mixed deletion restor
   await expect(page.locator('.hint')).toHaveText(
     'Drag to create a bar · Double-click for a milestone.',
   );
-  await expect(page.getByRole('textbox')).toHaveCount(0);
+  await expect(page.getByRole('textbox')).toHaveCount(1);
   await draw(page, 3, 5);
   await interval(page.locator('.bar'), 3, 5);
   await draw(page, -2, -1);
@@ -38,6 +39,10 @@ test('a fresh production document has the agreed defaults, mixed deletion restor
   await page.keyboard.press('Control+z');
   await expect(page.locator('.hint')).toHaveCount(0);
   await page.reload();
+  await expect(
+    page.getByRole('heading', { name: 'Resume draft' }),
+  ).toBeVisible();
+  await page.getByRole('button', { name: 'New project', exact: true }).click();
   await expect(page.locator('.bar, .milestone')).toHaveCount(0);
   await expect(page.locator('.hint')).toHaveCount(1);
   await expect(

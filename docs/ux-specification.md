@@ -1,6 +1,6 @@
 # Takt — functional UX specification
 
-**Status:** Agreed UX direction, refined for the first implementation milestone.
+**Status:** Editor, browser project files/Home/recovery, and Windows desktop implemented. Section 17 records the behavior and the lifecycle choices made for this delivery.
 
 **Last updated:** October 10, 2026.
 
@@ -14,7 +14,7 @@ The fixed relative origin is **Week 1**, aligned with the beginning of **Month 1
 
 Takt helps someone create a Gantt chart quickly, using the chart itself as the editing surface. The user should spend their time shaping the timeline rather than filling out task forms.
 
-The motivating frustration is that existing tools can require sign-in and too much navigation through property menus. Takt should open directly into an editor without an account requirement. Dragging, context menus, and inline text editing are the primary interaction methods.
+The motivating frustration is that existing tools can require sign-in and too much navigation through property menus. Takt requires no account. Launch shows Home; New project opens the editor immediately without a setup form. Dragging, context menus, and inline text editing are the primary interaction methods.
 
 The first version is for desktop browsers with a mouse or trackpad. The interface and terminology are English, even though the product name is German.
 
@@ -28,14 +28,16 @@ The first version is for desktop browsers with a mouse or trackpad. The interfac
 - Context-menu alternatives for creating bars and milestones.
 - Single selection, color editing, undo/redo, and confirmation before deleting rows or sections.
 - Smooth movement and resizing, including animations for bars displaced by collisions.
+- Native `.takt` project files, an editable title, Home, and automatic recovery of unfinished work.
+- Browser file opening/downloads, followed by Windows desktop Open/Save/Save As and recent files.
 
 ### Explicitly outside the current scope
 
 - Project-management features, progress tracking, dependency arrows, and dependency-based scheduling.
 - Multi-selection and bulk editing.
 - Mobile or tablet interaction design.
-- Persistence, autosave, cloud storage, local file formats, and document reopening.
-- Export controls and output formats. For now, assume the user takes a screenshot for a presentation.
+- Accounts, cloud storage managed by Takt, collaborative editing, and automatic merging of concurrent edits.
+- Other applications' project formats and image/PDF exports. Native `.takt` exchange is included; screenshots remain the presentation-output workaround.
 - Pixel-level visual implementation choices that are not fixed by the selected prototype.
 
 The selected Apricot prototype is the visual reference. This functional specification does not duplicate its typography, spacing, colors, icons, or control appearance.
@@ -55,7 +57,7 @@ Small overlays are acceptable when they serve a specific interaction: choosing a
 
 | Term               | Meaning                                                                                                |
 | ------------------ | ------------------------------------------------------------------------------------------------------ |
-| Document           | The chart currently being edited. Persistence and document-management behavior are deferred.           |
+| Document           | One chart with its title and calendar settings; a `.takt` file also carries its saved viewing state.   |
 | Section            | A named group of rows. It supplies an inherited color and can be collapsed or reordered as a unit.     |
 | Row                | A named horizontal lane containing bars and milestones. It belongs to one section.                     |
 | Bar                | A period occupying one or more whole weeks. It has an optional label and may have a custom color.      |
@@ -83,7 +85,7 @@ The hint disappears while any bar or milestone exists. It returns whenever the d
 
 Week 1 exists before any item is created. The first bar does not define or shift the origin. Drawing a bar in Week 4 creates a bar in Week 4.
 
-No document-name field is required for this draft. There is no setup form before the chart becomes usable.
+New documents have the editable title **Untitled**. There is no setup form before the chart becomes usable. Home and file controls are specified in section 17.
 
 ## 5. Time model
 
@@ -145,7 +147,7 @@ The agreed toolbar contains only:
 - Zoom.
 - Relative-week/calendar-date switch.
 
-The document name is omitted. Item properties do not accumulate in this toolbar.
+The chart controls remain together. The surrounding header adds a Home action on the Takt logo, an editable document title, and a compact File menu as specified in section 17. Item properties do not accumulate in this toolbar.
 
 ### 6.2 Navigation
 
@@ -464,4 +466,114 @@ The interaction decisions required to begin implementation are settled. The foll
 2. Final animation easing and whether individual operations need timings different from the initial 150 ms value.
 3. The precise collapsed-section hover delay around the initial half-second value.
 
-Persistence, autosave, document reopening, export, a home screen, mobile interaction design, and desktop packaging remain outside the first implementation milestone. The first milestone is a working editor whose contents reset on refresh.
+The original editor milestone reset on refresh. The implemented web and desktop extensions in section 17 add portable project files and recovery around that editor. Mobile interaction design remains outside scope.
+
+## 17. Project files, Home, and desktop
+
+**Decision date:** October 10, 2026. **Implementation status:** implemented; automated coverage is mapped in [acceptance coverage](acceptance-coverage.md). These decisions supersede the original milestone's persistence and desktop deferrals. Existing chart interactions and the selected Apricot appearance remain the foundation.
+
+### 17.1 Scope and delivery
+
+Takt remains a chart editor. “All sorts of projects” means applying its existing sections, rows, bars, and milestones to different planning subjects; it does not introduce assignees, resources, progress, dependencies, or scheduling engines.
+
+Deliver two milestones in order:
+
+1. **Web project files:** `.takt` format, title and file controls, Home, open/download, modification tracking, and browser draft recovery.
+2. **Windows desktop:** the same editor and format, native file operations, recents, recovery, external-file-change protection, and a directly runnable Windows EXE. Desktop packaging belongs in a separate `apps/desktop` folder.
+
+### 17.2 Document ownership and portable content
+
+One `.takt` file contains one chart. The format is versioned, human-readable JSON shared by web and desktop. There is no required interoperability with Microsoft Project, GanttProject, Mermaid, or other formats.
+
+The file preserves the title, sections and their order, rows and their order, bars, milestones, names, color inheritance and overrides, calendar reference, and Weeks/Dates mode. It also preserves zoom, horizontal/vertical viewing position, and collapsed sections. Reopening starts a fresh undo history. Selection, open menus/dialogs, unfinished gestures, and undo/redo history are excluded.
+
+Desktop projects are ordinary files in user-selected folders, including shared folders. The application-data directory contains recents, settings, and recovery copies; it is not a hidden authoritative project library. The user explicitly selected this file-ownership model over an application-managed library. Browser opening reads a local file for editing; Download creates an updated copy. Files are processed on the device, without an account or upload service.
+
+### 17.3 Home, header, and title
+
+- Launch shows Home rather than automatically opening the last chart.
+- Home offers **New project** and **Open .takt**. New opens the existing empty editor immediately.
+- Browser Home also offers **Resume draft** when a local draft exists; it has no recent-file list in this milestone.
+- Desktop Home includes the recent-file list in section 17.6 and recovery when applicable.
+- There is one active chart per browser tab or desktop window, with no internal document tabs. Recovery ownership follows section 17.10.
+- The Takt logo is the Home action. The header shows the editable document title beside it and a compact File menu, preserving the existing chart controls and visual language.
+- A new document is titled **Untitled**. The title is stored inside the file and supplies the suggested download filename. Changing the title does not silently rename an existing desktop file.
+
+| Platform | File menu                | Ctrl+S                                               |
+| -------- | ------------------------ | ---------------------------------------------------- |
+| Web      | New, Open, Download      | Download the current `.takt` file                    |
+| Desktop  | New, Open, Save, Save As | Save to the current path; first save asks for a path |
+
+Save As creates a separate file and makes its path active after a successful save. Opening an existing desktop file edits that file, rather than importing it into application-managed storage.
+
+### 17.4 Modified state and replacement protection
+
+Chart-content edits, title changes, calendar-reference changes, and switching Weeks/Dates count as edits. Zoom, scrolling, and collapse/expansion do not mark a document modified or cause a save warning. Save/download nevertheless captures the current viewing state, and recovery remembers it.
+
+Desktop saves are explicit: automatic recovery must never silently update the user's project file. An unsaved-change indicator communicates modified state. Closing or switching an edited desktop document offers **Save / Discard / Cancel**. A cancelled or failed save must preserve the working document and must not complete the pending replacement or close.
+
+On web, New or Open that would replace edits not yet downloaded offers **Download and continue / Discard changes / Cancel**. Returning Home keeps the current browser draft and offers Resume draft rather than discarding it. Parsing an invalid file must leave the current chart and recovery copy intact.
+
+### 17.5 Recovery
+
+Browser work is retained automatically in local browser storage so refresh or accidental closure does not ordinarily lose the current draft. This is recovery, not a project library or a substitute for downloading a portable file.
+
+Desktop retains recovery separately in the user's application-data directory. After an interrupted session, Home offers **Recover unsaved work**, with the title and recovery time. Recovery opens a modified document awaiting Save or Download, with fresh undo history. Deliberately discarding edits removes the associated recovery copy. Successfully saving/downloading establishes the new saved baseline; the browser's observable download-completion boundary follows section 17.10.
+
+Selecting a recovery reads its latest valid stored snapshot and original-file identity before replacing the current chart. A stale Home listing is not a historical version selector. Failed or cancelled recovery preserves the current chart and its recovery; temporary ownership acquired for that selection is released.
+
+### 17.6 Desktop recent files
+
+Show the ten most recently opened files, newest first, with filename and folder. Provide an expandable full list of all previously opened entries still retained by the user; ten is a display limit, not a history-retention limit. This is a history of opened files, not discovery of every `.takt` file on the computer.
+
+An entry can be removed from recents without deleting its file. If a file is unavailable, offer **Locate file / Remove from recents / Cancel**. Keep unavailable entries until the user locates or removes them; a temporarily disconnected shared drive is not grounds for silently dropping history.
+
+Successfully locating a moved file repairs its recent entry by retaining the newly opened path and removing the old unavailable path. Cancelling the picker or replacement guard, invalid data, and failed opens keep the old entry.
+
+### 17.7 Files modified externally
+
+Before replacing an opened desktop file on Save, detect changes since it was opened or last saved by this session. If another application or person changed it, offer **Reload their version / Save my work as another file / Overwrite / Cancel**. Reload warns explicitly that it replaces local unsaved edits. Preserve local edits when the action is cancelled or fails. Automatic chart merging is outside scope.
+
+Shared-folder file exchange does not imply live collaboration or exclusive ownership of the file by Takt. The implementation must describe the limits of its change detection rather than claim it prevents every concurrent writer race.
+
+### 17.8 Desktop delivery
+
+Provide a directly runnable Windows EXE; an installer alone does not satisfy this requirement. Project files stay wherever the user saves them. Recents and recovery live under the Windows user's application-data directory, not beside the executable. USB-style portable settings/storage are outside scope. Preserve all editor functionality from the web application.
+
+### 17.9 Acceptance scenarios for the new milestones
+
+The [acceptance reconciliation](acceptance-coverage.md#project-files-recovery-and-desktop-acceptance) maps these scenarios to codec/session tests, real browser workflows, screenshots, native filesystem tests, and direct-EXE integration.
+
+| Scenario                                 | Required result                                                                                                                         |
+| ---------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| Launch either platform                   | Home is shown with platform-appropriate actions.                                                                                        |
+| Create a project                         | Existing empty-chart defaults appear immediately with Untitled.                                                                         |
+| Round-trip a mixed chart through `.takt` | Title, structure/order, negative weeks, items, calendar, inherited/overridden colors, and viewing state survive; undo history is fresh. |
+| Open a web file and download edits       | Original local file is not silently overwritten; the downloaded file reopens with those edits.                                          |
+| Open invalid data or cancel the picker   | Existing chart, edits, and recovery remain intact.                                                                                      |
+| New/Open with undownloaded web edits     | Download and continue, Discard changes, and Cancel follow section 17.4.                                                                 |
+| Return to browser Home or refresh        | The current draft remains available through Resume draft.                                                                               |
+| Navigate a saved chart                   | View changes alone do not mark it modified or prompt on close; explicit save includes the latest view.                                  |
+| Save a desktop chart                     | Only an explicit save updates the chosen project file; cancellation/failure preserves unsaved work.                                     |
+| Close/switch an edited desktop chart     | Save, Discard, and Cancel preserve their stated outcomes.                                                                               |
+| Recover after interruption               | Title/time identify the recovery; recovered work opens modified and does not overwrite the project file automatically.                  |
+| Discard deliberately                     | That recovery is removed and is not offered later as lost work.                                                                         |
+| More than ten desktop files opened       | The latest ten appear initially; the full retained history remains reachable.                                                           |
+| Recent file is unavailable               | Locate, Remove from recents, and Cancel are available; removal leaves the actual file alone.                                            |
+| File changes externally before Save      | Conflict choices appear; local edits survive cancellation/failure; Reload warns before replacing them.                                  |
+| Start the Windows deliverable            | The direct EXE runs on the declared supported environment, with the same editor behavior and per-user app data.                         |
+
+### 17.10 Lifecycle decisions
+
+The user authorized the orchestrator and implementers to choose unspecified details on October 10, 2026. The following choices apply to this implementation and must be reported with its results:
+
+1. **Browser download baseline:** successful dispatch of an ordinary Download acknowledges only the captured snapshot and clears its modification indicator. The app cannot confirm that the file was retained on disk; its recovery copy remains. Download and continue defers that baseline acknowledgement until the user explicitly confirms retaining the download. Cancelling that acknowledgement leaves the work modified, so a later replacement still warns. Cancellation or download failure preserves the working document and recovery. Edits made after the captured snapshot remain modified.
+2. **Multiple instances:** tabs and desktop windows use separate recovery record IDs. Home can offer the available records with title/time; one instance never silently overwrites or removes another live instance's recovery. Recovering a live instance's record creates a separate copy. An abandoned record is claimed under its original ID, so deliberate discard removes it permanently. Desktop uses one window per process and permits multiple processes. This is not exclusive ownership or live synchronization of project files.
+3. **Desktop Home and Save As:** returning Home closes the active desktop document through Save / Discard / Cancel. Browser Home retains its draft. Successful desktop Save As makes the chosen new path the active file; changing the title never renames a file implicitly.
+4. **Title/pristine state:** titles are trimmed on commit and empty titles become Untitled. Title changes affect modification tracking but do not participate in chart undo/redo. An untouched new Untitled chart is clean and needs no replacement/close warning. A recovered document is modified even if its content matches an earlier saved baseline.
+5. **Recovery/storage failures:** show a persistent, unobtrusive warning with Retry when recovery cannot be stored or loaded. Editing and explicit file operations remain available. Retain original path and revision metadata when recovering desktop work; saving uses the normal external-change guard if the original file has changed. Recovery never silently updates that file.
+6. **Release target:** the initial direct executable targets Windows 11 x64 with the installed Evergreen WebView2 runtime. A missing runtime must produce a clear prerequisite message where the native bootstrap permits it. Other Windows versions/architectures require separate validation. File associations, an installer, signing, and automatic updates are outside these milestones.
+
+File commands finish committed inline item/title naming and cancel active pointer previews before capturing a snapshot. Unapplied dialog drafts and temporary hover expansion are excluded. New/Open validate the replacement before deliberately removing the old recovery; failed or cancelled replacement retains it.
+
+The [file-format proposal](takt-file-format.md) separates technical encoding choices from these product decisions. The [orchestrator handoff](project-files-orchestrator-handoff.md) gives the implementation sequence and ownership boundaries.

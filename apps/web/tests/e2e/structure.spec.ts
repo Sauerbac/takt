@@ -5,6 +5,7 @@ test('production editor organizes sections and rows, confirms container deletion
   page,
 }) => {
   await page.goto('/');
+  await page.getByRole('button', { name: 'New project', exact: true }).click();
   await page
     .getByRole('button', { name: 'Unnamed section', exact: true })
     .click();

@@ -1,0 +1,27 @@
+{
+  "name": "@takt/desktop",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1 --port 1420 --strictPort",
+    "build": "vite build",
+    "tauri": "tauri",
+    "test:native": "cargo test --manifest-path src-tauri/Cargo.toml",
+    "check": "svelte-check --tsconfig ./tsconfig.json && tsc --noEmit -p tsconfig.json",
+    "test:adapter": "vitest run src/platform.test.ts"
+  },
+  "dependencies": {
+    "@tauri-apps/api": "2.8.0",
+    "svelte": "^5.39.0"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "2.8.4",
+    "@sveltejs/vite-plugin-svelte": "^6.2.1",
+    "vite": "^7.1.7",
+    "typescript": "^5.9.2",
+    "svelte-check": "^4.3.2",
+    "vitest": "^4.1.11",
+    "@types/node": "^24.5.0"
+  }
+}

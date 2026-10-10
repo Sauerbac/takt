@@ -13,6 +13,7 @@ test('production editor combines user calendar dates, navigation, inheritance an
   page,
 }) => {
   await page.goto('/');
+  await page.getByRole('button', { name: 'New project', exact: true }).click();
   await zoomToWeekZero(page);
   await draw(page, 0, 2, 'Explore');
   const bar = page.locator('.bar');

@@ -1,5 +1,5 @@
 import { mount } from 'svelte';
-import Editor from './components/Editor.svelte';
+import App from './App.svelte';
 import './tokens.css';
 
-mount(Editor, { target: document.getElementById('app')! });
+mount(App, { target: document.getElementById('app')! });

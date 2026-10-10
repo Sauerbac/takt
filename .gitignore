@@ -6,3 +6,7 @@ test-results/
 playwright-report/
 .vite/
 .npm-cache/
+
+apps/desktop/src-tauri/target/
+
+apps/desktop/src-tauri/gen/

@@ -6,3 +6,8 @@ package-lock.json
 ui-prototype
 archive
 .npm-cache
+
+apps/desktop/src-tauri/target/
+apps/desktop/src-tauri/Cargo.lock
+
+apps/desktop/src-tauri/gen/

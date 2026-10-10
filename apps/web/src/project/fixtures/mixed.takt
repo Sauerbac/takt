@@ -1,0 +1,37 @@
+{
+  "format": "takt",
+  "version": 1,
+  "title": "Autumn α 🌻",
+  "document": {
+    "display": "dates",
+    "calendar": { "week": 0, "date": "2026-10-05" },
+    "sections": [
+      { "id": "__proto__", "name": "Design", "color": 145 },
+      { "id": "constructor", "name": "" }
+    ],
+    "rows": [
+      { "id": "r2", "sectionId": "constructor", "name": "Second" },
+      { "id": "r1", "sectionId": "__proto__", "name": "" }
+    ],
+    "bars": [
+      { "id": "b1", "rowId": "r1", "start": -4, "end": -1, "name": "" },
+      {
+        "id": "b2",
+        "rowId": "r1",
+        "start": -1,
+        "end": 3,
+        "name": "Launch",
+        "color": 0
+      }
+    ],
+    "milestones": [
+      { "id": "m1", "rowId": "r1", "boundary": 3, "name": "Ready" }
+    ]
+  },
+  "view": {
+    "zoom": 0.5,
+    "firstWeek": -3.25,
+    "scrollTop": 24.5,
+    "collapsedSectionIds": ["constructor"]
+  }
+}

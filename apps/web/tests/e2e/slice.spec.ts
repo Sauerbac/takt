@@ -15,9 +15,10 @@ test('production editor: draw, name, cascade, cancel, commit, undo and Windows r
   const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(error.message));
   await page.goto('/');
+  await page.getByRole('button', { name: 'New project', exact: true }).click();
   await expect(page.getByText('Unnamed section')).toBeVisible();
   await expect(page.getByText('Unnamed row')).toBeVisible();
-  await expect(page.getByRole('textbox')).toHaveCount(0);
+  await expect(page.getByRole('textbox')).toHaveCount(1);
   await draw(page, 0, 2, 'Research');
   await draw(page, 2, 4, 'Synthesis');
   await draw(page, 4, 5, 'Review');
@@ -59,6 +60,10 @@ test('production editor: draw, name, cascade, cancel, commit, undo and Windows r
   await interval(third, 5, 6);
   expect(errors).toEqual([]);
   await page.reload();
+  await expect(
+    page.getByRole('heading', { name: 'Resume draft' }),
+  ).toBeVisible();
+  await page.getByRole('button', { name: 'New project', exact: true }).click();
   await expect(page.locator('.bar')).toHaveCount(0);
 });
 
@@ -68,6 +73,7 @@ test('production editor: cancel an early overlapping drop, pass a neighbor, then
   const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(error.message));
   await page.goto('/');
+  await page.getByRole('button', { name: 'New project', exact: true }).click();
   // Motion is covered separately; this scenario advances a controlled gesture clock.
   await page.addStyleTag({ content: '.bar { transition: none !important; }' });
   await draw(page, 0, 1, 'A');
@@ -126,6 +132,7 @@ test('production editor: draw beyond the initial timeline, name, undo and reveal
   page,
 }) => {
   await page.goto('/');
+  await page.getByRole('button', { name: 'New project', exact: true }).click();
   await zoomToWeekZero(page);
   await pauseClock(page);
   const lane = await laneGeometry(page);
