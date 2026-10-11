@@ -17,14 +17,20 @@ fn store(app: &tauri::AppHandle) -> Result<Store, String> {
     };
     Store::new(root)
 }
-#[tauri::command]
-fn open_project(app: tauri::AppHandle, path: Option<String>) -> Result<Option<OpenedFile>, String> {
+// File and recovery commands are async so native dialogs and disk I/O stay off the main thread.
+#[tauri::command(async)]
+fn open_project(
+    app: tauri::AppHandle,
+    window: tauri::WebviewWindow,
+    path: Option<String>,
+) -> Result<Option<OpenedFile>, String> {
     let path = match path {
         Some(path) => PathBuf::from(path),
         None => match app
             .dialog()
             .file()
             .add_filter("Takt project", &["takt"])
+            .set_parent(&window)
             .blocking_pick_file()
         {
             Some(path) => path.into_path().map_err(|e| e.to_string())?,
@@ -33,9 +39,10 @@ fn open_project(app: tauri::AppHandle, path: Option<String>) -> Result<Option<Op
     };
     files::read(&path).map(Some)
 }
-#[tauri::command]
+#[tauri::command(async)]
 fn save_project(
     app: tauri::AppHandle,
+    window: tauri::WebviewWindow,
     bytes: String,
     path: Option<String>,
     expected: Option<String>,
@@ -49,6 +56,7 @@ fn save_project(
             .file()
             .add_filter("Takt project", &["takt"])
             .set_file_name(filename)
+            .set_parent(&window)
             .blocking_save_file()
         {
             Some(path) => path.into_path().map_err(|e| e.to_string())?,
@@ -57,25 +65,25 @@ fn save_project(
     };
     files::save(&path, &bytes, expected.as_deref(), overwrite).map(Some)
 }
-#[tauri::command]
+#[tauri::command(async)]
 fn remember_recent(app: tauri::AppHandle, path: String) -> Result<(), String> {
     store(&app)?.remember(&path)
 }
-#[tauri::command]
+#[tauri::command(async)]
 fn list_recents(app: tauri::AppHandle) -> Result<Vec<files::RecentFile>, String> {
     store(&app)?.recents()
 }
-#[tauri::command]
+#[tauri::command(async)]
 fn remove_recent(app: tauri::AppHandle, path: String) -> Result<(), String> {
     store(&app)?.remove_recent(&path)
 }
-#[tauri::command]
+#[tauri::command(async)]
 fn list_recovery(app: tauri::AppHandle) -> Result<Vec<serde_json::Value>, String> {
     let store = store(&app)?;
     store.sweep_locks();
     store.list_recovery()
 }
-#[tauri::command]
+#[tauri::command(async)]
 fn write_recovery(app: tauri::AppHandle, record: serde_json::Value) -> Result<(), String> {
     let store = store(&app)?;
     let id = record["id"].as_str().ok_or("Invalid recovery ID")?;
@@ -89,7 +97,7 @@ fn write_recovery(app: tauri::AppHandle, record: serde_json::Value) -> Result<()
     }
     store.write_recovery(record)
 }
-#[tauri::command]
+#[tauri::command(async)]
 fn remove_recovery(app: tauri::AppHandle, id: String) -> Result<(), String> {
     let store = store(&app)?;
     app.state::<Mutex<files::RecoveryLeases>>()
@@ -97,7 +105,7 @@ fn remove_recovery(app: tauri::AppHandle, id: String) -> Result<(), String> {
         .map_err(|e| e.to_string())?
         .remove(&store, &id)
 }
-#[tauri::command]
+#[tauri::command(async)]
 fn claim_recovery(
     app: tauri::AppHandle,
     record: serde_json::Value,
@@ -109,7 +117,7 @@ fn claim_recovery(
         .claim(&store, record)
 }
 struct IntegrationReport(Option<PathBuf>);
-#[tauri::command]
+#[tauri::command(async)]
 fn abandon_recovery_claim(
     app: tauri::AppHandle,
     claimed_id: String,
