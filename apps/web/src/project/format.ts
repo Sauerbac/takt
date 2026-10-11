@@ -85,9 +85,8 @@ function colored(
   return { color: record.color };
 }
 
-/** Validate unknown external data and construct an independent, stripped snapshot. */
-export function decodeProject(input: unknown): ProjectSnapshot {
-  const root = object(input, 'project');
+/** Title and chart only: the fields that decide whether a project is modified. */
+function decodeContent(root: Record<string, unknown>) {
   if (root.format !== 'takt') fail('format', 'must be "takt"');
   if (root.version !== 1)
     fail('version', 'is unsupported; this application supports version 1');
@@ -163,6 +162,13 @@ export function decodeProject(input: unknown): ProjectSnapshot {
   } catch (error) {
     fail('document', error instanceof Error ? error.message : 'is invalid');
   }
+  return { title, document };
+}
+
+/** Validate unknown external data and construct an independent, stripped snapshot. */
+export function decodeProject(input: unknown): ProjectSnapshot {
+  const root = object(input, 'project');
+  const { title, document } = decodeContent(root);
   const rawView = object(root.view, 'view');
   const zoom = number(rawView.zoom, 'view.zoom');
   if (zoom < 0.125 || zoom > 2)
@@ -174,7 +180,7 @@ export function decodeProject(input: unknown): ProjectSnapshot {
     'view.collapsedSectionIds',
     id,
   );
-  const sectionIds = new Set(sections.map((section) => section.id));
+  const sectionIds = new Set(document.sections.map((section) => section.id));
   if (collapsedSectionIds.some((value) => !sectionIds.has(value)))
     fail('view.collapsedSectionIds', 'must reference existing sections');
   if (new Set(collapsedSectionIds).size !== collapsedSectionIds.length)
@@ -203,9 +209,19 @@ export function parseProject(text: string): ProjectSnapshot {
 }
 export const encodeProject = (snapshot: ProjectSnapshot): string =>
   JSON.stringify(decodeProject(snapshot), null, 2) + '\n';
+// Documents are immutable values, so a normalized chart is serialized once per document.
+const documentKeys = new WeakMap<ChartDocument, string>();
+/** Compares title and chart only; the view never affects the key, valid or not. */
 export function contentKey(snapshot: ProjectSnapshot): string {
-  const { title, document } = decodeProject(snapshot);
-  return JSON.stringify({ title, document });
+  let document = documentKeys.get(snapshot.document);
+  if (document === undefined) {
+    document = JSON.stringify(
+      decodeContent(snapshot as unknown as Record<string, unknown>).document,
+    );
+    documentKeys.set(snapshot.document, document);
+  }
+  const title = snapshot.title.trim() || 'Untitled';
+  return `{"title":${JSON.stringify(title)},"document":${document}}`;
 }
 export function suggestedFilename(title: string): string {
   let stem = (title.trim() || 'Untitled')

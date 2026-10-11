@@ -329,8 +329,16 @@
       (id) => history.document.sections.some((section) => section.id === id),
     ),
   });
+  // One stable object per committed document, so the shell can tell edits from view changes.
+  let committedCopy: { version: number; document: ChartDocument } | undefined;
+  function committedDocument() {
+    if (committedCopy?.version !== history.version)
+      committedCopy = { version: history.version, document: history.document };
+    return committedCopy.document;
+  }
+  let published: { document: ChartDocument; view: ProjectView } | undefined;
   $effect(() => {
-    const committed = history.document;
+    const committed = committedDocument();
     // document is also a preview: observe it, but publish only committed history.
     void document;
     void visibleScrollTop;
@@ -339,7 +347,20 @@
     void view.zoom;
     void view.firstWeek;
     const savedView = projectView();
-    untrack(() => onchange?.(committed, savedView));
+    untrack(() => {
+      // Preview frames re-run this effect without changing what is published.
+      if (
+        published?.document === committed &&
+        published.view.zoom === savedView.zoom &&
+        published.view.firstWeek === savedView.firstWeek &&
+        published.view.scrollTop === savedView.scrollTop &&
+        published.view.collapsedSectionIds.join() ===
+          savedView.collapsedSectionIds.join()
+      )
+        return;
+      published = { document: committed, view: savedView };
+      onchange?.(committed, savedView);
+    });
   });
   export function prepareFile() {
     finishMenuName(true);
@@ -348,7 +369,7 @@
     calendarPicker = null;
     colorPicker = null;
     confirmation = null;
-    return { document: history.document, view: projectView() };
+    return { document: committedDocument(), view: projectView() };
   }
 
   function syncHistory() {

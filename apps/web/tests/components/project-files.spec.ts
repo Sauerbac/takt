@@ -441,3 +441,57 @@ test('editor shortcuts leave the retained chart alone on Home and behind shell d
   await expect(page.locator('.bar')).toHaveCount(1);
   await expect(page.locator('.bar').locator('span')).toHaveText('Keep');
 });
+
+test('recovery is written for edits, not for every scroll step or drag preview', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: 'New project', exact: true }).click();
+  await draw(page, 0, 2, 'Work');
+  const draft = () =>
+    page.evaluate(() => {
+      const key = Object.keys(localStorage).find((key) =>
+        key.startsWith('takt.draft.v1.'),
+      )!;
+      return JSON.parse(localStorage.getItem(key)!).snapshot;
+    });
+  await expect.poll(async () => (await draft()).document.bars.length).toBe(1);
+  await page.evaluate(() => {
+    const counter = window as unknown as { __draftWrites: number };
+    counter.__draftWrites = 0;
+    const native = Storage.prototype.setItem;
+    Storage.prototype.setItem = function (key, value) {
+      if (key.startsWith('takt.draft.v1.')) counter.__draftWrites++;
+      native.call(this, key, value);
+    };
+  });
+  const writes = () =>
+    page.evaluate(
+      () => (window as unknown as { __draftWrites: number }).__draftWrites,
+    );
+  const lane = (await page.getByTestId('lane').first().boundingBox())!;
+  await page.mouse.move(lane.x + 300, lane.y + 22);
+  for (let step = 0; step < 30; step++) await page.mouse.wheel(-6, 0);
+  expect(await writes()).toBeLessThanOrEqual(2);
+  await expect.poll(async () => (await draft()).view.firstWeek).not.toBe(-2);
+  const afterScroll = await writes();
+  expect(afterScroll).toBeLessThanOrEqual(3);
+  const bar = (await page.locator('.bar').boundingBox())!;
+  await page.mouse.move(bar.x + bar.width / 2, bar.y + bar.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(bar.x + bar.width / 2 + 200, bar.y + bar.height / 2, {
+    steps: 20,
+  });
+  expect(await writes()).toBe(afterScroll);
+  await page.mouse.up();
+  await expect(page.locator('.bar')).not.toHaveAttribute('data-start', '0');
+  await expect.poll(writes).toBe(afterScroll + 1);
+  await page.mouse.move(lane.x + 300, lane.y + 22);
+  await page.mouse.wheel(-200, 0);
+  const scrolled = await page
+    .getByTestId('lane')
+    .first()
+    .getAttribute('data-first-week');
+  await page.reload();
+  expect(String((await draft()).view.firstWeek)).toBe(scrolled);
+});

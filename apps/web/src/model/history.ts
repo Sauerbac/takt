@@ -27,6 +27,8 @@ export class History {
   private past: Command[] = [];
   private future: Command[] = [];
   private current: ChartDocument;
+  /** Increases whenever the committed document changes. */
+  version = 0;
   constructor(document: ChartDocument) {
     assertDocument(document);
     this.current = copyDocument(document);
@@ -54,6 +56,7 @@ export class History {
       revealId,
     });
     this.current = copyDocument(after);
+    this.version++;
     this.future = [];
     return true;
   }
@@ -62,6 +65,7 @@ export class History {
     if (command) {
       this.future.push(command);
       this.current = copyDocument(command.before);
+      this.version++;
     }
     return command;
   }
@@ -70,6 +74,7 @@ export class History {
     if (command) {
       this.past.push(command);
       this.current = copyDocument(command.after);
+      this.version++;
     }
     return command;
   }

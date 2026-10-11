@@ -1,6 +1,6 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { newProject } from './format';
-import { ProjectSession } from './session';
+import { ProjectSession, VIEW_PERSIST_DELAY } from './session';
 import type { PlatformAdapter, RecoveryRecord, SaveOutcome } from './platform';
 
 function fake() {
@@ -174,5 +174,53 @@ describe('document lifecycle', () => {
     finish();
     expect(await discarding).toBe(false);
     expect(session.snapshot!.title).toBe('New');
+  });
+  it('writes edits to recovery immediately and coalesces view-only changes', async () => {
+    vi.useFakeTimers();
+    try {
+      const { adapter, session, records } = fake();
+      let writes = 0;
+      const write = adapter.writeRecovery;
+      adapter.writeRecovery = async (record) => {
+        writes++;
+        await write(record);
+      };
+      session.create();
+      session.update({ ...session.snapshot!, title: 'Edited' });
+      await session.persist();
+      expect(records.get(session.recoveryId)!.snapshot.title).toBe('Edited');
+      writes = 0;
+      for (const scrollTop of [10, 20, 30])
+        session.update({
+          ...session.snapshot!,
+          view: { ...session.snapshot!.view, scrollTop },
+        });
+      await vi.advanceTimersByTimeAsync(VIEW_PERSIST_DELAY - 1);
+      expect(writes).toBe(0);
+      await vi.advanceTimersByTimeAsync(1);
+      expect(writes).toBe(1);
+      expect(records.get(session.recoveryId)!.snapshot.view.scrollTop).toBe(30);
+      session.update({
+        ...session.snapshot!,
+        view: { ...session.snapshot!.view, zoom: 2 },
+      });
+      await session.flush();
+      expect(writes).toBe(2);
+      expect(records.get(session.recoveryId)!.snapshot.view.zoom).toBe(2);
+      await session.persist();
+      await vi.advanceTimersByTimeAsync(VIEW_PERSIST_DELAY);
+      expect(writes).toBe(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+  it('an invalid view never breaks the modified check', () => {
+    const { session } = fake();
+    session.create();
+    session.update({
+      ...session.snapshot!,
+      view: { ...session.snapshot!.view, scrollTop: -5 },
+    });
+    expect(session.modified).toBe(false);
   });
 });

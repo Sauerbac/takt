@@ -7,6 +7,9 @@ import type {
   SaveOutcome,
 } from './platform';
 
+/** Longest a scroll, zoom or collapse change waits before reaching recovery. */
+export const VIEW_PERSIST_DELAY = 1000;
+
 export class ProjectSession {
   snapshot: ProjectSnapshot | null = null;
   file?: FileIdentity;
@@ -18,6 +21,8 @@ export class ProjectSession {
   error = '';
   drafts: RecoveryRecord[] = [];
   private writes = Promise.resolve();
+  private viewTimer: ReturnType<typeof setTimeout> | undefined;
+  private written = '';
   private replacementRequest = 0;
   constructor(
     readonly adapter: PlatformAdapter,
@@ -43,24 +48,46 @@ export class ProjectSession {
     }
     this.changed();
   }
+  /** Edits reach recovery immediately; view-only changes are coalesced. */
   update(snapshot: ProjectSnapshot) {
+    const edited =
+      !this.snapshot ||
+      snapshot.title !== this.snapshot.title ||
+      snapshot.document !== this.snapshot.document;
     this.snapshot = snapshot;
     this.changed();
-    void this.persist();
+    if (edited) void this.persist();
+    else
+      this.viewTimer ??= setTimeout(
+        () => void this.persist(),
+        VIEW_PERSIST_DELAY,
+      );
+  }
+  /** Write a waiting view change now: before file commands, Home, and page or window exit. */
+  flush() {
+    return this.viewTimer === undefined ? this.writes : this.persist();
   }
   async persist() {
+    clearTimeout(this.viewTimer);
+    this.viewTimer = undefined;
     if (!this.snapshot) return;
-    const record: RecoveryRecord = {
-      version: 1,
+    const stored = {
+      version: 1 as const,
       baseline: this.baseline,
       id: this.recoveryId,
-      updatedAt: new Date().toISOString(),
       snapshot: this.snapshot,
       ...(this.file ? { file: this.file } : {}),
     };
+    const key = JSON.stringify(stored);
+    const record: RecoveryRecord = {
+      ...stored,
+      updatedAt: new Date().toISOString(),
+    };
     this.writes = this.writes.then(async () => {
+      if (key === this.written) return;
       try {
         await this.adapter.writeRecovery(record);
+        this.written = key;
         this.recoveryWarning = '';
       } catch {
         this.recoveryWarning =
@@ -93,10 +120,13 @@ export class ProjectSession {
     const id = this.recoveryId,
       generation = this.generation,
       key = this.snapshot ? contentKey(this.snapshot) : '';
+    clearTimeout(this.viewTimer);
+    this.viewTimer = undefined;
     await this.writes;
     if (generation !== this.generation || id !== this.recoveryId) return false;
     try {
       await this.adapter.removeRecovery(id);
+      this.written = '';
     } catch {
       this.recoveryWarning =
         'Could not remove this recovery copy. Retry before discarding.';

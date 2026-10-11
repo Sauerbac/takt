@@ -109,6 +109,7 @@
     const prepared = editor?.prepareFile();
     title = title.trim() || 'Untitled';
     session.update({ ...session.snapshot, title, ...(prepared ?? {}) });
+    void session.flush();
   }
   function replace(opened: OpenedProject) {
     session.replace(opened);
