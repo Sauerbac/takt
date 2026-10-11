@@ -184,6 +184,8 @@ fn atomic_write_checked(
             .create_new(true)
             .open(&temporary)
             .map_err(|e| e.to_string())?;
+        // Before any content: the sibling starts with the folder's permissions.
+        copy_permissions(path, &temporary, &file)?;
         file.write_all(bytes).map_err(|e| e.to_string())?;
         file.sync_all().map_err(|e| e.to_string())?;
         drop(file);
@@ -197,6 +199,105 @@ fn atomic_write_checked(
         let _ = fs::remove_file(&temporary);
     }
     result
+}
+/// Give the sibling the access list of the file it will replace, which may be stricter than the
+/// folder's. The list is copied as stored: a file moved in from elsewhere keeps what it inherited
+/// there. A new file, or a volume without access lists, keeps the folder's permissions.
+#[cfg(windows)]
+fn copy_permissions(from: &Path, to: &Path, to_file: &fs::File) -> Result<(), String> {
+    use std::os::windows::{ffi::OsStrExt, io::AsRawHandle};
+    use std::ptr::null_mut;
+    use windows_sys::Win32::Foundation::ERROR_INSUFFICIENT_BUFFER;
+    use windows_sys::Win32::Security::{
+        GetFileSecurityW, GetSecurityDescriptorControl, SetFileSecurityW,
+        DACL_SECURITY_INFORMATION, PROTECTED_DACL_SECURITY_INFORMATION, SE_DACL_PROTECTED,
+        UNPROTECTED_DACL_SECURITY_INFORMATION,
+    };
+    use windows_sys::Win32::Storage::FileSystem::GetVolumeInformationByHandleW;
+    const FILE_PERSISTENT_ACLS: u32 = 0x8;
+    let wide =
+        |path: &Path| -> Vec<u16> { path.as_os_str().encode_wide().chain(Some(0)).collect() };
+    let failed = || {
+        format!(
+            "Could not keep this file's permissions, so it was not saved: {} Your edits are still available; save another copy.",
+            std::io::Error::last_os_error()
+        )
+    };
+    let mut volume = 0;
+    if unsafe {
+        GetVolumeInformationByHandleW(
+            to_file.as_raw_handle(),
+            null_mut(),
+            0,
+            null_mut(),
+            null_mut(),
+            &mut volume,
+            null_mut(),
+            0,
+        )
+    } == 0
+        || volume & FILE_PERSISTENT_ACLS == 0
+    {
+        return Ok(());
+    }
+    let from = wide(from);
+    let mut size = 0;
+    unsafe {
+        GetFileSecurityW(
+            from.as_ptr(),
+            DACL_SECURITY_INFORMATION,
+            null_mut(),
+            0,
+            &mut size,
+        )
+    };
+    let sizing = std::io::Error::last_os_error();
+    if sizing.kind() == std::io::ErrorKind::NotFound {
+        return Ok(());
+    }
+    if sizing.raw_os_error() != Some(ERROR_INSUFFICIENT_BUFFER as i32) {
+        return Err(failed());
+    }
+    // Security descriptors are read as 32-bit aligned structures.
+    let mut descriptor = vec![0u32; (size as usize).div_ceil(4)];
+    let mut control = 0;
+    let mut revision = 0;
+    if unsafe {
+        GetFileSecurityW(
+            from.as_ptr(),
+            DACL_SECURITY_INFORMATION,
+            descriptor.as_mut_ptr().cast(),
+            size,
+            &mut size,
+        ) == 0
+            || GetSecurityDescriptorControl(
+                descriptor.as_mut_ptr().cast(),
+                &mut control,
+                &mut revision,
+            ) == 0
+    } {
+        return Err(failed());
+    }
+    let inheritance = if control & SE_DACL_PROTECTED != 0 {
+        PROTECTED_DACL_SECURITY_INFORMATION
+    } else {
+        UNPROTECTED_DACL_SECURITY_INFORMATION
+    };
+    if unsafe {
+        SetFileSecurityW(
+            wide(to).as_ptr(),
+            DACL_SECURITY_INFORMATION | inheritance,
+            descriptor.as_mut_ptr().cast(),
+        )
+    } == 0
+    {
+        return Err(failed());
+    }
+    Ok(())
+}
+#[cfg(not(windows))]
+fn copy_permissions(_from: &Path, _to: &Path, _to_file: &fs::File) -> Result<(), String> {
+    Ok(())
 }
 #[cfg(windows)]
 fn replace(from: &Path, to: &Path) -> Result<(), String> {
@@ -558,6 +659,46 @@ mod tests {
         assert_eq!(fs::read_to_string(&path).unwrap(), "other");
         save(&path, "mine", Some(&first.revision), true).unwrap();
         assert_eq!(read(&path).unwrap().revision, revision(b"mine"));
+    }
+    #[cfg(windows)]
+    #[test]
+    fn save_keeps_the_permissions_of_the_file_it_replaces() {
+        fn icacls(path: &Path, arguments: &[&str]) -> String {
+            let output = std::process::Command::new("icacls")
+                .arg(path)
+                .args(arguments)
+                .output()
+                .unwrap();
+            assert!(output.status.success());
+            String::from_utf8_lossy(&output.stdout).into_owned()
+        }
+        // S-1-3-4 is OWNER RIGHTS, which needs no account name or locale.
+        let dir = tempfile::tempdir().unwrap();
+        let restricted = dir.path().join("restricted.takt");
+        fs::write(&restricted, "original").unwrap();
+        let inherited = icacls(&restricted, &[]);
+        icacls(&restricted, &["/inheritance:r", "/grant:r", "*S-1-3-4:F"]);
+        let own = icacls(&restricted, &[]);
+        assert_ne!(own, inherited);
+        save(&restricted, "new", None, true).unwrap();
+        assert_eq!(fs::read_to_string(&restricted).unwrap(), "new");
+        assert_eq!(icacls(&restricted, &[]), own);
+        // A file moved in from a private folder keeps that folder's permissions.
+        let private = dir.path().join("private");
+        fs::create_dir(&private).unwrap();
+        icacls(
+            &private,
+            &["/inheritance:r", "/grant:r", "*S-1-3-4:(OI)(CI)F"],
+        );
+        let moved = dir.path().join("moved.takt");
+        fs::write(private.join("moved.takt"), "original").unwrap();
+        fs::rename(private.join("moved.takt"), &moved).unwrap();
+        let carried = icacls(&moved, &[]);
+        save(&moved, "new", None, true).unwrap();
+        assert_eq!(icacls(&moved, &[]), carried);
+        fs::remove_file(&moved).unwrap();
+        save(&moved, "created", None, true).unwrap();
+        assert_ne!(icacls(&moved, &[]), carried);
     }
     #[test]
     fn failed_replace_preserves_original() {
