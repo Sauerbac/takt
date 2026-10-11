@@ -1,7 +1,0 @@
-/* Review controls are separate from the app design. No editor selectors here. */
-.color-switcher .switch-title{min-width:140px}
-.color-switcher label{padding:8px 6px;cursor:pointer;border-radius:5px}
-.color-switcher label:hover{background:#f1f3f6}
-.color-switcher .theme-choice{font-weight:600}
-.color-switcher .theme-choice.active{background:#27384d;color:white}
-@media(max-width:650px){.color-switcher{gap:2px;bottom:10px}.color-switcher .switch-title{min-width:105px;padding:0 7px}.color-switcher .gallery-link{padding:0 6px;margin-left:0}.color-switcher>a{min-width:27px}}

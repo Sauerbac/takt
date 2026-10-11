@@ -3,8 +3,6 @@ dist
 test-results
 playwright-report
 package-lock.json
-ui-prototype
-archive
 .npm-cache
 
 apps/desktop/src-tauri/target/
