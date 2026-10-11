@@ -226,7 +226,7 @@ test('recovery opens modified preserving original revision and native close guar
   page,
 }) => {
   await fixture(page, true);
-  await page.getByRole('button', { name: /Recovered work/ }).click();
+  await page.getByRole('button', { name: /^Recovered work/ }).click();
   await expect(page.getByLabel('Project title')).toHaveValue('Recovered work');
   await expect(page.getByLabel('Modified', { exact: true })).toBeVisible();
   await control(page, (fixture) =>
@@ -346,7 +346,7 @@ test('unsaved work can be deleted from desktop Home after confirmation', async (
   ).toBeVisible();
   await page.getByRole('button', { name: 'Delete', exact: true }).click();
   await expect(
-    page.getByRole('button', { name: /Recovered work/ }),
+    page.getByRole('button', { name: /^Recovered work/ }),
   ).toHaveCount(0);
   expect(await control(page, (fixture) => fixture.state().recovery)).toEqual(
     [],

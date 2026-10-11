@@ -121,7 +121,7 @@ test('invalid dropped bytes leave the chart and its recovery untouched, and text
   });
   expect(prevented).toBe(false);
   await page.reload();
-  await page.getByRole('button', { name: /Keep this/ }).click();
+  await page.getByRole('button', { name: /^Keep this/ }).click();
   await expect(page.getByLabel('Project title')).toHaveValue('Keep this');
 });
 

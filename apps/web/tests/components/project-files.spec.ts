@@ -117,7 +117,7 @@ test('Home, title, dirty baseline, guarded replacement, retained Home history an
   await expect(
     page.getByRole('heading', { name: 'Resume draft' }),
   ).toBeVisible();
-  await page.getByRole('button', { name: /Launch/ }).click();
+  await page.getByRole('button', { name: /^Launch/ }).click();
   await expect(page.locator('.bar')).toHaveCount(1);
   await expect(
     page.getByRole('button', { name: 'Undo', exact: true }),
@@ -129,7 +129,7 @@ test('Home, title, dirty baseline, guarded replacement, retained Home history an
     .click();
   await expect(page.getByLabel('Project title')).toHaveValue('Untitled');
   await page.getByRole('button', { name: 'Home', exact: true }).click();
-  await expect(page.getByRole('button', { name: /Launch/ })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: /^Launch/ })).toHaveCount(0);
 });
 
 test('download-and-continue requires acknowledgement and cancellation retains work', async ({
@@ -241,10 +241,10 @@ test('two tabs keep distinct drafts and resuming a foreign draft never overwrite
   await page.getByLabel('Project title').press('Enter');
   const other = await context.newPage();
   await other.goto('/');
-  await expect(other.getByRole('button', { name: /First tab/ })).toBeVisible();
+  await expect(other.getByRole('button', { name: /^First tab/ })).toBeVisible();
   await page.getByLabel('Project title').fill('Latest live tab');
   await page.getByLabel('Project title').press('Enter');
-  await other.getByRole('button', { name: /First tab/ }).click();
+  await other.getByRole('button', { name: /^First tab/ }).click();
   await expect(other.getByLabel('Project title')).toHaveValue(
     'Latest live tab',
   );
@@ -256,14 +256,16 @@ test('two tabs keep distinct drafts and resuming a foreign draft never overwrite
   await expect(
     page.getByRole('button', { name: /First tab.*Resume project/ }),
   ).toBeVisible();
-  await expect(page.getByRole('button', { name: /Second tab/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: /^Second tab/ })).toBeVisible();
   await other.keyboard.press('Control+n');
   await other
     .getByRole('button', { name: 'Discard changes', exact: true })
     .click();
   await page.reload();
-  await expect(page.getByRole('button', { name: /First tab/ })).toBeVisible();
-  await expect(page.getByRole('button', { name: /Second tab/ })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: /^First tab/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: /^Second tab/ })).toHaveCount(
+    0,
+  );
 });
 
 test('an abandoned browser draft is claimed in place and deliberate discard removes the original recovery', async ({
@@ -292,7 +294,7 @@ test('an abandoned browser draft is claimed in place and deliberate discard remo
     .toBe(true);
   await original.close();
   await page.goto('/');
-  await page.getByRole('button', { name: /Abandoned work/ }).click();
+  await page.getByRole('button', { name: /^Abandoned work/ }).click();
   await expect(page.getByLabel('Modified', { exact: true })).toBeVisible();
   await page.keyboard.press('Control+n');
   await page
@@ -301,7 +303,7 @@ test('an abandoned browser draft is claimed in place and deliberate discard remo
   await expect(page.getByLabel('Project title')).toHaveValue('Untitled');
   await page.getByRole('button', { name: 'Home', exact: true }).click();
   await expect(
-    page.getByRole('button', { name: /Abandoned work/ }),
+    page.getByRole('button', { name: /^Abandoned work/ }),
   ).toHaveCount(0);
 });
 
@@ -323,7 +325,7 @@ test('an invalid cached recovery claim preserves the current chart and its recov
   await page.getByLabel('Project title').press('Enter');
   await page.getByRole('button', { name: 'Home', exact: true }).click();
   await expect(
-    page.getByRole('button', { name: /Cached source/ }),
+    page.getByRole('button', { name: /^Cached source/ }),
   ).toBeVisible();
   await page.evaluate(() => {
     for (const key of Object.keys(localStorage).filter((key) =>
@@ -336,7 +338,7 @@ test('an invalid cached recovery claim preserves the current chart and its recov
       }
     }
   });
-  await page.getByRole('button', { name: /Cached source/ }).click();
+  await page.getByRole('button', { name: /^Cached source/ }).click();
   await expect(page.getByRole('alert')).toContainText('unsupported');
   await expect(
     page.getByRole('button', { name: /Retained current.*Resume project/ }),
@@ -397,11 +399,11 @@ test('cancelling a staged recovery frees its source for another tab without crea
     )
     .toBe(true);
   await page.getByRole('button', { name: 'Home', exact: true }).click();
-  await page.getByRole('button', { name: /Released source/ }).click();
+  await page.getByRole('button', { name: /^Released source/ }).click();
   await page.getByRole('button', { name: 'Cancel', exact: true }).click();
   const next = await context.newPage();
   await next.goto('/');
-  await next.getByRole('button', { name: /Released source/ }).click();
+  await next.getByRole('button', { name: /^Released source/ }).click();
   await expect(next.getByLabel('Project title')).toHaveValue('Released source');
   await expect(next.getByLabel('Modified', { exact: true })).toBeVisible();
   await next.keyboard.press('Control+n');
@@ -410,10 +412,10 @@ test('cancelling a staged recovery frees its source for another tab without crea
     .click();
   await next.getByRole('button', { name: 'Home', exact: true }).click();
   await expect(
-    next.getByRole('button', { name: /Released source/ }),
+    next.getByRole('button', { name: /^Released source/ }),
   ).toHaveCount(0);
   await expect(
-    next.getByRole('button', { name: /Retained chart/ }),
+    next.getByRole('button', { name: /^Retained chart/ }),
   ).toBeVisible();
 });
 

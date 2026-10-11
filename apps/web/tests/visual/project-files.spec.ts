@@ -22,7 +22,13 @@ test('Apricot persistent recovery warning', async ({ page }) => {
   });
   await page.goto('/');
   await page.getByRole('button', { name: 'New project', exact: true }).click();
+  // Recovery is first written by an edit; restoring the title keeps the pictured state.
+  await page.getByLabel('Project title').fill('Edited');
+  await page.getByLabel('Project title').press('Enter');
   await expect(page.getByRole('button', { name: 'Retry' })).toBeVisible();
+  await page.getByLabel('Project title').fill('Untitled');
+  await page.getByLabel('Project title').press('Enter');
+  await expect(page.getByLabel('Modified', { exact: true })).toHaveCount(0);
   await expect(page).toHaveScreenshot('project-recovery-warning.png');
 });
 
