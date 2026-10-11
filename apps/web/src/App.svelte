@@ -83,7 +83,7 @@
   );
   onMount(() => {
     void session.initialize();
-    void adapter.listRecents?.().then((value) => (recents = value));
+    void refreshRecents();
     const disposeDrop = adapter.onFileDrop?.(nativeFileDrop);
     const disposeClose = adapter.onCloseRequested?.(
       () =>
@@ -103,6 +103,22 @@
       disposeClose?.();
     };
   });
+  async function refreshRecents() {
+    try {
+      recents = (await adapter.listRecents?.()) ?? [];
+    } catch {
+      // Recent history is a convenience; Open still works without it.
+    }
+  }
+  async function removeRecent(path: string) {
+    try {
+      await adapter.removeRecent?.(path);
+    } catch {
+      session.error = 'Could not remove this entry from recent files.';
+      revision++;
+    }
+    await refreshRecents();
+  }
   function prepare() {
     fileMenu = false;
     if (!session.snapshot) return;
@@ -235,7 +251,7 @@
           replace(result.value);
           if (locatePath) {
             await adapter.removeRecent?.(locatePath);
-            recents = (await adapter.listRecents?.()) ?? [];
+            await refreshRecents();
           }
         });
       else if (result.status === 'failure') {
@@ -372,7 +388,7 @@
         session.generation++;
         revision++;
         void session.refreshDrafts();
-        void adapter.listRecents?.().then((value) => (recents = value));
+        void refreshRecents();
       });
     else {
       prepare();
@@ -595,11 +611,7 @@
                   disabled={operation}
                   title="Remove from recents"
                   aria-label={`Remove ${recent.name} from recents`}
-                  onclick={() =>
-                    void adapter
-                      .removeRecent?.(recent.path)
-                      .then(() => adapter.listRecents?.())
-                      .then((value) => (recents = value ?? []))}
+                  onclick={() => void removeRecent(recent.path)}
                   ><ProjectIcon name="close" /></button
                 >
               </div>{/each}{#if recents.length > 10}<button
@@ -919,10 +931,7 @@
         onclick={() => {
           const path = missing!.path;
           missing = null;
-          void adapter
-            .removeRecent?.(path)
-            .then(() => adapter.listRecents?.())
-            .then((value) => (recents = value ?? []));
+          void removeRecent(path);
         }}>Remove from recents</Button
       ><Button
         variant="primary"

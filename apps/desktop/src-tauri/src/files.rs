@@ -288,10 +288,13 @@ impl Store {
             if entry.path().extension().and_then(|v| v.to_str()) != Some("json") {
                 continue;
             }
-            let record =
-                serde_json::from_slice(&fs::read(entry.path()).map_err(|e| e.to_string())?)
-                    .map_err(|e| format!("Could not read {}: {e}", entry.path().display()))?;
-            result.push(record);
+            // One unreadable record must not hide the others; it stays on disk untouched.
+            let Ok(bytes) = fs::read(entry.path()) else {
+                continue;
+            };
+            if let Ok(record) = serde_json::from_slice(&bytes) {
+                result.push(record);
+            }
         }
         Ok(result)
     }
@@ -309,10 +312,10 @@ impl Store {
     pub fn recents(&self) -> Result<Vec<RecentFile>, String> {
         let mut records = self.read_records("recents")?;
         records.sort_by(|a, b| b["openedAt"].as_u64().cmp(&a["openedAt"].as_u64()));
-        records
+        Ok(records
             .into_iter()
-            .map(|v| serde_json::from_value(v).map_err(|e| e.to_string()))
-            .collect()
+            .filter_map(|v| serde_json::from_value(v).ok())
+            .collect())
     }
     pub fn remove_recent(&self, path: &str) -> Result<(), String> {
         remove(
@@ -507,6 +510,26 @@ mod tests {
         assert_eq!(store.list_recovery().unwrap().len(), 1);
         owner.release(&store, "live");
         assert_eq!(locks(), 0);
+    }
+    #[test]
+    fn unreadable_records_are_skipped_and_left_on_disk() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = Store::new(dir.path().into()).unwrap();
+        store
+            .write_recovery(serde_json::json!({"id":"good","updatedAt":"2026-10-11"}))
+            .unwrap();
+        let corrupt = store.recovery_path("corrupt").unwrap();
+        fs::write(&corrupt, "{").unwrap();
+        let listed = store.list_recovery().unwrap();
+        assert_eq!(listed.len(), 1);
+        assert_eq!(listed[0]["id"], "good");
+        assert_eq!(fs::read_to_string(corrupt).unwrap(), "{");
+        store.remember("C:/files/kept.takt").unwrap();
+        fs::write(dir.path().join("recents").join("corrupt.json"), "{").unwrap();
+        fs::write(dir.path().join("recents").join("shape.json"), "{}").unwrap();
+        let recents = store.recents().unwrap();
+        assert_eq!(recents.len(), 1);
+        assert_eq!(recents[0].name, "kept.takt");
     }
     #[test]
     fn safe_save_and_external_revision() {

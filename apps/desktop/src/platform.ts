@@ -2,6 +2,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { getCurrentWebview } from '@tauri-apps/api/webview';
 import {
+  decodeProject,
   encodeProject,
   parseProject,
   suggestedFilename,
@@ -21,6 +22,32 @@ const failure = (error: unknown) => ({
   status: 'failure' as const,
   message: String(error),
 });
+/** Native recovery records are external data: validate before they can replace a session. */
+function decodeRecovery(value: unknown): RecoveryRecord {
+  if (!value || typeof value !== 'object')
+    throw new Error('Invalid recovery record');
+  const record = value as Record<string, unknown>;
+  if (
+    record.version !== 1 ||
+    typeof record.id !== 'string' ||
+    !/^[a-zA-Z0-9-]+$/.test(record.id) ||
+    typeof record.updatedAt !== 'string' ||
+    !Number.isFinite(Date.parse(record.updatedAt)) ||
+    typeof record.baseline !== 'string'
+  )
+    throw new Error('Invalid recovery record');
+  if (
+    record.file &&
+    (typeof record.file !== 'object' ||
+      typeof (record.file as Record<string, unknown>).path !== 'string' ||
+      typeof (record.file as Record<string, unknown>).revision !== 'string')
+  )
+    throw new Error('Invalid recovery file identity');
+  return {
+    ...(record as unknown as RecoveryRecord),
+    snapshot: decodeProject(record.snapshot),
+  };
+}
 export const desktopAdapter: PlatformAdapter = {
   kind: 'desktop',
   onFileDrop(handler) {
@@ -91,34 +118,28 @@ export const desktopAdapter: PlatformAdapter = {
   },
   async listRecovery() {
     const records = await invoke<unknown[]>('list_recovery');
-    return records.map((value): RecoveryRecord => {
-      if (!value || typeof value !== 'object')
-        throw new Error('Invalid recovery record');
-      const record = value as Record<string, unknown>;
-      if (
-        record.version !== 1 ||
-        typeof record.id !== 'string' ||
-        !/^[a-zA-Z0-9-]+$/.test(record.id) ||
-        typeof record.updatedAt !== 'string' ||
-        !Number.isFinite(Date.parse(record.updatedAt)) ||
-        typeof record.baseline !== 'string'
-      )
-        throw new Error('Invalid recovery record');
-      if (
-        record.file &&
-        (typeof record.file !== 'object' ||
-          typeof (record.file as Record<string, unknown>).path !== 'string' ||
-          typeof (record.file as Record<string, unknown>).revision !== 'string')
-      )
-        throw new Error('Invalid recovery file identity');
-      return {
-        ...(record as unknown as RecoveryRecord),
-        snapshot: parseProject(JSON.stringify(record.snapshot)),
-      };
+    // An unreadable record stays on disk; it must not hide the others.
+    return records.flatMap((value) => {
+      try {
+        return [decodeRecovery(value)];
+      } catch {
+        return [];
+      }
     });
   },
   async claimRecovery(record) {
-    return invoke<RecoveryRecord>('claim_recovery', { record });
+    const claimed = await invoke<unknown>('claim_recovery', { record });
+    try {
+      return decodeRecovery(claimed);
+    } catch (error) {
+      const claimedId = (claimed as { id?: unknown } | null)?.id;
+      if (typeof claimedId === 'string')
+        await invoke('abandon_recovery_claim', {
+          claimedId,
+          sourceId: record.id,
+        }).catch(() => {});
+      throw error;
+    }
   },
   async abandonRecoveryClaim(claimedRecord, sourceRecord) {
     await invoke('abandon_recovery_claim', {

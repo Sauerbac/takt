@@ -127,31 +127,45 @@ describe('native adapter boundary', () => {
     });
     expect((await desktopAdapter.save(newProject())).status).toBe('failure');
   });
-  it('validates recovery envelopes and snapshots before session replacement', async () => {
+  it('lists valid recoveries and skips invalid envelopes and snapshots', async () => {
+    const valid = {
+      version: 1,
+      id: 'valid',
+      updatedAt: new Date().toISOString(),
+      baseline: '',
+      snapshot: newProject(),
+    };
     mocks.invoke.mockResolvedValueOnce([
-      {
-        version: 99,
-        id: 'record',
-        updatedAt: new Date().toISOString(),
-        snapshot: newProject(),
-        baseline: '',
-      },
+      { id: 'bad', updatedAt: 'now', snapshot: newProject() },
+      valid,
+      { ...valid, id: 'bad-snapshot', snapshot: {} },
+      { ...valid, id: 'bad-file', file: { path: 1 } },
+      null,
     ]);
-    await expect(desktopAdapter.listRecovery()).rejects.toThrow(
-      'Invalid recovery',
-    );
-    mocks.invoke.mockResolvedValueOnce([
-      {
-        version: 1,
-        id: 'record',
-        updatedAt: new Date().toISOString(),
-        snapshot: {},
-        baseline: '',
-      },
-    ]);
-    await expect(desktopAdapter.listRecovery()).rejects.toThrow(
+    expect(
+      (await desktopAdapter.listRecovery()).map((record) => record.id),
+    ).toEqual(['valid']);
+  });
+  it('validates a claimed recovery and releases the claim when it is invalid', async () => {
+    const source = {
+      version: 1 as const,
+      id: 'source',
+      updatedAt: new Date().toISOString(),
+      baseline: '',
+      snapshot: newProject(),
+    };
+    mocks.invoke.mockResolvedValueOnce({ ...source, extra: true });
+    expect((await desktopAdapter.claimRecovery!(source)).id).toBe('source');
+    mocks.invoke
+      .mockResolvedValueOnce({ ...source, id: 'fork', snapshot: {} })
+      .mockResolvedValueOnce(undefined);
+    await expect(desktopAdapter.claimRecovery!(source)).rejects.toThrow(
       'Invalid .takt',
     );
+    expect(mocks.invoke).toHaveBeenLastCalledWith('abandon_recovery_claim', {
+      claimedId: 'fork',
+      sourceId: 'source',
+    });
   });
   it('prevents native close and destroys only after the shared guard allows it', async () => {
     const unlisten = vi.fn();
