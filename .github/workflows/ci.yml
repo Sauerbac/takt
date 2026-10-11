@@ -1,0 +1,116 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_call:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  changes:
+    name: Detect desktop changes
+    runs-on: ubuntu-latest
+    outputs:
+      desktop: ${{ steps.filter.outputs.desktop }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      # Windows minutes are billed double, so pull requests that cannot affect
+      # the executable skip the desktop job. Pushes to main and releases always run it.
+      - id: filter
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          if [ "$GITHUB_EVENT_NAME" != pull_request ] ||
+            git diff --name-only "origin/$BASE_REF...HEAD" |
+            grep -qE '^(apps/|scripts/|\.github/workflows/|package(-lock)?\.json$)'
+          then echo "desktop=true" >> "$GITHUB_OUTPUT"
+          else echo "desktop=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  web:
+    name: Web checks and browser tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    # Keep this tag equal to the @playwright/test version in package-lock.json.
+    # The image supplies the browsers and renders the screenshot baselines.
+    container: mcr.microsoft.com/playwright:v1.63.0-noble
+    env:
+      HOME: /root # Firefox refuses to start as root with the runner's default HOME.
+      TAKT_IN_PLAYWRIGHT_IMAGE: '1'
+    steps:
+      - uses: actions/checkout@v5
+      - run: npm ci --no-audit --no-fund
+      - run: npm run format:check
+      - run: npm run check
+      - run: npm run build
+      - run: npm test
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-results
+          path: apps/web/test-results
+          retention-days: 7
+
+  image:
+    name: Container image
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - run: docker build -t takt .
+      - name: Serve the app and fetch it
+        run: |
+          docker run -d --name takt -p 8080:80 takt
+          for attempt in 1 2 3 4 5 6 7 8 9 10; do
+            if curl -fsS http://127.0.0.1:8080/ | grep -q '<title>Takt'; then exit 0; fi
+            sleep 1
+          done
+          docker logs takt
+          exit 1
+
+  desktop:
+    name: Windows executable
+    needs: changes
+    if: needs.changes.outputs.desktop == 'true'
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: apps/desktop/src-tauri
+      - run: npm ci --no-audit --no-fund
+      - run: npm run build
+      - run: npm run desktop:test
+      - run: npm run desktop:build
+      - run: npx playwright install chromium
+      - run: npm run desktop:test:launch
+      - uses: actions/upload-artifact@v4
+        with:
+          name: takt-windows-x64
+          path: apps/desktop/src-tauri/target/release/takt.exe
+          if-no-files-found: error
+          retention-days: 14
+
+  passed:
+    name: CI passed
+    needs: [changes, web, image, desktop]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      # The one required check: a skipped desktop job counts as passing.
+      - if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')
+        run: exit 1

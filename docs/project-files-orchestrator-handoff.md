@@ -13,7 +13,7 @@ Read before dispatching workers:
 3. [Implementation decisions](implementation-decisions.md), especially sections 3–4, 14, and 17: editor boundaries, gesture/history invariants, testing, and the new architecture.
 4. [Proposed `.takt` contract](takt-file-format.md): fields, coordinate semantics, validation, and versioning. Concrete wire details are proposed, not an already shipped compatibility contract.
 5. [README](../README.md) and [acceptance coverage](acceptance-coverage.md): environment, commands, and current regression coverage.
-6. [Apricot prototype guide](../ui-prototype/README.md) for new UI; [format/desktop research](research/project-files-and-desktop.md) for platform integration.
+6. Apricot prototype guide (`ui-prototype/README.md` under the tag `archive/design-exploration`) for new UI; [format/desktop research](research/project-files-and-desktop.md) for platform integration.
 
 Keep user-observable behavior in the UX specification and technical contracts in their designated documents. This handoff is a work plan, not a competing source of product rules.
 

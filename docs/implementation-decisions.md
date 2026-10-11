@@ -301,6 +301,8 @@ Use screenshot comparisons for stable visual states from the selected prototype 
 
 Motion tests inspect actual CSS transitions and pause them at intermediate times so scheduling delays cannot hide the animation. Behavioral assertions also check settled bounding boxes. Include pickups during animation; waiting for every bar to settle before a drag would miss interrupted-motion defects.
 
+Screenshot baselines are rendered by Chromium in the official Playwright Linux image whose tag matches the locked `@playwright/test` version. `npm run test:visual` runs the `visual` project in that container on developer machines, and CI runs the whole web job inside it, so both compare the same pixels and no baseline depends on a host's fonts. Baselines carry the `-linux` suffix only.
+
 Automation can prove specified behavior and regression safety. Initial visual baselines and subjective interaction quality still require deliberate human design judgment when they are established or intentionally changed; they do not create a recurring manual regression checklist.
 
 ## 15. Implementation sequence
@@ -420,3 +422,15 @@ Update [acceptance coverage](acceptance-coverage.md) with actual test references
 - **Messages:** recovery warnings and errors share one fixed stack below the header instead of the bottom edge, where they would cover the toolbar.
 
 Visual baselines were regenerated for this direction after the user selected version E. Behavior the direction adds is covered in `tests/components/design-direction.spec.ts`; see the acceptance reconciliation.
+
+## 19. Continuous integration, releases, and hosting
+
+**Decision date:** October 11, 2026. Commands and the release procedure are in the [README](../README.md#continuous-integration-and-releases); this section records why the pipeline has its shape.
+
+- **Pull requests gate `main`.** CI runs the documented validation sequence, so agent-made changes meet the same automated acceptance as local work. One summarizing job, `CI passed`, is the required check; it lets path-filtered jobs skip without blocking a merge.
+- **Browser tests run on Linux** inside the Playwright image, which also defines the screenshot baselines (section 14). Windows runners are used only for the executable, because their minutes are billed double on a private repository. Pull requests that cannot change the executable skip that job; `main` and releases always run it, which also keeps the Cargo cache warm.
+- **The executable in a release is the one CI tested.** The release workflow reuses the CI workflow and publishes the artifact its desktop job built and launch-checked, rather than building again.
+- **One version.** The root and workspace manifests, `tauri.conf.json`, and `Cargo.toml` carry the same version; `scripts/check-version.mjs` enforces it in `npm run check` and compares it with the tag at release.
+- **The release artifact is the bare executable** with a checksum, matching the acceptance target in UX section 17. An installer, signing, file associations, and updates remain separate product decisions.
+- **Hosting is a container of static files.** The `Dockerfile` builds `apps/web` and serves it with nginx; `deploy/nginx.conf` caches fingerprinted assets permanently and revalidates the entry page. CI builds and fetches from the image on every pull request so it cannot rot. Deployment itself is not wired into the repository: a host such as Coolify builds from the repository or pulls the released image, and holds its own configuration.
+- **No automated dependency updates.** Each update pull request costs a full CI run; dependencies are upgraded deliberately.

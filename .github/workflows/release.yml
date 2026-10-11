@@ -1,0 +1,66 @@
+name: Release
+
+# Pushing a tag such as v0.1.0 runs the complete CI, then publishes the Windows
+# executable to GitHub Releases and the web image to the container registry.
+on:
+  push:
+    tags: ['v[0-9]+.[0-9]+.[0-9]+*']
+
+permissions:
+  contents: read
+
+jobs:
+  version:
+    name: Tag matches the app version
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - run: node scripts/check-version.mjs "$GITHUB_REF_NAME"
+
+  ci:
+    needs: version
+    uses: ./.github/workflows/ci.yml
+
+  publish:
+    name: Publish release
+    needs: ci
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+      packages: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/download-artifact@v5
+        with:
+          name: takt-windows-x64
+      - name: Name the executable and record its checksum
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          asset="Takt-$version-windows-x64.exe"
+          mv takt.exe "$asset"
+          sha256sum "$asset" > "$asset.sha256"
+          echo "ASSET=$asset" >> "$GITHUB_ENV"
+          echo "VERSION=$version" >> "$GITHUB_ENV"
+          echo "IMAGE=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_ENV"
+      - name: Push the web image
+        run: |
+          echo "$GH_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          docker build -t "$IMAGE:$VERSION" .
+          docker push "$IMAGE:$VERSION"
+          case "$VERSION" in
+            *-*) ;;
+            *) docker tag "$IMAGE:$VERSION" "$IMAGE:latest" && docker push "$IMAGE:latest" ;;
+          esac
+      # Last, so a visible release always has its executable and image.
+      - name: Create the GitHub release
+        run: |
+          prerelease=""
+          case "$VERSION" in *-*) prerelease="--prerelease" ;; esac
+          gh release create "$GITHUB_REF_NAME" "$ASSET" "$ASSET.sha256" \
+            --verify-tag --generate-notes $prerelease \
+            --notes "**$ASSET** runs directly on Windows 11 x64 with the Microsoft Edge WebView2 Runtime; there is nothing to install. It is not code-signed, so Windows SmartScreen asks for confirmation on first launch.
+
+          Web image: \`$IMAGE:$VERSION\`"

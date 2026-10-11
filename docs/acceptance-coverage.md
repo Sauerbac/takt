@@ -2,7 +2,7 @@
 
 Reconciled October 4, 2026 against the [UX specification](ux-specification.md) and the [automated verification contract](implementation-decisions.md#14-automated-verification-contract). The first six implementation steps are complete. The project-file and desktop extension is mapped separately below. Accounts and mobile interaction remain outside scope.
 
-Paths below are relative to `apps/web`. Component tests run in Chromium, Firefox, and WebKit. Production integration runs against the built app; visual comparisons use the existing Chromium/Windows Apricot baselines. Motion tests inspect actual intermediate CSS transitions as well as immediate pointer attachment.
+Paths below are relative to `apps/web`. Component tests run in Chromium, Firefox, and WebKit. Production integration runs against the built app; visual comparisons use Chromium baselines rendered in the Playwright Linux container. Motion tests inspect actual intermediate CSS transitions as well as immediate pointer attachment.
 
 ## UX acceptance scenarios
 
