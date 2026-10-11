@@ -12,36 +12,52 @@
   } = $props();
 </script>
 
-<button type="button" aria-label={label} title={label} {disabled} {onclick}>
-  <svg viewBox="0 0 24 24" aria-hidden="true" class:redo>
-    <path d="M8 5 3 10l5 5M3 10h10a6 6 0 0 1 6 6v3" />
+<button
+  type="button"
+  aria-label={label}
+  title={label}
+  class:redo
+  {disabled}
+  {onclick}
+>
+  <svg viewBox="0 0 16 16" aria-hidden="true">
+    <path d="M3 6h7a3 3 0 0 1 0 6H6M3 6l3-3M3 6l3 3" />
   </svg>
+  <span>{label}</span>
 </button>
 
 <style>
   button {
-    width: 34px;
-    height: 34px;
-    display: grid;
-    place-items: center;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 10px;
     border: 0;
-    border-radius: var(--radius);
+    border-radius: var(--radius-lg);
     background: transparent;
+    font-size: 13px;
     cursor: pointer;
   }
   button:hover:enabled {
     background: var(--soft);
   }
+  button:disabled {
+    cursor: default;
+  }
   svg {
-    width: 18px;
-    height: 18px;
+    width: 16px;
+    height: 16px;
     fill: none;
     stroke: currentColor;
-    stroke-width: 1.6;
+    stroke-width: 1.5;
     stroke-linecap: round;
     stroke-linejoin: round;
   }
   .redo {
+    flex-direction: row-reverse;
+  }
+  .redo svg {
     transform: scaleX(-1);
   }
 </style>

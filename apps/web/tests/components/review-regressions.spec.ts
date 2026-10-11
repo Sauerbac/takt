@@ -94,8 +94,9 @@ test('clicking blank viewport background clears selection without adding history
   await expect(bar).toHaveClass(/selected/);
   const viewport = page.getByRole('region', { name: 'Whole-week Gantt chart' });
   const bounds = (await viewport.boundingBox())!;
+  // Left of the floating toolbar, which covers the bottom centre of the chart.
   await page.mouse.click(
-    bounds.x + bounds.width / 2,
+    bounds.x + bounds.width / 4,
     bounds.y + bounds.height - 30,
   );
   await expect(bar).not.toHaveClass(/selected/);

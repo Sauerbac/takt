@@ -20,32 +20,28 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    gap: 7px;
-    min-height: 36px;
+    gap: 8px;
+    min-height: 34px;
     padding: 0 14px;
     border: 1px solid var(--line);
-    border-radius: 7px;
+    border-radius: var(--radius);
     background: var(--surface);
     color: var(--ink);
     font-size: 13px;
-    font-weight: 600;
-    box-shadow: 0 1px 2px #182e4709;
+    font-weight: 500;
+    white-space: nowrap;
+    box-shadow: var(--shadow-xs);
     cursor: pointer;
     transition:
       background 150ms,
-      box-shadow 150ms,
-      transform 150ms;
+      border-color 150ms;
   }
   button:hover:enabled {
     background: var(--soft);
-    box-shadow: 0 2px 5px #182e4712;
-  }
-  button:active:enabled {
-    transform: translateY(1px);
-    box-shadow: none;
+    border-color: var(--line-strong);
   }
   button:focus-visible {
-    outline: 3px solid #f3b18480;
+    outline: 2px solid var(--accent);
     outline-offset: 2px;
   }
   button:disabled {
@@ -53,28 +49,30 @@
     cursor: default;
   }
   .primary {
-    background: var(--bar-fill);
-    border-color: #dc9a6d;
-    color: var(--bar-ink);
-    box-shadow:
-      inset 0 1px 0 #ffffff40,
-      0 1px 2px #182e4712;
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--on-accent);
+    font-weight: 600;
+    box-shadow: var(--shadow-accent);
   }
   .primary:hover:enabled {
-    background: #eda575;
+    background: var(--accent-hover);
+    border-color: var(--accent-hover);
   }
   .danger {
-    background: #a23e42;
-    border-color: #92363a;
-    color: white;
-    box-shadow:
-      inset 0 1px 0 #ffffff30,
-      0 1px 2px #a23e4226;
+    background: var(--danger);
+    border-color: var(--danger);
+    color: #fff;
+    font-weight: 600;
   }
   .danger:hover:enabled {
-    background: #92363a;
-    box-shadow:
-      inset 0 1px 0 #ffffff30,
-      0 2px 5px #a23e4233;
+    background: var(--danger-hover);
+    border-color: var(--danger-hover);
+  }
+  button :global(kbd) {
+    font-family: inherit;
+    font-size: 11px;
+    font-weight: 400;
+    opacity: 0.9;
   }
 </style>

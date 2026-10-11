@@ -138,10 +138,10 @@
     width: 40px;
     height: 40px;
     flex-shrink: 0;
-    border: 1px solid #f3b18455;
+    border: 1px solid var(--accent-line);
     border-radius: 10px;
-    background: #f3b18426;
-    color: #ad6b3e;
+    background: var(--accent-soft);
+    color: var(--accent);
   }
   svg {
     width: 18px;
@@ -202,8 +202,8 @@
     border-radius: 6px;
     background: var(--selected-fill);
     box-shadow:
-      0 0 0 1px #182e4755,
-      0 2px 5px #182e4733;
+      0 0 0 1px #18181b55,
+      0 2px 5px #18181b33;
   }
   input::-moz-range-thumb {
     box-sizing: border-box;
@@ -213,11 +213,11 @@
     border-radius: 6px;
     background: var(--selected-fill);
     box-shadow:
-      0 0 0 1px #182e4755,
-      0 2px 5px #182e4733;
+      0 0 0 1px #18181b55,
+      0 2px 5px #18181b33;
   }
   input:focus-visible {
-    outline: 3px solid #f3b18480;
+    outline: 2px solid var(--ring);
     outline-offset: 5px;
   }
   .preview {

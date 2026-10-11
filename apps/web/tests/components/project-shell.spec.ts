@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 
 for (const width of [800, 1280]) {
-  test(`File belongs to the toolbar and only the logo navigates Home at ${width}px`, async ({
+  test(`header holds logo, centred title, Save and File; chart controls float below at ${width}px`, async ({
     page,
   }) => {
     await page.setViewportSize({ width, height: 800 });
@@ -13,17 +13,35 @@ for (const width of [800, 1280]) {
     const file = page.getByRole('button', { name: 'File', exact: true });
     const logo = (await home.boundingBox())!;
     const fileBounds = (await file.boundingBox())!;
-    const title = (await page.getByLabel('Project title').boundingBox())!;
-    const undo = (await page
-      .getByRole('button', { name: 'Undo', exact: true })
+    const title = (await page.locator('.title-field').boundingBox())!;
+    const save = (await page
+      .getByRole('button', { name: 'Download', exact: true })
       .boundingBox())!;
+    const undo = page.getByRole('button', { name: 'Undo', exact: true });
+    const toolbar = (await page.getByLabel('Editor controls').boundingBox())!;
+    const chart = (await page.locator('.viewport').boundingBox())!;
     expect(logo.width).toBeLessThan(110);
     expect(logo.x + logo.width).toBeLessThan(title.x);
-    expect(title.x + title.width).toBeLessThan(fileBounds.x);
-    expect(fileBounds.x + fileBounds.width).toBeLessThan(undo.x);
-    expect(await file.evaluate((node) => !!node.closest('.toolbar'))).toBe(
+    expect(title.x + title.width).toBeLessThan(save.x);
+    expect(save.x + save.width).toBeLessThan(fileBounds.x);
+    // The title is centred in the window, not merely between its neighbors.
+    expect(title.x + title.width / 2).toBeCloseTo(width / 2, -1);
+    expect(await file.evaluate((node) => !!node.closest('header'))).toBe(true);
+    expect(await undo.evaluate((node) => !!node.closest('.toolbar'))).toBe(
       true,
     );
+    for (const name of ['Weeks', 'Dates'])
+      expect(
+        await page
+          .getByRole('button', { name, exact: true })
+          .evaluate((node) => !!node.closest('.toolbar')),
+      ).toBe(true);
+    expect(toolbar.x + toolbar.width / 2).toBeCloseTo(
+      chart.x + chart.width / 2,
+      0,
+    );
+    expect(toolbar.y).toBeGreaterThan(chart.y + chart.height / 2);
+    expect(toolbar.y + toolbar.height).toBeLessThan(chart.y + chart.height);
     await page.mouse.click(logo.x + logo.width + 12, logo.y + logo.height / 2);
     await expect(page.getByLabel('Project title')).toBeVisible();
     await file.click();
@@ -65,7 +83,9 @@ test('File menu shares pointer and keyboard focus and dismisses on Tab', async (
   ).toBeFocused();
   await page.keyboard.press('Shift+Tab');
   await expect(page.getByRole('menu')).toHaveCount(0);
-  await expect(page.getByLabel('Project title')).toBeFocused();
+  await expect(
+    page.getByRole('button', { name: 'Download', exact: true }),
+  ).toBeFocused();
 });
 
 test('Home stacks its columns without horizontal overflow in a narrow window', async ({
@@ -74,8 +94,12 @@ test('Home stacks its columns without horizontal overflow in a narrow window', a
   await page.setViewportSize({ width: 600, height: 800 });
   await page.goto('/');
   await expect(
-    page.getByRole('heading', { name: 'Start', exact: true }),
+    page.getByRole('heading', { name: 'Welcome to Takt' }),
   ).toBeVisible();
+  const start = (await page.locator('.home-start').boundingBox())!;
+  const projects = (await page.locator('.home-projects').boundingBox())!;
+  expect(start.width).toBe(600);
+  expect(projects.y).toBeGreaterThanOrEqual(start.y + start.height);
   await expect(
     page.getByRole('heading', { name: 'Room for what’s next' }),
   ).toBeVisible();

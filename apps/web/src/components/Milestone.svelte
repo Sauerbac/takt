@@ -127,11 +127,12 @@
     height: 12px;
     transform: rotate(45deg);
     border: 1px solid var(--bar-ink);
+    border-radius: 2px;
     background: var(--bar-fill);
   }
   .invalid i {
-    background: #fff;
-    border: 2px dashed #a23e42;
+    background: var(--surface);
+    border: 2px dashed var(--danger);
   }
   .invalid {
     cursor: not-allowed;

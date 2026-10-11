@@ -1,23 +1,64 @@
+@import '@fontsource-variable/geist/wght.css';
+
+/* Takt design tokens. The Takt design system documents every value and its use. */
 :root {
-  font-family: 'Segoe UI', Arial, sans-serif;
-  color: #182e47;
-  background: #f4f6f8;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  color: var(--ink);
+  background: var(--background);
   font-synthesis: none;
-  --ink: #182e47;
-  --muted: #596c7d;
-  --row-ink: #304761;
+
+  --font-sans: 'Geist Variable', 'Geist', system-ui, 'Segoe UI', sans-serif;
+
+  /* Neutral zinc surfaces, lines and text. */
+  --background: #fafafa;
   --surface: #fff;
-  --soft: #f0f3f7;
-  --line: #dce3eb;
-  --grid: #edf0f4;
-  --section-bg: #f7f9fb;
+  --soft: #f4f4f5;
+  --line: #e4e4e7;
+  --line-strong: #d4d4d8;
+  --grid: #ececef;
+  --section-bg: #fafafa;
+  --ink: #18181b;
+  --row-ink: #3f3f46;
+  --muted: #71717a;
+  --subtle: #a1a1aa;
+
+  /* Apricot is the single primary color. */
   --accent: #b35d35;
-  --bar-ink: #874327;
+  --accent-hover: #9f4f2b;
+  --accent-deep: #8f4526;
+  --accent-soft: #fdf6f1;
+  --accent-line: #ecd5c6;
+  --on-accent: #fff;
+  --ring: #b35d3559;
+
+  --danger: #a23e42;
+  --danger-hover: #92363a;
+  --danger-soft: #a23e420d;
+
+  /* Default chart color (Peach) and the logo's companion hues. */
   --bar-fill: #f3b184;
+  --bar-ink: #6b3219;
   --lavender: #b5a2e0;
   --sea-blue: #a0d4dd;
-  --radius: 5px;
-  --bar-radius: 3px;
+
+  --radius-sm: 4px;
+  --radius: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 12px;
+  --bar-radius: 6px;
+
+  --shadow-xs: 0 1px 2px #18181b0d;
+  --shadow-sm: 0 1px 2px #18181b1a;
+  --shadow-accent: 0 1px 2px #b35d354d;
+  --shadow-raised: 0 4px 14px #18181b14;
+  --shadow-float: 0 12px 32px #18181b24, 0 2px 6px #18181b0f;
+  --shadow-dialog: 0 20px 70px #18181b2b, 0 4px 16px #18181b12;
+  --backdrop: #18181b33;
+
+  /* Page gutter beside the header, chart and footer. */
+  --gutter: 34px;
+
   --settlement: 150ms;
 }
 * {
@@ -36,8 +77,8 @@ button {
 }
 button:focus-visible {
   outline: 2px solid var(--accent);
-  outline-offset: 3px;
+  outline-offset: 2px;
 }
 button:disabled {
-  opacity: 0.4;
+  opacity: 0.45;
 }

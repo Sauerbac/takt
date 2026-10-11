@@ -62,7 +62,7 @@ test('chart fills the available window and freezes the top row and left column d
     const footer = (await page.locator('footer').boundingBox())!;
     expect(viewport.width).toBe(size.width - 68);
     expect(viewport.y + viewport.height).toBeCloseTo(footer.y, 0);
-    expect(footer.y + footer.height).toBeCloseTo(size.height - 26, 0);
+    expect(footer.y + footer.height).toBeCloseTo(size.height, 0);
     expect(
       await page.evaluate(() => document.documentElement.scrollHeight),
     ).toBe(size.height);

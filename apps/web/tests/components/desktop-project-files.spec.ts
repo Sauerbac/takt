@@ -64,11 +64,17 @@ test('desktop Home/New guards preserve edits after Cancel, cancelled Save, faile
   await expect(page.getByLabel('Project title')).toHaveValue('Local edits');
   await page.keyboard.press('Control+n');
   await control(page, (fixture) => fixture.queueSave('cancelled'));
-  await page.getByRole('button', { name: 'Save', exact: true }).click();
+  await page
+    .getByRole('dialog')
+    .getByRole('button', { name: 'Save', exact: true })
+    .click();
   await expect(page.getByRole('dialog')).toBeVisible();
   await expect(page.getByLabel('Project title')).toHaveValue('Local edits');
   await control(page, (fixture) => fixture.queueSave('failure'));
-  await page.getByRole('button', { name: 'Save', exact: true }).click();
+  await page
+    .getByRole('dialog')
+    .getByRole('button', { name: 'Save', exact: true })
+    .click();
   await expect(page.getByRole('alert')).toContainText('disk is full');
   await expect(page.getByRole('dialog')).toBeVisible();
   await page
@@ -295,7 +301,10 @@ test('successful Save and conflict Save another complete a pending guarded Open'
     fixture.queueOpen('success', '/projects/project-2.takt'),
   );
   await page.keyboard.press('Control+o');
-  await page.getByRole('button', { name: 'Save', exact: true }).click();
+  await page
+    .getByRole('dialog')
+    .getByRole('button', { name: 'Save', exact: true })
+    .click();
   await expect(page.getByLabel('Project title')).toHaveValue('Project 2');
   await edit(page, 'Second local edits');
   await control(page, (fixture) => {
@@ -303,7 +312,10 @@ test('successful Save and conflict Save another complete a pending guarded Open'
     fixture.queueOpen('success', '/projects/project-3.takt');
   });
   await page.keyboard.press('Control+o');
-  await page.getByRole('button', { name: 'Save', exact: true }).click();
+  await page
+    .getByRole('dialog')
+    .getByRole('button', { name: 'Save', exact: true })
+    .click();
   await page
     .getByRole('button', { name: 'Save my work as another file', exact: true })
     .click();
@@ -334,6 +346,41 @@ test('the window still closes when its recovery copy cannot be removed', async (
     .getByRole('button', { name: 'Discard changes', exact: true })
     .click();
   expect(await discarded).toBe(true);
+});
+
+test('an edit made while a saved project is closing gets the unsaved-changes guard', async ({
+  page,
+}) => {
+  await opened(page);
+  await edit(page);
+  await page.keyboard.press('Control+s');
+  await expect(page.getByLabel('Modified', { exact: true })).toHaveCount(0);
+  await control(page, (fixture) => fixture.deferRemove());
+  const closing = control(page, (fixture) => fixture.requestClose());
+  await edit(page, 'Late edit');
+  await control(page, (fixture) => fixture.finishRemove());
+  await expect(
+    page.getByRole('heading', { name: 'Keep your changes?' }),
+  ).toBeVisible();
+  await page.getByRole('button', { name: 'Cancel', exact: true }).click();
+  expect(await closing).toBe(false);
+  await expect(page.getByLabel('Project title')).toHaveValue('Late edit');
+  await expect
+    .poll(() =>
+      control(page, (fixture) =>
+        fixture
+          .state()
+          .recovery.some((record) => record.snapshot.title === 'Late edit'),
+      ),
+    )
+    .toBe(true);
+  // Without a late edit the same close finishes on its own.
+  await page.keyboard.press('Control+s');
+  await expect(page.getByLabel('Modified', { exact: true })).toHaveCount(0);
+  await control(page, (fixture) => fixture.deferRemove());
+  const clean = control(page, (fixture) => fixture.requestClose());
+  await control(page, (fixture) => fixture.finishRemove());
+  expect(await clean).toBe(true);
 });
 
 test('unsaved work can be deleted from desktop Home after confirmation', async ({
@@ -446,4 +493,39 @@ test('a file enters recents when it replaces the project, not when its guard is 
   await expect(page.locator('.recent-entry').first()).toContainText(
     'picked.takt',
   );
+});
+
+test('header Save writes the project and the title tooltip names the file', async ({
+  page,
+}) => {
+  await fixture(page);
+  await page.getByRole('button', { name: 'New project', exact: true }).click();
+  const field = page.locator('.title-field');
+  // A project without a file has only the rename hint.
+  await expect(field).toHaveAttribute('title', 'Rename project');
+  await page.getByRole('button', { name: 'Home', exact: true }).click();
+  await page
+    .getByRole('button', { name: 'Open .takt file', exact: true })
+    .click();
+  await expect(page.getByLabel('Project title')).toHaveValue('Project 1');
+  const named = 'project-1.takt · Rename project';
+  await expect(field).toHaveAttribute('title', named);
+  const button = page
+    .locator('header')
+    .getByRole('button', { name: 'Save', exact: true });
+  expect((await field.boundingBox())!.height).toBe(
+    (await button.boundingBox())!.height,
+  );
+  await edit(page, 'Header save');
+  await expect(field.getByLabel('Modified', { exact: true })).toBeVisible();
+  await button.click();
+  await expect(page.getByLabel('Modified', { exact: true })).toHaveCount(0);
+  await expect(field).toHaveAttribute('title', named);
+  expect(
+    await control(
+      page,
+      (fixture) =>
+        fixture.state().files['/projects/project-1.takt'].snapshot.title,
+    ),
+  ).toBe('Header save');
 });

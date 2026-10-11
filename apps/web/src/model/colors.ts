@@ -6,6 +6,7 @@ export {
   quickColors,
   DEFAULT_COLOR,
   hueGradient,
+  sectionAppearance,
 } from './palette';
 export function colorLabelInk(color: Color): string {
   return colorAppearance(color).ink;

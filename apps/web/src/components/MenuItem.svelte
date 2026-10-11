@@ -66,10 +66,10 @@
     min-height: 34px;
     padding: 7px 9px;
     border: 0;
-    border-radius: 5px;
+    border-radius: var(--radius-sm);
     color: var(--ink);
     background: transparent;
-    font-size: 12px;
+    font-size: 13px;
     font-weight: 500;
     text-align: left;
     cursor: pointer;
@@ -94,14 +94,14 @@
   }
   small {
     color: var(--muted);
-    font-size: 10px;
+    font-size: 11px;
     font-weight: 400;
   }
   .destructive {
-    color: #a23e42;
+    color: var(--danger);
   }
   .destructive:focus {
-    background: #a23e420d;
+    background: var(--danger-soft);
   }
   .destructive small {
     color: inherit;

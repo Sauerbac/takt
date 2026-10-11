@@ -2,11 +2,11 @@
 
 **Status:** Editor, browser project files/Home/recovery, and Windows desktop implemented. Section 17 records the behavior and the lifecycle choices made for this delivery.
 
-**Last updated:** October 10, 2026.
+**Last updated:** October 11, 2026.
 
 **Audience:** Product, design, and implementation collaborators.
 
-This document captures the agreed interaction model for Takt. It describes what the editor should let someone do and how those actions behave. It does not prescribe visual styling, an implementation framework, a storage architecture, or an export format.
+This document captures the agreed interaction model for Takt. It describes what the editor should let someone do and how those actions behave. It does not prescribe an implementation framework, a storage architecture, or an export format. Section 18 records the visual direction and where its values live.
 
 The fixed relative origin is **Week 1**, aligned with the beginning of **Month 1** and **Year 1** in the overview. Earlier weeks and years may use zero and negative numbers.
 
@@ -38,9 +38,9 @@ The first version is for desktop browsers with a mouse or trackpad. The interfac
 - Mobile or tablet interaction design.
 - Accounts, cloud storage managed by Takt, collaborative editing, and automatic merging of concurrent edits.
 - Other applications' project formats and image/PDF exports. Native `.takt` exchange is included; screenshots remain the presentation-output workaround.
-- Pixel-level visual implementation choices that are not fixed by the selected prototype.
+- Pixel-level visual implementation choices that are not fixed by the design system.
 
-The selected Apricot prototype is the visual reference. This functional specification does not duplicate its typography, spacing, colors, icons, or control appearance.
+The Takt design system (section 18) is the visual reference. This functional specification does not duplicate its typography, spacing, colors, icons, or control appearance.
 
 ## 2. Core UX principles
 
@@ -147,7 +147,7 @@ The agreed toolbar contains only:
 - Zoom.
 - Relative-week/calendar-date switch.
 
-The chart controls remain together. The surrounding header adds a Home action on the Takt logo, an editable document title, and a compact File menu as specified in section 17. Item properties do not accumulate in this toolbar.
+The chart controls remain together in one toolbar that floats over the bottom edge of the chart, centred horizontally. It stays in place while the chart scrolls, and the chart can scroll far enough to bring its last row and the Add section control above it. Undo and Redo show their names beside their icons. The Zoom list opens upward from this toolbar. The header above the chart holds the Home action on the Takt logo, the editable document title, a Save button, and a compact File menu as specified in section 17. Item properties do not accumulate in the toolbar or the header.
 
 ### 6.2 Navigation
 
@@ -165,7 +165,7 @@ The zoom control is a custom dropdown with a nearby chevron that rotates while o
 
 Navigation must coexist with creation gestures. An ordinary drag in empty row space creates a bar; Space-drag is the distinct panning gesture.
 
-The editor fills the available window width and height between its toolbar and footer. Scrolling stays inside the chart viewport. The timeline heading row stays fixed vertically, including the top-left corner, while section and row headings move vertically with their corresponding lanes. Content under the fixed header cannot receive pointer input. Horizontal scrolling moves only the timeline: week headings, grid lines, bars, and milestones. The section/row heading column, section names, row names, and their controls stay pinned on the left. They still move vertically with their corresponding rows and sections. Timeline content cannot paint or receive pointer input over that fixed column. This applies to ordinary horizontal scrolling, edge auto-scroll, and future panning.
+The editor fills the available window width and height between its header and footer. Scrolling stays inside the chart viewport. The timeline heading row stays fixed vertically, including the top-left corner, while section and row headings move vertically with their corresponding lanes. Content under the fixed header cannot receive pointer input. Horizontal scrolling moves only the timeline: week headings, grid lines, bars, and milestones. The section/row heading column, section names, row names, and their controls stay pinned on the left. They still move vertically with their corresponding rows and sections. Timeline content cannot paint or receive pointer input over that fixed column. This applies to ordinary horizontal scrolling, edge auto-scroll, and future panning.
 
 At 100%, the timeline shows approximately 24 weeks (initially Week −1 through Week 22); 200% shows approximately 12 weeks and 12.5% approximately 192. A narrow window may show fewer weeks because the chart retains its minimum width. The zoom range is 12.5% to 200%. Dates always displays a year band on top. Below it, individual week-start dates appear at widths of at least 60 CSS pixels per week, and aligned calendar month bands appear at smaller widths. Month boundaries follow actual calendar dates even within a week. Weeks displays spaced week labels at a power-of-two stride sufficient to give each label at least 60 CSS pixels. Weeks always shows relative years above its week labels. Below 60 CSS pixels per week, it switches to relative month bands below the year bands, using the same threshold and layout as Dates. Week 1, Month 1 and Year 1 start together; the relative overview uses Gregorian calendar lengths anchored to a synthetic January 1 of Year 1, independent of any real calendar reference. Month numbers restart at 1 each year, with short labels M1 through M12 where necessary. Earlier years include Year 0 and negative years. Clicking or right-clicking either kind of month band uses the week under the pointer; keyboard activation uses the first visible whole-week start in the band. Individual week headings, when shown, and the lane grid remain one week wide, including unlabeled heading cells; selecting an unlabeled cell assigns a reference to that specific week. Grid lines and editing retain whole-week precision. Ctrl/Cmd plus mouse-wheel zoom preserves the time under the pointer; toolbar zoom preserves the time at the viewport center. Exact zoom steps and wheel sensitivity remain tunable implementation details.
 
@@ -493,13 +493,16 @@ Desktop projects are ordinary files in user-selected folders, including shared f
 
 - Launch shows Home rather than automatically opening the last chart.
 - Home offers **New project** and **Open .takt**. New opens the existing empty editor immediately.
-- Both platforms accept a single `.takt` file dropped onto Home or the editor. Home has a visible drop zone that also opens the picker on click or keyboard activation; dragging a file over the editor shows a drop prompt. Leaving the window or cancelling the drag clears the feedback. Drops follow the existing Open validation and replacement guard. Desktop preserves the dropped path and revision for subsequent Save and recent history; browser drops open file contents for editing/download.
+- Both platforms accept a single `.takt` file dropped onto Home or the editor. Home's **Open .takt file** card is the visible drop zone and also opens the picker on click or keyboard activation; dragging a file over the editor shows a drop prompt. Leaving the window or cancelling the drag clears the feedback. Drops follow the existing Open validation and replacement guard. Desktop preserves the dropped path and revision for subsequent Save and recent history; browser drops open file contents for editing/download.
 - Multiple-file drops ask for one `.takt` file and leave current work untouched. Other file extensions are rejected with a useful message; `.takt` is case-insensitive. Invalid bytes preserve the current chart and recovery. Drops during an open/save operation or a modal dialog are ignored, and browser file drops never navigate away from the application. Text drags retain ordinary browser behavior.
 - Browser Home also offers **Resume draft** when a local draft exists; it has no recent-file list in this milestone. Drafts and desktop recoveries can be deleted from Home as described in section 17.11.
 - Desktop Home includes the recent-file list in section 17.6 and recovery when applicable.
 - There is one active chart per browser tab or desktop window, with no internal document tabs. Recovery ownership follows section 17.10.
-- The Takt logo is the Home action; its hit area ends at the logo, leaving the surrounding header space inactive. The header keeps the editable document title between the logo and controls. The compact File menu belongs to the right-hand toolbar with undo/redo, zoom, and Weeks/Dates.
-- Home groups New/Open under Start and current work, recovery, and desktop recents in a neighboring column. Empty Home explains where projects/drafts appear; a brief gesture guide introduces drawing, milestones, and resizing. Narrow windows stack the columns. Recent entries show compact filename/folder rows, with removal available on hover or keyboard focus.
+- The Takt logo is the Home action at the left of the header; its hit area ends at the logo, leaving the surrounding header space inactive.
+- The editable document title is centred in the header in a raised, rounded field of fixed width, as tall as the Save and File buttons in the same row. While the project has unsaved changes, an apricot dot labelled Modified shows inside the field before the title; its place is reserved, so nothing moves when it appears. When the project has a file on disk, the field's tooltip names that file. There is no line beneath the title.
+- The title must read as editable before it is touched: at rest the field has a visible outline, a soft shadow, and a pencil icon at its end; on hover the outline strengthens and the field takes a light grey fill, with a text cursor and a “Rename project” tooltip. While editing, the field is white with the stronger grey outline. Its states are neutral: no accent outline, glow, or accent pencil, so the Modified dot is the only apricot in the field. A click places the caret; Enter commits, Escape restores the previous title.
+- The right of the header holds a primary **Save** button (labelled **Download** on web, where it downloads the `.takt` file) with its Ctrl/Cmd+S hint, followed by the compact File menu. The button performs the same command as the File menu entry and Ctrl/Cmd+S and stays available when nothing has changed. Undo/redo, zoom, and Weeks/Dates live in the floating toolbar of section 6.1.
+- Home is a left/right split. The left panel carries the logo, the “Welcome to Takt” heading, **New project**, and one **Open .takt file** card that is both the picker button and the visible drop zone. The right side lists the current project, recovery, and desktop recents. Home has no tagline, gesture guide, or storage note; the creation hint in the empty chart introduces the gestures. Empty Home explains where projects/drafts appear. Narrow windows stack the two sides. Recent entries show compact filename/folder rows, with removal available on hover or keyboard focus.
 - A new document is titled **Untitled**. The title is stored inside the file and supplies the suggested download filename. Changing the title does not silently rename an existing desktop file.
 
 | Platform | File menu                | Ctrl+S                                               |
@@ -507,13 +510,15 @@ Desktop projects are ordinary files in user-selected folders, including shared f
 | Web      | New, Open, Download      | Download the current `.takt` file                    |
 | Desktop  | New, Open, Save, Save As | Save to the current path; first save asks for a path |
 
+The header button runs the Ctrl+S command of its platform.
+
 Save As creates a separate file and makes its path active after a successful save. Opening an existing desktop file edits that file, rather than importing it into application-managed storage.
 
 ### 17.4 Modified state and replacement protection
 
 Chart-content edits, title changes, calendar-reference changes, and switching Weeks/Dates count as edits. Zoom, scrolling, and collapse/expansion do not mark a document modified or cause a save warning. Save/download nevertheless captures the current viewing state, and recovery remembers it.
 
-Desktop saves are explicit: automatic recovery must never silently update the user's project file. An unsaved-change indicator communicates modified state. Closing or switching an edited desktop document offers **Save / Discard / Cancel**. A cancelled or failed save must preserve the working document and must not complete the pending replacement or close.
+Desktop saves are explicit: automatic recovery must never silently update the user's project file. The apricot dot in the title field communicates modified state. Closing or switching an edited desktop document offers **Save / Discard / Cancel**. A cancelled or failed save must preserve the working document and must not complete the pending replacement or close.
 
 On web, New or Open that would replace edits not yet downloaded offers **Download and continue / Discard changes / Cancel**. Returning Home keeps the current browser draft and offers Resume draft rather than discarding it. Parsing an invalid file must leave the current chart and recovery copy intact.
 
@@ -586,11 +591,25 @@ File commands finish committed inline item/title naming and cancel active pointe
 1. **When recovery exists:** a project gets a recovery copy with its first edit: a chart-content, title, calendar-reference, or Weeks/Dates change. An untouched new Untitled chart, or a file that was only opened and navigated, has none and is not offered on Home after refresh or closure. Once a copy exists it is kept current until the project is discarded or replaced, including after the content returns to its saved state.
 2. **How quickly changes reach recovery:** committed edits are stored immediately. Zoom, scrolling, and collapse changes may wait up to one second, and are stored at once before file commands, returning Home, and refresh or closure. An interruption can therefore lose at most the last second of viewing position, never an edit. Gesture previews are never stored.
 3. **Deleting drafts and recoveries:** each **Resume draft** and **Recover unsaved work** entry has a delete control, shown on hover or keyboard focus like recent-file removal. Deleting asks for confirmation naming the title and time, and removes that copy permanently. A copy that is open in another tab or window is not deleted; a message explains why.
-4. **Closing the desktop window:** the window always closes once the user has chosen Save or Discard, or when nothing is unsaved. Removing the recovery copy at that point is best effort; if it fails, the copy may be offered again on the next launch and can be deleted there. Cancel still keeps the window open.
+4. **Closing the desktop window:** the window always closes once the user has chosen Save or Discard, or when nothing is unsaved. Removing the recovery copy at that point is best effort; if it fails, the copy may be offered again on the next launch and can be deleted there. Cancel still keeps the window open. An edit made while that removal is still running is unsaved work: the window stays open and offers Save / Discard / Cancel.
 5. **Unreadable stored records:** a recovery copy or recent entry that cannot be read is skipped without hiding the others. Desktop leaves the unreadable file on disk and shows no warning for it.
 6. **Hidden and covered editor:** editor shortcuts such as Delete, undo, and redo do nothing while Home is shown or a shell dialog is open.
 7. **Shortcut hints:** the web application does not show the Ctrl/Cmd+N hint because browsers reserve that shortcut for a new window. The shortcut still works where the browser delivers it, and desktop shows it.
 8. **Times:** draft and recovery times use one fixed English format, for example “11 Oct 2026, 14:05”, in the viewer's time zone.
 9. **Recent history:** a file enters recent history when it actually replaces the current project or is saved, not when it is merely chosen and the replacement is then cancelled.
+10. **File permissions on desktop save:** saving over an existing file keeps that file's access permissions, even when they are stricter than its folder's; a new file gets its folder's. If the permissions cannot be kept, the save fails with a message and the edits stay available to save elsewhere.
 
 The [file-format proposal](takt-file-format.md) separates technical encoding choices from these product decisions. The [orchestrator handoff](project-files-orchestrator-handoff.md) gives the implementation sequence and ownership boundaries.
+
+## 18. Visual direction
+
+**Decision date:** October 11, 2026. The user selected version E of the design exploration, with a raised title field after version D. It replaces the Apricot prototype as the visual reference; chart behavior is unchanged.
+
+- The look follows shadcn conventions: Geist as the only typeface, neutral zinc greys for surfaces, lines, and text, and apricot `#b35d35` as the single primary color.
+- Primary actions (New project, Save or Download, and the confirming action of a dialog) use apricot, never black. Destructive confirmation keeps its red.
+- A section heading row is tinted with a light wash of its section color across the full chart width, with the section name in that color's dark ink. The tint follows recoloring and undo/redo. Rows keep the neutral surface.
+- The timeline heading row, its top-left corner, and the year band are white, like rows.
+- Home's left panel is apricot with white content; the rest of the application uses neutral surfaces.
+- Sections 6.1 and 17.3 describe the header, floating toolbar, and Home layout that belong to this direction.
+
+Exact values (colors, type scale, spacing, radii, shadows) live in `apps/web/src/tokens.css` and are documented with component guidance in the Takt design system. This specification does not repeat them.

@@ -195,10 +195,10 @@
     place-items: center;
     width: 40px;
     height: 40px;
-    border: 1px solid #f3b18455;
+    border: 1px solid var(--accent-line);
     border-radius: 10px;
-    background: #f3b18426;
-    color: #ad6b3e;
+    background: var(--accent-soft);
+    color: var(--accent);
   }
   svg {
     width: 18px;
@@ -286,34 +286,34 @@
     background: var(--soft);
   }
   td button.outside {
-    color: #9ca7b4;
+    color: var(--subtle);
   }
   td button[aria-current='date'] {
-    border-color: #e5ab81;
+    border-color: var(--accent);
   }
   td button.selected,
   td button.selected:hover {
-    background: var(--bar-fill);
-    color: var(--bar-ink);
+    background: var(--accent);
+    color: var(--on-accent);
     font-weight: 600;
-    box-shadow: 0 1px 2px #182e4712;
+    box-shadow: var(--shadow-accent);
   }
   button:focus-visible {
-    outline: 3px solid #f3b18480;
+    outline: 2px solid var(--ring);
     outline-offset: 1px;
   }
   .today {
     padding: 6px 9px;
-    border: 1px solid #f3b18455;
+    border: 1px solid var(--accent-line);
     border-radius: 6px;
-    background: #f3b18418;
-    color: #a16032;
+    background: var(--accent-soft);
+    color: var(--accent);
     font-size: 11px;
     font-weight: 600;
     cursor: pointer;
   }
   .today:hover {
-    background: #f3b18430;
+    background: var(--accent-line);
   }
   .actions {
     display: flex;

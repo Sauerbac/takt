@@ -71,14 +71,12 @@
     max-height: calc(100dvh - 32px);
     padding: 24px;
     border: 1px solid var(--line);
-    border-radius: 12px;
+    border-radius: var(--radius-xl);
     color: var(--ink);
     background: var(--surface);
-    box-shadow:
-      0 20px 70px #182e472b,
-      0 4px 16px #182e4712;
+    box-shadow: var(--shadow-dialog);
   }
   dialog::backdrop {
-    background: #182e4730;
+    background: var(--backdrop);
   }
 </style>

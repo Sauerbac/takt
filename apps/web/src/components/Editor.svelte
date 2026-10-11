@@ -15,7 +15,7 @@
     colorAppearance,
     DEFAULT_COLOR,
     documentColors,
-    colorLabelInk,
+    sectionAppearance,
     itemColor,
     recolor,
   } from '../model/colors';
@@ -768,6 +768,8 @@
       animateZoom(2, targetX, { week, clientX });
     }
   }
+  // Height the floating toolbar covers at the bottom of the chart viewport.
+  const TOOLBAR_CLEARANCE = 68;
   function revealRow(id: string) {
     const row = layout.rows.find((row) => row.id === id && row.visible);
     if (row) revealAt(row.top + 54, 44);
@@ -784,14 +786,18 @@
     const visible = viewport.getBoundingClientRect();
     if (bounds.top < visible.top + 54)
       viewport.scrollTop += bounds.top - visible.top - 54;
-    else if (bounds.bottom > visible.top + viewport.clientHeight)
-      viewport.scrollTop += bounds.bottom - visible.top - viewport.clientHeight;
+    else if (bounds.bottom > visible.top + revealHeight())
+      viewport.scrollTop += bounds.bottom - visible.top - revealHeight();
+  }
+  // Revealed content stops above the floating toolbar when the chart can scroll that far.
+  function revealHeight() {
+    return viewport.clientHeight - TOOLBAR_CLEARANCE;
   }
   function revealAt(top: number, height: number) {
     // Use the destination layout, even while expansion/reordering is animating.
     if (top < viewport.scrollTop + 54) viewport.scrollTop = top - 54;
-    else if (top + height > viewport.scrollTop + viewport.clientHeight)
-      viewport.scrollTop = top + height - viewport.clientHeight;
+    else if (top + height > viewport.scrollTop + revealHeight())
+      viewport.scrollTop = top + height - revealHeight();
   }
   function structuralBounds() {
     const bounds = viewport.getBoundingClientRect();
@@ -1561,23 +1567,391 @@
   </button>
 {/snippet}
 
-<main class="shell" class:with-files={!!fileControls}>
+<main class="shell">
   <header>
-    {#if onhome}<button
-        class="brand home-brand"
-        aria-label="Home"
-        onclick={onhome}
-        ><img class="mark" src={taktMark} alt="" />Takt<span class="dot">.</span
-        ></button
-      >{:else}<div class="brand" aria-label="Takt">
-        <img class="mark" src={taktMark} alt="" />Takt<span class="dot">.</span>
+    <div class="header-start">
+      {#if onhome}<button
+          class="brand home-brand"
+          aria-label="Home"
+          onclick={onhome}
+          ><img class="mark" src={taktMark} alt="" /><span
+            >Takt<span class="dot">.</span></span
+          ></button
+        >{:else}<div class="brand" aria-label="Takt">
+          <img class="mark" src={taktMark} alt="" /><span
+            >Takt<span class="dot">.</span></span
+          >
+        </div>{/if}
+    </div>
+    {#if fileControls}<div class="header-title">
+        {@render fileControls()}
       </div>{/if}
-    {#if fileControls}{@render fileControls()}{/if}
+    <div class="header-end">
+      {#if fileMenuControls}{@render fileMenuControls()}{/if}
+    </div>
+  </header>
+  <div class="stage">
+    <!-- The scroll region is focusable so keyboard users can scroll its overflow. -->
+    <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+    <div
+      class="viewport"
+      class:pannable={spaceHeld}
+      class:panning={!!pan}
+      use:navigation
+      bind:this={viewport}
+      role="region"
+      aria-label="Whole-week Gantt chart"
+      aria-busy={zooming}
+      tabindex="0"
+      onpointerdown={backgroundPress}
+      onscroll={viewportScrolled}
+      onpointermove={move}
+      onpointerup={end}
+      onpointercancel={cancel}
+      onlostpointercapture={() => {
+        if (pointerId !== null) cancel();
+      }}
+      style:--labels={`${LABEL_WIDTH}px`}
+    >
+      <div
+        class="chart"
+        class:structuralDragging={structuralMeaningful}
+        bind:this={chart}
+        style:height={`${54 + layout.height}px`}
+      >
+        <div class="chart-header">
+          <div class="lane-heading"></div>
+          <div class="weeks" bind:clientWidth={laneWidth}>
+            {#each years as band}
+              <div
+                class="year-band"
+                style:left={`${Math.max(0, (band.start - view.firstWeek) * weekWidth)}px`}
+                style:width={`${(Math.min(band.end, view.firstWeek + laneWidth / weekWidth) - Math.max(band.start, view.firstWeek)) * weekWidth}px`}
+              >
+                {band.label}
+              </div>
+            {/each}
+            {#if monthHeadings}
+              {#each months as band}
+                <button
+                  class="month-band"
+                  data-month={band.label}
+                  title={band.label}
+                  aria-label={`${band.label} · Set reference at clicked week`}
+                  disabled={busy}
+                  style:left={`${Math.max(0, (band.start - view.firstWeek) * weekWidth)}px`}
+                  style:width={`${(Math.min(band.end, view.firstWeek + laneWidth / weekWidth) - Math.max(band.start, view.firstWeek)) * weekWidth}px`}
+                  oncontextmenu={(event) =>
+                    void calendarMenu(event, Math.floor(weekAt(event.clientX)))}
+                  onclick={(event) =>
+                    openCalendar(
+                      event,
+                      event.detail
+                        ? Math.floor(weekAt(event.clientX))
+                        : Math.ceil(Math.max(band.start, view.firstWeek)),
+                    )}
+                  >{compactWeeks && (band.end - band.start) * weekWidth < 60
+                    ? band.label.replace('Month ', 'M')
+                    : band.label}</button
+                >
+              {/each}
+            {:else}
+              {#each weeks as week}<button
+                  class="week"
+                  class:date-week={document.display === 'dates'}
+                  aria-label={`${weekLabel(document, week)} · Set date for ${relativeWeekLabel(week)}`}
+                  title={weekLabel(document, week)}
+                  data-week={week}
+                  disabled={busy}
+                  oncontextmenu={(event) => void calendarMenu(event, week)}
+                  onclick={(event) => openCalendar(event, week)}
+                  style:left={`${(week - view.firstWeek) * weekWidth}px`}
+                  style:width={`${weekWidth}px`}
+                >
+                  {#if document.display === 'dates'}
+                    {@const label = weekLabel(document, week)}
+                    <span>{label.slice(0, -5)}</span>
+                  {:else if week % stride === 0}
+                    <span
+                      class="week-label"
+                      style:width={`${weekWidth * stride}px`}
+                      style:left={`${(weekWidth * (1 - stride)) / 2}px`}
+                      >{weekLabel(document, week)}</span
+                    >
+                  {/if}
+                </button>{/each}
+            {/if}
+          </div>
+        </div>
+        {#each renderedSections as section (section.id)}
+          {@const appearance = sectionAppearance(
+            document.sections.find((item) => item.id === section.id)?.color ??
+              DEFAULT_COLOR,
+          )}
+          <div
+            class="section"
+            class:carried={structural?.id === section.id &&
+              structuralMeaningful}
+            data-section-heading={section.id}
+            data-testid={`section-${section.id}`}
+            style:--section-bg={appearance.tint}
+            style:--section-ink={appearance.ink}
+            style:top={`${54 + structureTop(section.id, section.top)}px`}
+            oncontextmenu={(event) =>
+              void structureMenu(event, 'section', section.id)}
+            role="group"
+            aria-label={section.name || 'Unnamed section'}
+          >
+            <div class="section-label">
+              {@render dragGrip(
+                'section',
+                section.id,
+                section.name || 'Unnamed section',
+              )}
+              <button
+                class="collapse"
+                aria-label={`${collapsed.includes(section.id) ? 'Expand' : 'Collapse'} ${section.name || 'Unnamed section'}`}
+                aria-expanded={!collapsed.includes(section.id)}
+                onclick={() => toggleSection(section.id)}
+              >
+                <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+                  <path d="m6 4 4 4-4 4" />
+                </svg>
+              </button>
+              <span class="section-color" style:background={appearance.mark}
+              ></span>
+              {#if view.editingId === section.id}
+                {@render nameInput('Section')}
+              {:else}
+                <button
+                  class="section-name"
+                  onpointerdown={(event) =>
+                    startStructure(event, 'move-section', section.id)}
+                  onclick={(event) => {
+                    if (event.detail === 0) rename(section.id);
+                  }}>{section.name || 'Unnamed section'}</button
+                >
+              {/if}
+              <span class="count"
+                >{String(section.rows.length).padStart(2, '0')}</span
+              >
+            </div>
+            <div></div>
+          </div>
+          <div
+            class="add-row-line"
+            style:top={`${54 + structureTop(section.id, section.addTop)}px`}
+            class:carried={structural?.id === section.id &&
+              structuralMeaningful}
+          >
+            <button
+              class="add-row"
+              aria-label={`Add row to ${section.name || 'Unnamed section'}`}
+              onclick={() => void addRow(section.id)}>+ Add row</button
+            >
+          </div>
+        {/each}
+        {#each renderedRows as row (row.id)}
+          <div
+            class="row"
+            class:carried={carriesRow(row.id)}
+            class:hidden={!rowVisible(row.id)}
+            style:top={`${54 + structureTop(row.id, row.top)}px`}
+            data-testid={`row-${row.id}`}
+            data-section={row.sectionId}
+          >
+            <div
+              class="row-label"
+              oncontextmenu={(event) =>
+                void structureMenu(event, 'row', row.id)}
+              role="group"
+              aria-label={row.name || 'Unnamed row'}
+            >
+              {@render dragGrip('row', row.id, row.name || 'Unnamed row')}
+              {#if view.editingId === row.id}
+                {@render nameInput('Row')}
+              {:else}
+                <button
+                  class="row-name"
+                  onpointerdown={(event) =>
+                    startStructure(event, 'move-row', row.id)}
+                  ondblclick={() => rename(row.id)}
+                  >{row.name || 'Unnamed row'}</button
+                >
+              {/if}
+            </div>
+            <div
+              class="lane"
+              role="region"
+              aria-label={`Timeline row ${layout.rows.findIndex((candidate) => candidate.id === row.id) + 1}`}
+              tabindex="-1"
+              data-testid="lane"
+              data-row-lane={row.id}
+              data-first-week={view.firstWeek}
+              data-week-width={weekWidth}
+              onpointerdown={(event) =>
+                start(event, 'draw', crypto.randomUUID(), row.id)}
+              ondblclick={(event) => {
+                if (!(event.target as Element).closest('.bar, .milestone'))
+                  void createMilestone(
+                    row.id,
+                    Math.floor(weekAt(event.clientX)),
+                  );
+              }}
+              oncontextmenu={(event) => void openMenu(event, row.id)}
+            >
+              <svg class="week-grid" aria-hidden="true"
+                ><path d={gridPath} /></svg
+              >
+              {#if empty && row.id === hintRow}<span class="hint"
+                  >Drag to create a bar · Double-click for a milestone.</span
+                >{/if}
+              <div
+                class="timeline-content"
+                style:transform={`translateX(${timelineShift}px)`}
+              >
+                {#if gesture && motion?.meaningful && motion.proposal?.rowId === row.id}
+                  {@const proposal = motion.proposal}
+                  <div
+                    class="snap-preview"
+                    class:invalid={!motion.validDrop}
+                    class:milestone-preview={gesture.kind === 'milestone-move'}
+                    data-testid="snap-preview"
+                    data-start={proposal.start}
+                    data-end={proposal.end}
+                    data-row={proposal.rowId}
+                    data-valid={motion.validDrop}
+                    style:--bar-fill={proposalColor.fill}
+                    style:--bar-ink={proposalColor.ink}
+                    style:left={`${(proposal.start - FIRST_WEEK) * weekWidth + (gesture.kind === 'milestone-move' ? -7 : inset)}px`}
+                    style:width={`${gesture.kind === 'milestone-move' ? 14 : (proposal.end - proposal.start) * weekWidth - inset * 2}px`}
+                  ></div>
+                {/if}
+              </div>
+            </div>
+          </div>
+        {/each}
+        <div
+          class="items"
+          class:changingScale
+          class:carrying={structuralMeaningful}
+          style:width={`${laneWidth}px`}
+          style:height={`${structural ? Math.max(layout.height, structuralTop + (structural.kind === 'move-section' ? layout.sections.find((section) => section.id === structural!.id)!.height : 44)) : layout.height}px`}
+        >
+          <div
+            class="timeline-content"
+            style:transform={`translateX(${timelineShift}px)`}
+          >
+            {#if structural && structuralMeaningful}
+              {#if structural.kind === 'move-section'}
+                {@const section = layout.sections.find(
+                  (section) => section.id === structural!.id,
+                )!}
+                <div
+                  class="carried-surface section-surface"
+                  style:--section-bg={sectionAppearance(
+                    document.sections.find((item) => item.id === structural!.id)
+                      ?.color ?? DEFAULT_COLOR,
+                  ).tint}
+                  style:left={`${-timelineShift}px`}
+                  style:width={`${laneWidth}px`}
+                  style:top={`${structuralTop}px`}
+                  style:height={`${section.height}px`}
+                ></div>
+              {/if}
+              {#each renderedRows.filter( (row) => carriesRow(row.id) ) as row (row.id)}
+                <div
+                  class="carried-surface"
+                  style:left={`${-timelineShift}px`}
+                  style:width={`${laneWidth}px`}
+                  style:top={`${structureTop(row.id, row.top)}px`}
+                >
+                  <svg class="week-grid" aria-hidden="true"
+                    ><path d={gridPath} /></svg
+                  >
+                </div>
+              {/each}
+            {/if}
+            {#each shown.bars as bar (bar.id)}
+              <Bar
+                bar={gesture?.id === bar.id && motion?.proposal
+                  ? { ...bar, ...motion.proposal }
+                  : bar}
+                {weekWidth}
+                color={colorAppearance(itemColor(shown, bar))}
+                timing={barTiming(shown, bar.start, bar.end)}
+                onmenu={itemMenu}
+                visible={rowVisible(bar.rowId)}
+                carried={carriesRow(bar.rowId)}
+                top={gesture?.id === bar.id && movingBetweenRows
+                  ? trackingTop
+                  : rowTop(bar.rowId)}
+                selected={view.selectedId === bar.id || gesture?.id === bar.id}
+                invalid={gesture?.id === bar.id && motion?.validDrop === false}
+                editing={view.editingId === bar.id}
+                {draft}
+                tracking={motion &&
+                gesture?.id === bar.id &&
+                (gesture.kind !== 'draw' || motion.meaningful)
+                  ? motion.tracking
+                  : undefined}
+                onstart={start}
+                onnamedrag={startNameDrag}
+                onrename={rename}
+                ondraft={(value) => (draft = value)}
+                onfinish={finishName}
+              />
+            {/each}
+            {#each shown.milestones as item (item.id)}
+              <Milestone
+                item={gesture?.id === item.id && motion?.proposal
+                  ? {
+                      ...item,
+                      boundary: motion.proposal.start,
+                      rowId: motion.proposal.rowId,
+                    }
+                  : item}
+                {weekWidth}
+                color={colorAppearance(itemColor(shown, item))}
+                timing={milestoneTiming(shown, item.boundary)}
+                onmenu={itemMenu}
+                visible={rowVisible(item.rowId)}
+                carried={carriesRow(item.rowId)}
+                top={gesture?.id === item.id ? trackingTop : rowTop(item.rowId)}
+                tracking={gesture?.id === item.id
+                  ? motion?.tracking.start
+                  : undefined}
+                selected={view.selectedId === item.id ||
+                  gesture?.id === item.id}
+                invalid={gesture?.id === item.id && motion?.validDrop === false}
+                editing={view.editingId === item.id}
+                {draft}
+                onstart={start}
+                onrename={rename}
+                ondraft={(value) => (draft = value)}
+                onfinish={finishName}
+              />
+            {/each}
+          </div>
+        </div>
+        <div
+          class="add-section-line"
+          style:top={`${54 + layout.height - 36}px`}
+        >
+          <button
+            class="add-row"
+            aria-label="Add section"
+            onclick={() => void addSection()}>+ Add section</button
+          >
+        </div>
+      </div>
+      <!-- Lets the last rows scroll clear of the floating toolbar. -->
+      <div
+        class="toolbar-clearance"
+        style:height={`${TOOLBAR_CLEARANCE}px`}
+      ></div>
+    </div>
     <div class="toolbar" aria-label="Editor controls">
-      {#if fileMenuControls}
-        {@render fileMenuControls()}
-        <span class="divider"></span>
-      {/if}
       <div class="history">
         <IconButton
           label="Undo"
@@ -1616,345 +1990,6 @@
           disabled={busy}
           oncontextmenu={(event) => void calendarMenu(event, 0)}
           onclick={(event) => setDisplay(event, 'dates')}>Dates</button
-        >
-      </div>
-    </div>
-  </header>
-  <!-- The scroll region is focusable so keyboard users can scroll its overflow. -->
-  <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
-  <div
-    class="viewport"
-    class:pannable={spaceHeld}
-    class:panning={!!pan}
-    use:navigation
-    bind:this={viewport}
-    role="region"
-    aria-label="Whole-week Gantt chart"
-    aria-busy={zooming}
-    tabindex="0"
-    onpointerdown={backgroundPress}
-    onscroll={viewportScrolled}
-    onpointermove={move}
-    onpointerup={end}
-    onpointercancel={cancel}
-    onlostpointercapture={() => {
-      if (pointerId !== null) cancel();
-    }}
-    style:--labels={`${LABEL_WIDTH}px`}
-  >
-    <div
-      class="chart"
-      class:structuralDragging={structuralMeaningful}
-      bind:this={chart}
-      style:height={`${54 + layout.height}px`}
-    >
-      <div class="chart-header">
-        <div class="lane-heading">Sections &amp; rows</div>
-        <div class="weeks" bind:clientWidth={laneWidth}>
-          {#each years as band}
-            <div
-              class="year-band"
-              style:left={`${Math.max(0, (band.start - view.firstWeek) * weekWidth)}px`}
-              style:width={`${(Math.min(band.end, view.firstWeek + laneWidth / weekWidth) - Math.max(band.start, view.firstWeek)) * weekWidth}px`}
-            >
-              {band.label}
-            </div>
-          {/each}
-          {#if monthHeadings}
-            {#each months as band}
-              <button
-                class="month-band"
-                data-month={band.label}
-                title={band.label}
-                aria-label={`${band.label} · Set reference at clicked week`}
-                disabled={busy}
-                style:left={`${Math.max(0, (band.start - view.firstWeek) * weekWidth)}px`}
-                style:width={`${(Math.min(band.end, view.firstWeek + laneWidth / weekWidth) - Math.max(band.start, view.firstWeek)) * weekWidth}px`}
-                oncontextmenu={(event) =>
-                  void calendarMenu(event, Math.floor(weekAt(event.clientX)))}
-                onclick={(event) =>
-                  openCalendar(
-                    event,
-                    event.detail
-                      ? Math.floor(weekAt(event.clientX))
-                      : Math.ceil(Math.max(band.start, view.firstWeek)),
-                  )}
-                >{compactWeeks && (band.end - band.start) * weekWidth < 60
-                  ? band.label.replace('Month ', 'M')
-                  : band.label}</button
-              >
-            {/each}
-          {:else}
-            {#each weeks as week}<button
-                class="week"
-                class:date-week={document.display === 'dates'}
-                aria-label={`${weekLabel(document, week)} · Set date for ${relativeWeekLabel(week)}`}
-                title={weekLabel(document, week)}
-                data-week={week}
-                disabled={busy}
-                oncontextmenu={(event) => void calendarMenu(event, week)}
-                onclick={(event) => openCalendar(event, week)}
-                style:left={`${(week - view.firstWeek) * weekWidth}px`}
-                style:width={`${weekWidth}px`}
-              >
-                {#if document.display === 'dates'}
-                  {@const label = weekLabel(document, week)}
-                  <span>{label.slice(0, -5)}</span>
-                {:else if week % stride === 0}
-                  <span
-                    class="week-label"
-                    style:width={`${weekWidth * stride}px`}
-                    style:left={`${(weekWidth * (1 - stride)) / 2}px`}
-                    >{weekLabel(document, week)}</span
-                  >
-                {/if}
-              </button>{/each}
-          {/if}
-        </div>
-      </div>
-      {#each renderedSections as section (section.id)}
-        <div
-          class="section"
-          class:carried={structural?.id === section.id && structuralMeaningful}
-          data-section-heading={section.id}
-          data-testid={`section-${section.id}`}
-          style:top={`${54 + structureTop(section.id, section.top)}px`}
-          oncontextmenu={(event) =>
-            void structureMenu(event, 'section', section.id)}
-          role="group"
-          aria-label={section.name || 'Unnamed section'}
-        >
-          <div class="section-label">
-            {@render dragGrip(
-              'section',
-              section.id,
-              section.name || 'Unnamed section',
-            )}
-            <button
-              class="collapse"
-              aria-label={`${collapsed.includes(section.id) ? 'Expand' : 'Collapse'} ${section.name || 'Unnamed section'}`}
-              aria-expanded={!collapsed.includes(section.id)}
-              onclick={() => toggleSection(section.id)}
-            >
-              <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
-                <path d="m6 4 4 4-4 4" />
-              </svg>
-            </button>
-            <span
-              class="section-color"
-              style:background={colorLabelInk(
-                document.sections.find((item) => item.id === section.id)
-                  ?.color ?? DEFAULT_COLOR,
-              )}
-            ></span>
-            {#if view.editingId === section.id}
-              {@render nameInput('Section')}
-            {:else}
-              <button
-                class="section-name"
-                onpointerdown={(event) =>
-                  startStructure(event, 'move-section', section.id)}
-                onclick={(event) => {
-                  if (event.detail === 0) rename(section.id);
-                }}>{section.name || 'Unnamed section'}</button
-              >
-            {/if}
-            <span class="count"
-              >{String(section.rows.length).padStart(2, '0')}</span
-            >
-          </div>
-          <div></div>
-        </div>
-        <div
-          class="add-row-line"
-          style:top={`${54 + structureTop(section.id, section.addTop)}px`}
-          class:carried={structural?.id === section.id && structuralMeaningful}
-        >
-          <button
-            class="add-row"
-            aria-label={`Add row to ${section.name || 'Unnamed section'}`}
-            onclick={() => void addRow(section.id)}>+ Add row</button
-          >
-        </div>
-      {/each}
-      {#each renderedRows as row (row.id)}
-        <div
-          class="row"
-          class:carried={carriesRow(row.id)}
-          class:hidden={!rowVisible(row.id)}
-          style:top={`${54 + structureTop(row.id, row.top)}px`}
-          data-testid={`row-${row.id}`}
-          data-section={row.sectionId}
-        >
-          <div
-            class="row-label"
-            oncontextmenu={(event) => void structureMenu(event, 'row', row.id)}
-            role="group"
-            aria-label={row.name || 'Unnamed row'}
-          >
-            {@render dragGrip('row', row.id, row.name || 'Unnamed row')}
-            {#if view.editingId === row.id}
-              {@render nameInput('Row')}
-            {:else}
-              <button
-                class="row-name"
-                onpointerdown={(event) =>
-                  startStructure(event, 'move-row', row.id)}
-                ondblclick={() => rename(row.id)}
-                >{row.name || 'Unnamed row'}</button
-              >
-            {/if}
-          </div>
-          <div
-            class="lane"
-            role="region"
-            aria-label={`Timeline row ${layout.rows.findIndex((candidate) => candidate.id === row.id) + 1}`}
-            tabindex="-1"
-            data-testid="lane"
-            data-row-lane={row.id}
-            data-first-week={view.firstWeek}
-            data-week-width={weekWidth}
-            onpointerdown={(event) =>
-              start(event, 'draw', crypto.randomUUID(), row.id)}
-            ondblclick={(event) => {
-              if (!(event.target as Element).closest('.bar, .milestone'))
-                void createMilestone(row.id, Math.floor(weekAt(event.clientX)));
-            }}
-            oncontextmenu={(event) => void openMenu(event, row.id)}
-          >
-            <svg class="week-grid" aria-hidden="true"><path d={gridPath} /></svg
-            >
-            {#if empty && row.id === hintRow}<span class="hint"
-                >Drag to create a bar · Double-click for a milestone.</span
-              >{/if}
-            <div
-              class="timeline-content"
-              style:transform={`translateX(${timelineShift}px)`}
-            >
-              {#if gesture && motion?.meaningful && motion.proposal?.rowId === row.id}
-                {@const proposal = motion.proposal}
-                <div
-                  class="snap-preview"
-                  class:invalid={!motion.validDrop}
-                  class:milestone-preview={gesture.kind === 'milestone-move'}
-                  data-testid="snap-preview"
-                  data-start={proposal.start}
-                  data-end={proposal.end}
-                  data-row={proposal.rowId}
-                  data-valid={motion.validDrop}
-                  style:--bar-fill={proposalColor.fill}
-                  style:--bar-ink={proposalColor.ink}
-                  style:left={`${(proposal.start - FIRST_WEEK) * weekWidth + (gesture.kind === 'milestone-move' ? -7 : inset)}px`}
-                  style:width={`${gesture.kind === 'milestone-move' ? 14 : (proposal.end - proposal.start) * weekWidth - inset * 2}px`}
-                ></div>
-              {/if}
-            </div>
-          </div>
-        </div>
-      {/each}
-      <div
-        class="items"
-        class:changingScale
-        class:carrying={structuralMeaningful}
-        style:width={`${laneWidth}px`}
-        style:height={`${structural ? Math.max(layout.height, structuralTop + (structural.kind === 'move-section' ? layout.sections.find((section) => section.id === structural!.id)!.height : 44)) : layout.height}px`}
-      >
-        <div
-          class="timeline-content"
-          style:transform={`translateX(${timelineShift}px)`}
-        >
-          {#if structural && structuralMeaningful}
-            {#if structural.kind === 'move-section'}
-              {@const section = layout.sections.find(
-                (section) => section.id === structural!.id,
-              )!}
-              <div
-                class="carried-surface section-surface"
-                style:left={`${-timelineShift}px`}
-                style:width={`${laneWidth}px`}
-                style:top={`${structuralTop}px`}
-                style:height={`${section.height}px`}
-              ></div>
-            {/if}
-            {#each renderedRows.filter( (row) => carriesRow(row.id) ) as row (row.id)}
-              <div
-                class="carried-surface"
-                style:left={`${-timelineShift}px`}
-                style:width={`${laneWidth}px`}
-                style:top={`${structureTop(row.id, row.top)}px`}
-              >
-                <svg class="week-grid" aria-hidden="true"
-                  ><path d={gridPath} /></svg
-                >
-              </div>
-            {/each}
-          {/if}
-          {#each shown.bars as bar (bar.id)}
-            <Bar
-              bar={gesture?.id === bar.id && motion?.proposal
-                ? { ...bar, ...motion.proposal }
-                : bar}
-              {weekWidth}
-              color={colorAppearance(itemColor(shown, bar))}
-              timing={barTiming(shown, bar.start, bar.end)}
-              onmenu={itemMenu}
-              visible={rowVisible(bar.rowId)}
-              carried={carriesRow(bar.rowId)}
-              top={gesture?.id === bar.id && movingBetweenRows
-                ? trackingTop
-                : rowTop(bar.rowId)}
-              selected={view.selectedId === bar.id || gesture?.id === bar.id}
-              invalid={gesture?.id === bar.id && motion?.validDrop === false}
-              editing={view.editingId === bar.id}
-              {draft}
-              tracking={motion &&
-              gesture?.id === bar.id &&
-              (gesture.kind !== 'draw' || motion.meaningful)
-                ? motion.tracking
-                : undefined}
-              onstart={start}
-              onnamedrag={startNameDrag}
-              onrename={rename}
-              ondraft={(value) => (draft = value)}
-              onfinish={finishName}
-            />
-          {/each}
-          {#each shown.milestones as item (item.id)}
-            <Milestone
-              item={gesture?.id === item.id && motion?.proposal
-                ? {
-                    ...item,
-                    boundary: motion.proposal.start,
-                    rowId: motion.proposal.rowId,
-                  }
-                : item}
-              {weekWidth}
-              color={colorAppearance(itemColor(shown, item))}
-              timing={milestoneTiming(shown, item.boundary)}
-              onmenu={itemMenu}
-              visible={rowVisible(item.rowId)}
-              carried={carriesRow(item.rowId)}
-              top={gesture?.id === item.id ? trackingTop : rowTop(item.rowId)}
-              tracking={gesture?.id === item.id
-                ? motion?.tracking.start
-                : undefined}
-              selected={view.selectedId === item.id || gesture?.id === item.id}
-              invalid={gesture?.id === item.id && motion?.validDrop === false}
-              editing={view.editingId === item.id}
-              {draft}
-              onstart={start}
-              onrename={rename}
-              ondraft={(value) => (draft = value)}
-              onfinish={finishName}
-            />
-          {/each}
-        </div>
-      </div>
-      <div class="add-section-line" style:top={`${54 + layout.height - 36}px`}>
-        <button
-          class="add-row"
-          aria-label="Add section"
-          onclick={() => void addSection()}>+ Add section</button
         >
       </div>
     </div>
@@ -2213,67 +2248,94 @@
 
 <style>
   .shell {
-    padding: 0 34px 26px;
     height: 100dvh;
     display: grid;
-    grid-template-rows: 88px minmax(0, 1fr) auto;
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    background: var(--background);
   }
   header {
-    height: 88px;
     display: flex;
     align-items: center;
-    justify-content: space-between;
+    gap: 16px;
+    min-height: 58px;
+    padding: 8px var(--gutter);
+    background: var(--surface);
+    border-bottom: 1px solid var(--line);
   }
-  .with-files header {
-    position: relative;
-    display: grid;
-    grid-template-columns: minmax(90px, 1fr) minmax(80px, 300px) auto;
-    gap: 20px;
+  .header-start,
+  .header-end {
+    flex: 1 1 0;
+    display: flex;
+    align-items: center;
+    /* The sides keep their controls whole; a long title shrinks instead. */
+    min-width: max-content;
   }
-  .with-files .toolbar {
-    justify-self: end;
+  .header-end {
+    justify-content: flex-end;
+    gap: 8px;
+  }
+  .header-title {
+    flex: 0 1 360px;
+    min-width: 0;
   }
   .brand {
     display: flex;
     align-items: center;
-    gap: 10px;
-    font-size: 26px;
-    font-weight: 700;
-    letter-spacing: -1px;
+    gap: 8px;
+    font-size: 18px;
+    font-weight: 600;
+    letter-spacing: -0.5px;
   }
   .home-brand {
-    justify-self: start;
-    background: transparent;
+    margin-left: -8px;
+    padding: 6px 8px;
     border: 0;
-    padding: 0;
+    border-radius: var(--radius);
+    background: transparent;
     cursor: pointer;
+  }
+  .home-brand:hover {
+    background: var(--soft);
   }
   .dot {
     color: var(--accent);
-    margin-left: -10px;
   }
   .mark {
     display: block;
-    width: 23px;
-    height: 23px;
+    width: 20px;
+    height: 20px;
     flex-shrink: 0;
   }
-  .toolbar,
+  .stage {
+    position: relative;
+    display: flex;
+    /* Let the chart scroll inside the viewport instead of widening the page. */
+    min-width: 0;
+    min-height: 0;
+    margin: 16px var(--gutter) 0;
+  }
+  .toolbar {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 16px;
+    z-index: 15;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    width: max-content;
+    max-width: calc(100% - 16px);
+    margin-inline: auto;
+    padding: 5px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-xl);
+    background: var(--surface);
+    box-shadow: var(--shadow-float);
+  }
   .history {
     display: flex;
     align-items: center;
-    gap: 3px;
-  }
-  .toolbar {
-    gap: 13px;
-  }
-  @media (max-width: 900px) {
-    .with-files header {
-      gap: 14px;
-    }
-    .with-files .toolbar {
-      gap: 8px;
-    }
+    gap: 2px;
   }
   .divider {
     width: 1px;
@@ -2281,29 +2343,26 @@
     background: var(--line);
   }
   .mode-switch {
-    font-size: 13px;
-    font-weight: 600;
-    padding: 7px 11px;
-    background: var(--surface);
-    border: 1px solid var(--line);
-    border-radius: var(--radius);
-  }
-  .mode-switch {
     display: flex;
     padding: 3px;
-    gap: 2px;
+    border-radius: var(--radius-lg);
+    background: var(--soft);
+    font-size: 13px;
   }
   .mode-switch button {
+    height: 30px;
+    padding: 0 12px;
     border: 0;
-    padding: 5px 9px;
-    border-radius: 3px;
+    border-radius: var(--radius);
     background: transparent;
-    color: var(--muted);
+    color: var(--row-ink);
     cursor: pointer;
   }
   .mode-switch button.active {
     color: var(--ink);
-    background: var(--soft);
+    background: var(--surface);
+    font-weight: 500;
+    box-shadow: var(--shadow-sm);
   }
   .pannable,
   .panning {
@@ -2323,10 +2382,11 @@
   .viewport {
     outline: none;
     overflow: auto;
+    flex: 1;
+    min-width: 0;
     background: var(--surface);
     border: 1px solid var(--line);
-    border-radius: var(--radius);
-    min-height: 0;
+    border-radius: var(--radius-lg);
   }
   .chart {
     position: relative;
@@ -2357,15 +2417,8 @@
   }
   .lane-heading {
     top: 0;
-    display: flex;
-    align-items: center;
-    padding: 0 22px;
+    background: var(--surface);
     border-right: 1px solid var(--line);
-    font-size: 11px;
-    letter-spacing: 1.1px;
-    text-transform: uppercase;
-    font-weight: 600;
-    color: var(--muted);
   }
   .weeks {
     position: relative;
@@ -2385,9 +2438,10 @@
     background: transparent;
     padding: 0;
     cursor: pointer;
-    font-size: 13px;
-    color: var(--row-ink);
+    font-size: 12px;
+    color: var(--ink);
     font-weight: 500;
+    font-variant-numeric: tabular-nums;
   }
   .date-week {
     font-size: 11px;
@@ -2410,12 +2464,13 @@
     border-right: 1px solid var(--line);
     text-align: center;
     font-size: 11px;
+    font-weight: 500;
   }
   .year-band {
     top: 0;
     height: 20px;
     line-height: 20px;
-    background: var(--section-bg);
+    background: var(--surface);
     color: var(--muted);
     pointer-events: none;
   }
@@ -2434,8 +2489,9 @@
     width: 100%;
     transition: top var(--settlement) ease-out;
     height: 36px;
+    /* Each section sets --section-bg and --section-ink to its own color. */
     background: var(--section-bg);
-    border-bottom: 1px solid var(--line);
+    border-bottom: 1px solid var(--grid);
   }
   .section-label {
     background: var(--section-bg);
@@ -2444,19 +2500,22 @@
     gap: 8px;
     padding: 0 14px;
     font-size: 13px;
-    font-weight: 650;
+    font-weight: 600;
+    color: var(--section-ink, var(--ink));
   }
   .section-color {
-    width: 7px;
-    height: 7px;
-    border-radius: 50%;
+    flex: none;
+    width: 10px;
+    height: 10px;
+    border-radius: 3px;
     background: var(--bar-ink);
   }
   .count {
     margin-left: auto;
     font-size: 11px;
     font-weight: 400;
-    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+    opacity: 0.7;
   }
   .row {
     position: absolute;
@@ -2474,8 +2533,7 @@
     padding: 0 14px;
     gap: 8px;
     border-right: 1px solid var(--line);
-    font-size: 14px;
-    font-weight: 500;
+    font-size: 13px;
     color: var(--row-ink);
   }
   .lane {
@@ -2503,7 +2561,7 @@
     align-items: center;
     justify-content: center;
     pointer-events: none;
-    font-size: 14px;
+    font-size: 13px;
     color: var(--muted);
   }
   .timeline-content {
@@ -2564,7 +2622,7 @@
     padding: 0;
     border: 0;
     background: transparent;
-    color: #9ca7b4;
+    color: var(--subtle);
     cursor: grab;
     touch-action: none;
   }
@@ -2648,7 +2706,7 @@
   .add-row-line.carried {
     background: var(--surface);
     /* The final strip supplies one shadow below the complete carried group. */
-    box-shadow: 0 4px 12px #182e471a;
+    box-shadow: 0 4px 12px #18181b1a;
     clip-path: inset(0 -12px -16px);
   }
   .row-name,
@@ -2659,8 +2717,9 @@
   .collapse {
     border: 0;
     background: none;
-    border-radius: 4px;
-    color: var(--muted);
+    border-radius: var(--radius-sm);
+    color: inherit;
+    opacity: 0.75;
     padding: 0;
     width: 20px;
     height: 24px;
@@ -2671,10 +2730,10 @@
     cursor: pointer;
   }
   .collapse:hover {
-    color: var(--row-ink);
+    opacity: 1;
   }
   .collapse:focus-visible {
-    outline: 1px solid var(--muted);
+    outline: 2px solid var(--accent);
     outline-offset: 1px;
   }
   .collapse svg {
@@ -2696,6 +2755,8 @@
   }
   #delete-title {
     font-size: 17px;
+    font-weight: 600;
+    letter-spacing: -0.3px;
     margin: 0 0 12px;
   }
   #delete-description {
@@ -2723,11 +2784,27 @@
     position: sticky;
     left: 22px;
     margin: 7px 22px;
+    height: 22px;
+    padding: 0 6px;
     border: 0;
+    border-radius: var(--radius-sm);
     background: none;
     color: var(--muted);
     font-size: 12px;
     cursor: pointer;
+  }
+  .add-row:hover {
+    background: var(--soft);
+    color: var(--ink);
+  }
+  .add-section-line .add-row {
+    height: 26px;
+    margin: 5px 8px;
+    left: 8px;
+    padding: 0 10px;
+    border: 1px dashed var(--line-strong);
+    border-radius: var(--radius);
+    color: var(--row-ink);
   }
   .snap-preview.milestone-preview {
     height: 14px;
@@ -2744,10 +2821,8 @@
     padding: 6px;
     background: var(--surface);
     border: 1px solid var(--line);
-    border-radius: 9px;
-    box-shadow:
-      0 12px 32px #182e471a,
-      0 2px 6px #182e470a;
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-float);
   }
   .menu-heading {
     padding: 6px 9px 5px;
@@ -2755,13 +2830,13 @@
   .menu-heading small {
     display: block;
     color: var(--muted);
-    font-size: 10px;
+    font-size: 11px;
     text-transform: capitalize;
     margin-bottom: 4px;
   }
   .menu-heading strong {
     display: block;
-    font-size: 12px;
+    font-size: 13px;
     font-weight: 600;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -2775,7 +2850,7 @@
     padding: 0;
     background: transparent;
     color: var(--ink);
-    font-size: 12px;
+    font-size: 13px;
     font-weight: 600;
   }
   .menu-name:focus {
@@ -2794,7 +2869,7 @@
     justify-content: space-between;
     align-items: center;
     color: var(--muted);
-    font-size: 10px;
+    font-size: 11px;
     margin-bottom: 9px;
   }
   .color-label span:first-child {
@@ -2816,8 +2891,8 @@
     width: 32px;
     height: 30px;
     padding: 0;
-    border: 1px solid #182e4710;
-    border-radius: 5px;
+    border: 1px solid #18181b14;
+    border-radius: var(--radius-sm);
     color: var(--swatch-ink);
     background: var(--swatch-fill);
     box-shadow: inset 0 1px 0 #ffffff30;
@@ -2856,10 +2931,22 @@
   }
   .notice {
     position: fixed;
-    bottom: 8px;
-    left: 34px;
+    bottom: 12px;
+    left: 0;
+    right: 0;
+    width: max-content;
+    max-width: calc(100% - 40px);
+    margin-inline: auto;
+    padding: 5px 10px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--surface);
+    box-shadow: var(--shadow-xs);
     font-size: 12px;
-    color: #a23e42;
+    color: var(--danger);
+  }
+  .notice:empty {
+    display: none;
   }
   .snap-preview {
     position: absolute;
@@ -2871,7 +2958,7 @@
     pointer-events: none;
   }
   .snap-preview.invalid {
-    border-color: #a23e42;
+    border-color: var(--danger);
     background: #a23e4220;
   }
   footer {
@@ -2879,8 +2966,8 @@
     justify-content: space-between;
     gap: 20px;
     color: var(--muted);
-    font-size: 11px;
+    font-size: 12px;
     line-height: 1.5;
-    padding-top: 13px;
+    padding: 10px var(--gutter);
   }
 </style>

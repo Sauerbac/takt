@@ -139,7 +139,7 @@ test('custom calendar opens centered with backdrop, confines focus and commits o
     await dialog.evaluate(
       (node) => getComputedStyle(node, '::backdrop').backgroundColor,
     ),
-  ).toBe('rgba(24, 46, 71, 0.19)');
+  ).toBe('rgba(24, 24, 27, 0.2)');
   await page.getByRole('button', { name: 'Next month', exact: true }).click();
   await expect(page.getByRole('grid')).toHaveAccessibleName('November 2026');
   await page.getByRole('button', { name: '12 Nov 2026', exact: true }).click();

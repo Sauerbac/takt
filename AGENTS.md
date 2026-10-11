@@ -4,7 +4,7 @@ Takt is a desktop-browser Gantt editor. The shared Svelte 5, Vite, and TypeScrip
 
 - Before changing product behavior, read `docs/ux-specification.md`. For architecture, interaction-engine, component, or test-coverage decisions, also read `docs/implementation-decisions.md`. Product behavior belongs in the UX specification.
 - For project files, Home, recovery, recent files, or desktop packaging, start with `docs/project-files-orchestrator-handoff.md`; it links the agreed behavior, proposed format, unresolved questions, and agent ownership plan.
-- Use `ui-prototype/` as the Apricot visual reference. It is static prototype code, not production code to port wholesale.
+- For visual work, read the [Takt design system](https://claude.ai/artifact/K1y9MSi2FfLWuh9ihQPUHh) and use the tokens in `apps/web/src/tokens.css`; implementation decisions section 18 says how they map to components. `ui-prototype/` is the superseded Apricot prototype.
 - Use npm from the repository root and commit the root `package-lock.json`. See `README.md` for setup, individual commands, fixtures, and browser-test caveats.
 - While iterating, run only the tests for the change: one Playwright test by `-g` in one browser, plus the fast rule tests. The full component suite takes about ten minutes; run the complete sequence once, at the end.
 - Complete changes with `npm run format:check`, `npm run check`, `npm run build`, then `npm test`. Build before integrated production tests. For desktop changes, also run the native and direct-EXE checks documented in `README.md`.

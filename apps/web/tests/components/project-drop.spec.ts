@@ -43,7 +43,7 @@ test('Home drop zone opens files, survives nested drag boundaries, and remains a
 }) => {
   await page.goto('/');
   const zone = page.getByRole('button', {
-    name: 'Open a project by dropping a .takt file or browsing',
+    name: 'Open .takt file',
   });
   expect((await fileDrag(page, 'dragenter', [incoming])).prevented).toBe(true);
   await fileDrag(page, 'dragenter', [incoming], '.drop-zone strong');

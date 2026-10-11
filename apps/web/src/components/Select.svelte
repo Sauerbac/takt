@@ -39,8 +39,13 @@
   function show(index = Math.max(0, selected)) {
     const bounds = trigger.getBoundingClientRect();
     left = Math.min(bounds.left, window.innerWidth - 144);
-    top = bounds.bottom + 6;
     menu.showPopover();
+    // Open upward when the list would not fit below, as in the bottom toolbar.
+    const height = menu.offsetHeight;
+    top =
+      bounds.bottom + 6 + height > window.innerHeight - 8
+        ? Math.max(8, bounds.top - 6 - height)
+        : bounds.bottom + 6;
     // Native toggle notifications are queued; keyboard input can arrive first.
     open = true;
     void focusOption(index);
@@ -132,32 +137,29 @@
   button {
     color: var(--ink);
     font-size: 13px;
-    font-weight: 600;
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
     cursor: pointer;
   }
   button[role='combobox'] {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 9px;
-    min-width: 82px;
-    height: 34px;
+    gap: 8px;
+    min-width: 84px;
+    height: 36px;
     padding: 0 10px;
-    border: 1px solid var(--line);
-    border-radius: 7px;
-    background: var(--surface);
-    box-shadow: 0 1px 2px #182e4708;
-    transition:
-      background 150ms,
-      border-color 150ms;
+    border: 0;
+    border-radius: var(--radius-lg);
+    background: transparent;
+    transition: background 150ms;
   }
   button[role='combobox']:hover:enabled,
   .open {
     background: var(--soft);
-    border-color: #b9c3ce;
   }
   button:focus-visible {
-    outline: 3px solid #f3b18480;
+    outline: 2px solid var(--accent);
     outline-offset: 2px;
   }
   button:disabled {
@@ -183,11 +185,9 @@
     width: 136px;
     padding: 5px;
     border: 1px solid var(--line);
-    border-radius: 9px;
+    border-radius: var(--radius-lg);
     background: var(--surface);
-    box-shadow:
-      0 8px 24px #182e471a,
-      0 2px 6px #182e470a;
+    box-shadow: var(--shadow-float);
   }
   .options button {
     display: flex;
@@ -196,10 +196,10 @@
     width: 100%;
     padding: 8px 9px;
     border: 0;
-    border-radius: 5px;
+    border-radius: var(--radius-sm);
     background: transparent;
     text-align: left;
-    font-weight: 500;
+    font-weight: 400;
   }
   .options button:hover,
   .options button:focus-visible {
@@ -207,9 +207,9 @@
     outline: none;
   }
   .options button[aria-selected='true'] {
-    background: #f3b18426;
+    background: var(--accent-soft);
   }
   .options span {
-    color: #aa6536;
+    color: var(--accent);
   }
 </style>

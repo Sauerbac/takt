@@ -57,6 +57,20 @@ export function colorAppearance(color: Color): { fill: string; ink: string } {
   };
 }
 
+// A section heading row carries a light opaque wash of its color, with a
+// stronger mark of the same hue beside the name.
+export function sectionAppearance(color: Color): {
+  tint: string;
+  mark: string;
+  ink: string;
+} {
+  return {
+    tint: hex(0.965, 0.018, color),
+    mark: hex(0.55, 0.09, color),
+    ink: hex(0.35, 0.04, color),
+  };
+}
+
 export const hueGradient = `linear-gradient(to right, ${Array.from(
   { length: 73 },
   (_, index) => `${colorAppearance(index * 5).fill} ${(index / 72) * 100}%`,

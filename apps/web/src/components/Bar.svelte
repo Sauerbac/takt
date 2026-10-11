@@ -151,9 +151,9 @@
     border-radius: var(--bar-radius);
     background: var(--bar-fill);
     color: var(--bar-ink);
-    font-size: 13px;
+    font-size: 12px;
     line-height: 14px;
-    font-weight: 600;
+    font-weight: 500;
     display: flex;
     align-items: center;
     padding: 0 min(12px, var(--handle-width));
@@ -174,7 +174,7 @@
     z-index: 3;
   }
   .bar.invalid {
-    border: 1px dashed #a23e42;
+    border: 1px dashed var(--danger);
     cursor: not-allowed;
   }
   .bar span {
@@ -230,11 +230,11 @@
   .handle::after {
     content: '';
     display: block;
-    height: 10px;
-    width: 2px;
+    height: 12px;
+    width: min(3px, 100%);
     margin: auto;
     background: currentColor;
-    opacity: 0.6;
-    border-radius: 1px;
+    opacity: 0.4;
+    border-radius: 2px;
   }
 </style>

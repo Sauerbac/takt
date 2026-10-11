@@ -5,7 +5,7 @@
   import Button from './components/Button.svelte';
   import MenuItem from './components/MenuItem.svelte';
   import ProjectIcon from './components/ProjectIcon.svelte';
-  import taktMark from './assets/takt-mark.svg';
+  import TitleField from './components/TitleField.svelte';
   import { browserAdapter } from './project/browser';
   import { newProject, contentKey } from './project/format';
   import type { ProjectSnapshot } from './project/format';
@@ -31,6 +31,8 @@
       error: session.error,
       warning: session.recoveryWarning,
       drafts: session.drafts,
+      // The header names the file a desktop project is saved in.
+      fileName: session.file?.path.split(/[\\/]/).pop(),
     };
   });
   let editor = $state<Editor | undefined>();
@@ -96,6 +98,10 @@
   const saveLabel = $derived(
     adapter.kind === 'web' ? 'Download .takt' : 'Save',
   );
+  function commitTitle() {
+    title = title.trim() || 'Untitled';
+    if (session.snapshot) session.update({ ...session.snapshot, title });
+  }
   onMount(() => {
     void session.initialize();
     void refreshRecents();
@@ -103,15 +109,20 @@
     const disposeClose = adapter.onCloseRequested?.(
       () =>
         new Promise((resolve) => {
+          const offerGuard = () => {
+            closeResolve = resolve;
+            guard = true;
+            pending = () => resolve(true);
+          };
           prepare();
-          if (!session.modified) {
-            // Removing recovery is best effort: a window must always be closable.
-            void session.discard().finally(() => resolve(true));
-            return;
-          }
-          closeResolve = resolve;
-          guard = true;
-          pending = () => resolve(true);
+          if (session.modified) return offerGuard();
+          // Removing recovery is best effort: a window must always be closable.
+          // The editor stays usable meanwhile, so an edit made during removal is guarded.
+          void session.discard().finally(() => {
+            prepare();
+            if (session.modified) offerGuard();
+            else resolve(true);
+          });
         }),
     );
     return () => {
@@ -538,178 +549,130 @@
 />
 {#if current.home}
   <main class="home">
-    <header class="home-header">
+    <section class="home-start">
       <div class="home-brand">
-        <img src={taktMark} alt="" />Takt<span>.</span>
+        <svg viewBox="0 0 32 32" aria-hidden="true"
+          ><rect x="3" y="4" width="16" height="6" rx="1" /><rect
+            x="8"
+            y="13"
+            width="21"
+            height="6"
+            rx="1"
+          /><rect x="16" y="22" width="13" height="6" rx="1" /></svg
+        >Takt.
       </div>
-      <span class="home-caption">A place for your plans</span>
-    </header>
-    <section class="welcome">
+      <div class="home-art" aria-hidden="true">
+        <i></i><i></i><i></i><b></b>
+      </div>
       <h1>Welcome to Takt</h1>
-      <p>Give your next idea a timeline.</p>
+      <button class="new-project" onclick={create} disabled={operation}>
+        <svg viewBox="0 0 16 16" aria-hidden="true"
+          ><path d="M8 3v10M3 8h10" /></svg
+        >
+        <strong>New project</strong>
+        {#if newShortcut}<kbd aria-hidden="true">{newShortcut}</kbd>{/if}
+      </button>
+      <button
+        class="drop-zone"
+        class:drag-active={fileDrag}
+        disabled={dropBlocked}
+        onclick={() => void open()}
+        aria-label="Open .takt file"
+      >
+        <ProjectIcon name="open" />
+        <strong>Open .takt file</strong>
+        <span>Drop a file here or click to browse</span>
+        <kbd aria-hidden="true">{modifier} O</kbd>
+      </button>
     </section>
-    <div class="home-columns">
-      <section class="start" aria-labelledby="start-heading">
-        <h2 id="start-heading">Start</h2>
-        <button
-          class="start-action"
-          onclick={create}
-          disabled={operation}
-          aria-label="New project"
-        >
-          <span class="action-icon"><ProjectIcon name="new" /></span>
-          <span class="action-text"
-            ><strong>New project</strong><small
-              >A blank canvas for your plan</small
-            ></span
+    <div class="home-projects">
+      {#if current.snapshot}<section class="drafts">
+          <h2>Current project</h2>
+          <button
+            class="draft current-project"
+            onclick={() => {
+              session.home = false;
+              revision++;
+            }}
+            ><span class="project-art" aria-hidden="true"
+              ><i></i><i></i><i></i></span
+            ><span class="project-text"
+              ><strong>{current.snapshot.title}</strong><small
+                >Resume project</small
+              ></span
+            ><span class="resume-arrow"><ProjectIcon name="arrow" /></span
+            ></button
           >
-          {#if newShortcut}<kbd aria-hidden="true">{newShortcut}</kbd>{/if}
-        </button>
-        <button
-          class="start-action"
-          onclick={() => void open()}
-          disabled={operation}
-          aria-label="Open .takt file"
-        >
-          <span class="action-icon"><ProjectIcon name="open" /></span>
-          <span class="action-text"
-            ><strong>Open .takt file</strong><small
-              >Pick up where you left off</small
-            ></span
-          >
-          <kbd aria-hidden="true">{modifier} O</kbd>
-        </button>
-        <p class="local-note">
-          Your files stay on your device.<br />No account needed.
-        </p>
-        <button
-          class="drop-zone"
-          class:drag-active={fileDrag}
-          disabled={dropBlocked}
-          onclick={() => void open()}
-          aria-label="Open a project by dropping a .takt file or browsing"
-        >
-          <ProjectIcon name="drop" />
-          <strong>Drop a .takt file here</strong>
-          <small>or click to browse</small>
-        </button>
-      </section>
-      <div class="continue">
-        {#if current.snapshot}<section class="drafts">
-            <h2>Current project</h2>
-            <button
-              class="draft"
-              onclick={() => {
-                session.home = false;
-                revision++;
-              }}
-              ><span class="list-icon"><ProjectIcon name="file" /></span><span
-                class="project-text"
-                ><strong>{current.snapshot.title}</strong><small
-                  >Resume project</small
-                ></span
-              ><span class="resume-arrow"><ProjectIcon name="arrow" /></span
-              ></button
-            >
-          </section>{/if}
-        {#if availableDrafts.length}<section class="drafts">
-            <h2>
-              {adapter.kind === 'web' ? 'Resume draft' : 'Recover unsaved work'}
-            </h2>
-            {#each availableDrafts as record}<div class="draft-entry">
-                <button
-                  class="draft"
-                  disabled={operation}
-                  onclick={() => resume(record)}
-                  ><span class="list-icon"><ProjectIcon name="clock" /></span
-                  ><span class="project-text"
-                    ><strong>{record.snapshot.title}</strong><small
-                      >{draftTime(record.updatedAt)}</small
-                    ></span
-                  ><span class="resume-arrow"><ProjectIcon name="arrow" /></span
-                  ></button
-                ><button
-                  class="remove-recent"
-                  disabled={operation}
-                  title="Delete"
-                  aria-label={`Delete ${record.snapshot.title} from ${draftTime(record.updatedAt)}`}
-                  onclick={() => (draftRemoval = record)}
-                  ><ProjectIcon name="close" /></button
-                >
-              </div>{/each}
-          </section>{/if}
-        {#if adapter.kind === 'desktop' && recents.length}<section
-            class="drafts"
-          >
-            <h2>Recent files</h2>
-            {#each showAll ? recents : recents.slice(0, 10) as recent}<div
-                class="recent-entry"
+        </section>{/if}
+      {#if availableDrafts.length}<section class="drafts">
+          <h2>
+            {adapter.kind === 'web' ? 'Resume draft' : 'Recover unsaved work'}
+          </h2>
+          {#each availableDrafts as record}<div class="draft-entry">
+              <button
+                class="draft"
+                disabled={operation}
+                onclick={() => resume(record)}
+                ><span class="list-icon"><ProjectIcon name="clock" /></span
+                ><span class="project-text"
+                  ><strong>{record.snapshot.title}</strong><small
+                    >{draftTime(record.updatedAt)}</small
+                  ></span
+                ></button
+              ><button
+                class="remove-recent"
+                disabled={operation}
+                title="Delete"
+                aria-label={`Delete ${record.snapshot.title} from ${draftTime(record.updatedAt)}`}
+                onclick={() => (draftRemoval = record)}
+                ><ProjectIcon name="close" /></button
               >
-                <button
-                  class="draft"
-                  disabled={operation}
-                  title={recent.path}
-                  onclick={() => void open(recent.path)}
-                  ><span class="list-icon"><ProjectIcon name="file" /></span
-                  ><span class="project-text"
-                    ><strong>{recent.name}</strong><small>{recent.folder}</small
-                    ></span
-                  ></button
-                ><button
-                  class="remove-recent"
-                  disabled={operation}
-                  title="Remove from recents"
-                  aria-label={`Remove ${recent.name} from recents`}
-                  onclick={() => void removeRecent(recent.path)}
-                  ><ProjectIcon name="close" /></button
-                >
-              </div>{/each}{#if recents.length > 10}<button
-                class="show-recents"
-                onclick={() => (showAll = !showAll)}
-                >{showAll ? 'Show latest ten' : 'Show all recent files'}</button
-              >{/if}
-          </section>{/if}
-        {#if !hasProjects}
-          <section class="empty-projects" aria-labelledby="empty-heading">
-            <div class="mini-timeline" aria-hidden="true">
-              <i></i><i></i><i></i><b></b>
-            </div>
-            <h2 id="empty-heading">Room for what’s next</h2>
-            <p>
-              {adapter.kind === 'desktop'
-                ? 'Your recent projects will appear here.'
-                : 'Create a project or open a .takt file to get started.'}
-            </p>
-            <small
-              >{adapter.kind === 'desktop'
-                ? 'Unsaved work can be recovered here, too.'
-                : 'Locally retained drafts will be available here.'}</small
+            </div>{/each}
+        </section>{/if}
+      {#if adapter.kind === 'desktop' && recents.length}<section class="drafts">
+          <h2>Recent files</h2>
+          {#each showAll ? recents : recents.slice(0, 10) as recent}<div
+              class="recent-entry"
             >
-          </section>
-        {/if}
-      </div>
-    </div>
-    <section class="quick-guide" aria-labelledby="guide-heading">
-      <h2 id="guide-heading">A few simple moves</h2>
-      <div class="guide-items">
-        <div>
-          <span class="gesture-mark bar-mark" aria-hidden="true"></span><strong
-            >Draw your plan</strong
+              <button
+                class="draft"
+                disabled={operation}
+                title={recent.path}
+                onclick={() => void open(recent.path)}
+                ><span class="project-text"
+                  ><strong>{recent.name}</strong><small>{recent.folder}</small
+                  ></span
+                ></button
+              ><button
+                class="remove-recent"
+                disabled={operation}
+                title="Remove from recents"
+                aria-label={`Remove ${recent.name} from recents`}
+                onclick={() => void removeRecent(recent.path)}
+                ><ProjectIcon name="close" /></button
+              >
+            </div>{/each}{#if recents.length > 10}<button
+              class="show-recents"
+              onclick={() => (showAll = !showAll)}
+              >{showAll ? 'Show latest ten' : 'Show all recent files'}</button
+            >{/if}
+        </section>{/if}
+      {#if !hasProjects}
+        <section class="empty-projects" aria-labelledby="empty-heading">
+          <h2 id="empty-heading">Room for what’s next</h2>
+          <p>
+            {adapter.kind === 'desktop'
+              ? 'Your recent projects will appear here.'
+              : 'Create a project or open a .takt file to get started.'}
+          </p>
+          <small
+            >{adapter.kind === 'desktop'
+              ? 'Unsaved work can be recovered here, too.'
+              : 'Locally retained drafts will be available here.'}</small
           >
-          <p>Drag across a row to create a bar.</p>
-        </div>
-        <div>
-          <span class="gesture-mark milestone-mark" aria-hidden="true"
-          ></span><strong>Mark a moment</strong>
-          <p>Double-click a row to add a milestone.</p>
-        </div>
-        <div>
-          <span class="gesture-mark adjust-mark" aria-hidden="true"
-          ></span><strong>Make it yours</strong>
-          <p>Drag bars to move. Drag their ends to resize.</p>
-        </div>
-      </div>
-    </section>
+        </section>
+      {/if}
+    </div>
   </main>
 {/if}
 {#if current.snapshot}
@@ -732,38 +695,29 @@
       >
         {#snippet fileControls()}
           <div class="file-controls">
-            <div class="title-wrap">
-              <input
-                aria-label="Project title"
-                bind:value={title}
-                onblur={() => {
-                  title = title.trim() || 'Untitled';
-                  if (session.snapshot)
-                    session.update({ ...session.snapshot, title });
-                }}
-                onkeydown={(event) => {
-                  if (event.key === 'Enter') {
-                    event.preventDefault();
-                    event.currentTarget.blur();
-                  }
-                  if (event.key === 'Escape') {
-                    title = session.snapshot?.title ?? 'Untitled';
-                    event.currentTarget.blur();
-                  }
-                }}
-              /><svg class="title-pencil" viewBox="0 0 16 16" aria-hidden="true"
-                ><path
-                  d="m10.7 2.3 3 3-8.6 8.6-3.6.6.6-3.6zM9.3 3.7l3 3"
-                /></svg
-              >{#if current.modified}<span
-                  class="modified"
-                  aria-label="Modified"
-                  title="Modified">●</span
-                >{/if}
-            </div>
+            <TitleField
+              bind:value={title}
+              label="Project title"
+              hint={current.fileName
+                ? `${current.fileName} · Rename project`
+                : 'Rename project'}
+              modified={current.modified}
+              oncommit={commitTitle}
+              oncancel={() => (title = session.snapshot?.title ?? 'Untitled')}
+            />
           </div>
         {/snippet}
         {#snippet fileMenuControls()}
+          <Button
+            variant="primary"
+            disabled={operation}
+            title={saveLabel}
+            onclick={() => void save()}
+            >{adapter.kind === 'web' ? 'Download' : 'Save'}<kbd
+              class="save-hint"
+              aria-hidden="true">{modifier} S</kbd
+            ></Button
+          >
           <div class="file-menu-wrap">
             <button
               class="file-trigger"
@@ -882,21 +836,24 @@
     </div>
   </div>
 {/if}
-{#if current.warning}<div class="warning" role="status">
-    {current.warning}<button
-      onclick={() => void session.persist().then(() => session.refreshDrafts())}
-      >Retry</button
-    >
-  </div>{/if}
-{#if current.error}<div class="error" role="alert">
-    {current.error}<button
-      aria-label="Dismiss error"
-      onclick={() => {
-        session.error = '';
-        revision++;
-      }}>×</button
-    >
-  </div>{/if}
+<div class="toasts">
+  {#if current.warning}<div class="warning" role="status">
+      {current.warning}<button
+        onclick={() =>
+          void session.persist().then(() => session.refreshDrafts())}
+        >Retry</button
+      >
+    </div>{/if}
+  {#if current.error}<div class="error" role="alert">
+      {current.error}<button
+        aria-label="Dismiss error"
+        onclick={() => {
+          session.error = '';
+          revision++;
+        }}>×</button
+      >
+    </div>{/if}
+</div>
 {#if guard}<Dialog titleId="replace-title" onclose={cancelGuard}
     ><h2 id="replace-title">Keep your changes?</h2>
     {#if acknowledge}<p>
@@ -1035,217 +992,214 @@
     pointer-events: none;
   }
   .home {
-    max-width: 1080px;
-    margin: auto;
-    padding: 0 34px 54px;
-  }
-  .home-header {
-    height: 88px;
+    min-height: 100dvh;
     display: flex;
-    align-items: center;
-    justify-content: space-between;
-    border-bottom: 1px solid var(--line);
+    flex-wrap: wrap;
+    background: var(--background);
+  }
+  .home-start {
+    flex: 1 1 380px;
+    max-width: 520px;
+    min-height: 520px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 24px 40px 40px;
+    background: var(--accent);
+    color: var(--on-accent);
   }
   .home-brand {
     display: flex;
     align-items: center;
-    gap: 10px;
-    font-size: 26px;
-    font-weight: 700;
-    letter-spacing: -1px;
+    gap: 8px;
+    font-size: 20px;
+    font-weight: 600;
+    letter-spacing: -0.5px;
   }
-  .home-brand img {
-    width: 23px;
+  .home-brand svg {
+    width: 22px;
+    height: 22px;
+    fill: currentColor;
   }
-  .home-brand span {
-    color: var(--accent);
-    margin-left: -10px;
+  .home-art {
+    position: relative;
+    height: 64px;
+    margin-top: auto;
   }
-  .home-caption {
-    color: var(--muted);
-    font-size: 12px;
+  .home-art i,
+  .home-art b {
+    position: absolute;
+    background: currentColor;
   }
-  .welcome {
-    margin: 54px 0 40px;
+  .home-art i {
+    height: 16px;
+    border-radius: var(--radius-sm);
+  }
+  .home-art i:nth-child(1) {
+    top: 0;
+    left: 0;
+    width: 44%;
+  }
+  .home-art i:nth-child(2) {
+    top: 24px;
+    left: 26%;
+    width: 38%;
+    opacity: 0.7;
+  }
+  .home-art i:nth-child(3) {
+    top: 48px;
+    left: 48%;
+    width: 40%;
+    opacity: 0.5;
+  }
+  .home-art b {
+    top: 50px;
+    right: 6px;
+    width: 12px;
+    height: 12px;
+    border-radius: 2px;
+    transform: rotate(45deg);
   }
   h1 {
-    font-size: 36px;
-    line-height: 1.2;
+    margin: 28px 0 16px;
+    font-size: 40px;
+    line-height: 1.05;
     font-weight: 600;
-    letter-spacing: -1.1px;
-    margin: 0 0 10px;
+    letter-spacing: -1.4px;
+  }
+  h2 {
+    margin: 0 0 12px;
+    font-size: 17px;
+    font-weight: 600;
+    letter-spacing: -0.3px;
   }
   p {
+    margin: 0;
     color: var(--muted);
     line-height: 1.6;
   }
-  .welcome p {
-    margin: 0;
-    font-size: 16px;
-  }
-  h2 {
-    font-size: 18px;
-    margin: 0 0 16px;
-  }
-  .home h2 {
-    font-size: 15px;
-    font-weight: 600;
-    margin: 0 0 18px;
-  }
-  .home-columns {
-    display: grid;
-    grid-template-columns: 320px minmax(0, 1fr);
-    gap: 70px;
-    min-height: 270px;
-  }
-  .start-action {
-    display: flex;
-    align-items: center;
-    width: 100%;
-    gap: 12px;
-    padding: 13px 10px;
-    margin: 0 0 4px -10px;
-    border: 0;
-    border-radius: 7px;
-    text-align: left;
-    background: transparent;
-    cursor: pointer;
-  }
-  .start-action:hover:enabled {
-    background: #e9edf2;
-  }
-  .action-icon {
-    display: grid;
-    place-items: center;
-    color: var(--accent);
-    width: 36px;
-    height: 36px;
-    background: #f8e9de;
-    border-radius: 7px;
-  }
-  .action-text {
-    flex: 1;
-  }
-  .action-text strong {
-    display: block;
-    color: var(--accent);
-    font-size: 14px;
-    font-weight: 600;
-  }
-  .action-text small {
-    display: block;
-    color: var(--muted);
-    font-size: 12px;
-    margin-top: 4px;
-  }
   kbd {
     font-family: inherit;
-    font-size: 10px;
-    color: var(--muted);
+    font-size: 11px;
     white-space: nowrap;
   }
-  .local-note {
-    font-size: 12px;
-    margin: 24px 0 0;
-    line-height: 1.8;
+  .new-project,
+  .drop-zone {
+    border-radius: var(--radius-lg);
+    cursor: pointer;
+  }
+  .new-project:focus-visible,
+  .drop-zone:focus-visible {
+    outline: 2px solid var(--on-accent);
+    outline-offset: 2px;
+  }
+  .new-project {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-height: 56px;
+    padding: 0 18px;
+    border: 0;
+    background: var(--surface);
+    color: var(--accent-deep);
+    text-align: left;
+    box-shadow: 0 2px 6px #3c190a40;
+  }
+  .new-project:hover:enabled {
+    background: var(--accent-soft);
+  }
+  .new-project svg {
+    width: 18px;
+    height: 18px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.8;
+    stroke-linecap: round;
+  }
+  .new-project strong {
+    flex: 1;
+    font-size: 15px;
+    font-weight: 600;
+  }
+  .new-project kbd {
+    padding: 2px 6px;
+    border: 1px solid var(--accent-line);
+    border-radius: var(--radius-sm);
   }
   .drop-zone {
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 8px;
-    width: 100%;
-    min-height: 114px;
-    margin-top: 22px;
-    padding: 18px;
-    border: 1px dashed #b9c3ce;
-    border-radius: 8px;
-    background: transparent;
-    color: var(--muted);
-    cursor: pointer;
+    gap: 6px;
+    min-height: 168px;
+    padding: 16px;
+    border: 1.5px dashed #ffffffbf;
+    background: #ffffff14;
+    color: inherit;
+    font-size: 12px;
   }
   .drop-zone strong {
-    font-size: 12px;
-    font-weight: 500;
-    color: var(--ink);
+    font-size: 15px;
+    font-weight: 600;
   }
-  .drop-zone small {
-    font-size: 11px;
+  .drop-zone kbd {
+    margin-top: 4px;
+    padding: 2px 6px;
+    border: 1px solid #fff9;
+    border-radius: var(--radius-sm);
   }
   .drop-zone:hover:enabled,
   .drop-zone.drag-active {
-    border-color: var(--accent);
-    background: #f8e9de;
-    color: var(--accent);
+    border-style: solid;
+    border-color: var(--on-accent);
+    background: #ffffff2e;
   }
-  .drop-overlay {
-    position: fixed;
-    inset: 0;
-    z-index: 40;
-    display: grid;
-    place-items: center;
-    background: #182e471f;
-    pointer-events: none;
-    padding: 24px;
-  }
-  .drop-prompt {
-    width: min(420px, 100%);
-    padding: 42px 28px;
-    text-align: center;
-    border: 2px dashed var(--accent);
-    border-radius: 12px;
-    background: #fffaf5;
-    box-shadow: 0 12px 36px #182e471f;
-    color: var(--accent);
-  }
-  .drop-prompt h2 {
-    margin: 18px 0 8px;
-    font-size: 18px;
-    color: var(--ink);
-  }
-  .drop-prompt p {
-    margin: 0;
-    font-size: 13px;
-  }
-  .continue {
+  .home-projects {
+    flex: 999 1 460px;
     min-width: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 30px;
+    padding: 48px 56px;
   }
-  .drafts + .drafts {
-    margin-top: 26px;
+  .drafts,
+  .empty-projects {
+    width: 100%;
+    max-width: 600px;
   }
-  .drafts h2 {
-    margin-bottom: 10px;
+  .home-projects h2 {
+    margin: 0 0 10px;
+    color: var(--muted);
+    font-size: 13px;
+    font-weight: 500;
+    letter-spacing: 0;
   }
   .draft {
+    flex: 1;
     display: flex;
     align-items: center;
+    gap: 12px;
     width: 100%;
     min-width: 0;
-    gap: 12px;
-    text-align: left;
-    padding: 10px;
+    min-height: 46px;
+    padding: 0 12px;
     border: 0;
-    border-radius: 6px;
+    border-radius: var(--radius);
     background: transparent;
+    text-align: left;
     cursor: pointer;
   }
-  .draft:hover:enabled,
-  .draft-entry:hover,
-  .recent-entry:hover {
-    background: #e9edf2;
-  }
-  .list-icon {
-    display: flex;
-    color: #7e8c9b;
-  }
   .project-text {
-    min-width: 0;
     flex: 1;
+    min-width: 0;
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
   }
   .project-text strong,
   .project-text small {
-    display: block;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -1255,45 +1209,104 @@
     font-weight: 500;
   }
   .project-text small {
-    margin-top: 3px;
     color: var(--muted);
-    font-size: 11px;
+    font-size: 12px;
   }
-  .resume-arrow {
+  .current-project {
+    gap: 16px;
+    min-height: 84px;
+    padding: 0 20px;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: var(--surface);
+    box-shadow: var(--shadow-xs);
+  }
+  .current-project:hover {
+    border-color: var(--line-strong);
+    background: var(--soft);
+  }
+  .current-project .project-text {
+    display: block;
+  }
+  .current-project strong {
+    display: block;
+    font-size: 17px;
+    font-weight: 600;
+    letter-spacing: -0.3px;
+  }
+  .project-art {
+    flex: none;
     display: flex;
-    color: var(--muted);
+    flex-direction: column;
+    gap: 4px;
+    width: 56px;
+  }
+  .project-art i {
+    height: 7px;
+    border-radius: 2px;
+    background: var(--bar-fill);
+  }
+  .project-art i:nth-child(1) {
+    width: 60%;
+  }
+  .project-art i:nth-child(2) {
+    width: 55%;
+    margin-left: 25%;
+    background: var(--lavender);
+  }
+  .project-art i:nth-child(3) {
+    width: 45%;
+    margin-left: 55%;
+    background: var(--sea-blue);
+  }
+  .resume-arrow,
+  .list-icon {
+    display: flex;
+    color: var(--accent);
   }
   .draft-entry,
   .recent-entry {
     display: flex;
     align-items: center;
-    border-radius: 6px;
+  }
+  .draft-entry {
+    border: 1px solid var(--accent-line);
+    border-radius: var(--radius-lg);
+    background: var(--accent-soft);
+  }
+  .draft-entry + .draft-entry {
+    margin-top: 8px;
+  }
+  .draft-entry .project-text strong {
+    flex: 1;
+  }
+  .recent-entry {
+    border-bottom: 1px solid var(--line);
   }
   .recent-entry .draft {
-    padding-block: 8px;
-  }
-  .recent-entry .project-text {
-    display: flex;
-    align-items: baseline;
-    gap: 18px;
+    padding-inline: 0;
+    border-radius: 0;
   }
   .recent-entry .project-text strong {
-    flex: 0 1 45%;
+    flex: 0 1 48%;
   }
   .recent-entry .project-text small {
     flex: 1;
-    margin-top: 0;
+  }
+  .draft-entry:hover,
+  .recent-entry:hover .draft:enabled {
+    color: var(--accent-deep);
   }
   .remove-recent {
     flex: none;
     display: grid;
     place-items: center;
-    width: 28px;
-    height: 28px;
-    margin-right: 8px;
+    width: 32px;
+    height: 32px;
+    margin-right: 6px;
     padding: 0;
     border: 0;
-    border-radius: 4px;
+    border-radius: var(--radius-sm);
     background: transparent;
     color: var(--muted);
     opacity: 0;
@@ -1306,11 +1319,12 @@
     opacity: 1;
   }
   .remove-recent:hover:enabled {
-    background: var(--surface);
+    background: var(--soft);
+    color: var(--ink);
   }
   .show-recents {
-    margin: 14px 0 0 10px;
-    padding: 2px 0;
+    margin-top: 10px;
+    padding: 4px 0;
     border: 0;
     background: transparent;
     color: var(--accent);
@@ -1320,151 +1334,48 @@
   .show-recents:hover {
     text-decoration: underline;
   }
-  .empty-projects {
-    padding: 6px 0 20px;
-  }
   .empty-projects h2 {
-    margin: 22px 0 8px;
+    margin-bottom: 8px;
+    color: var(--ink);
+    font-size: 17px;
+    font-weight: 600;
+    letter-spacing: -0.3px;
   }
   .empty-projects p {
-    font-size: 13px;
-    margin: 0 0 6px;
+    margin-bottom: 4px;
   }
   .empty-projects small {
-    font-size: 12px;
-    color: var(--muted);
-  }
-  .mini-timeline {
-    position: relative;
-    width: 240px;
-    height: 98px;
-    border: 1px solid var(--line);
-    border-radius: 6px;
-    background:
-      repeating-linear-gradient(
-        90deg,
-        transparent 0 39px,
-        var(--grid) 39px 40px
-      ),
-      var(--surface);
-  }
-  .mini-timeline i {
-    position: absolute;
-    height: 13px;
-    border-radius: 3px;
-  }
-  .mini-timeline i:nth-child(1) {
-    top: 18px;
-    left: 16px;
-    width: 94px;
-    background: var(--bar-fill);
-  }
-  .mini-timeline i:nth-child(2) {
-    top: 42px;
-    left: 70px;
-    width: 92px;
-    background: var(--lavender);
-  }
-  .mini-timeline i:nth-child(3) {
-    top: 66px;
-    left: 133px;
-    width: 76px;
-    background: var(--sea-blue);
-  }
-  .mini-timeline b {
-    position: absolute;
-    top: 19px;
-    left: 178px;
-    width: 11px;
-    height: 11px;
-    background: var(--accent);
-    transform: rotate(45deg);
-    border-radius: 1px;
-  }
-  .quick-guide {
-    margin-top: 46px;
-    padding-top: 26px;
-    border-top: 1px solid var(--line);
-  }
-  .quick-guide h2 {
-    margin-bottom: 22px;
     color: var(--muted);
     font-size: 12px;
   }
-  .guide-items {
+  .drop-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 40;
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 28px;
+    place-items: center;
+    padding: 24px;
+    background: var(--backdrop);
+    pointer-events: none;
   }
-  .guide-items strong {
-    font-size: 12px;
-    font-weight: 600;
+  .drop-prompt {
+    width: min(420px, 100%);
+    padding: 40px 28px;
+    border: 2px dashed var(--accent);
+    border-radius: var(--radius-xl);
+    background: var(--accent-soft);
+    box-shadow: var(--shadow-float);
+    color: var(--accent);
+    text-align: center;
   }
-  .guide-items p {
-    font-size: 12px;
-    margin: 6px 0 0;
-  }
-  .gesture-mark {
-    display: inline-block;
-    width: 26px;
-    height: 10px;
-    margin-right: 10px;
-    border-radius: 2px;
-    background: var(--bar-fill);
-    vertical-align: middle;
-  }
-  .milestone-mark {
-    width: 9px;
-    height: 9px;
-    margin: 0 18px 0 7px;
-    background: var(--lavender);
-    transform: rotate(45deg);
-  }
-  .adjust-mark {
-    background: var(--sea-blue);
-    border-left: 2px solid #547e84;
-    border-right: 2px solid #547e84;
+  .drop-prompt h2 {
+    margin: 16px 0 8px;
+    color: var(--ink);
   }
   .file-controls {
     display: flex;
     justify-content: center;
     min-width: 0;
-  }
-  .title-wrap {
-    position: relative;
-    width: 100%;
-  }
-  .title-wrap input {
-    width: 100%;
-    border: 1px solid var(--line);
-    border-radius: 5px;
-    padding: 9px 28px 9px 12px;
-    color: var(--ink);
-    background: var(--surface);
-    font-size: 13px;
-    font-weight: 600;
-  }
-  .title-wrap input:focus {
-    outline: none;
-    border-color: var(--accent);
-  }
-  .modified {
-    position: absolute;
-    right: -12px;
-    top: 11px;
-    font-size: 10px;
-    color: var(--accent);
-  }
-  .title-pencil {
-    position: absolute;
-    right: 11px;
-    top: 11px;
-    width: 14px;
-    height: 14px;
-    stroke: var(--muted);
-    fill: none;
-    stroke-width: 1.25;
-    pointer-events: none;
   }
   .file-menu-wrap {
     position: relative;
@@ -1473,22 +1384,21 @@
   .file-trigger {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    gap: 12px;
+    gap: 10px;
     height: 34px;
-    padding: 0 10px;
+    padding: 0 12px;
     border: 1px solid var(--line);
-    border-radius: 7px;
+    border-radius: var(--radius);
     background: var(--surface);
-    box-shadow: 0 1px 2px #182e4708;
+    box-shadow: var(--shadow-xs);
     font-size: 13px;
-    font-weight: 600;
+    font-weight: 500;
     cursor: pointer;
   }
   .file-trigger:hover:enabled,
   .file-trigger[aria-expanded='true'] {
     background: var(--soft);
-    border-color: #b9c3ce;
+    border-color: var(--line-strong);
   }
   .file-trigger svg {
     width: 14px;
@@ -1507,88 +1417,60 @@
     position: absolute;
     top: calc(100% + 8px);
     right: 0;
-    width: 252px;
     z-index: 30;
-    background: var(--surface);
+    width: 252px;
     padding: 5px;
     border: 1px solid var(--line);
-    border-radius: 8px;
-    box-shadow:
-      0 10px 30px #182e471f,
-      0 2px 6px #182e470a;
+    border-radius: var(--radius-lg);
+    background: var(--surface);
+    box-shadow: var(--shadow-float);
   }
   .menu-heading {
     padding: 8px 9px 7px;
-    font-size: 10px;
-    font-weight: 600;
     color: var(--muted);
+    font-size: 11px;
+    font-weight: 500;
   }
   .menu-divider {
     height: 1px;
-    background: var(--line);
     margin: 5px 4px;
+    background: var(--line);
   }
-  @media (max-width: 900px) {
-    .home-columns {
-      grid-template-columns: 280px minmax(0, 1fr);
-      gap: 36px;
-    }
-    .guide-items {
-      gap: 18px;
-    }
-  }
-  @media (max-width: 680px) {
-    .home {
-      padding-inline: 24px;
-    }
-    .home-columns {
-      grid-template-columns: 1fr;
-      gap: 36px;
-    }
-    .start-action {
-      max-width: 340px;
-    }
-    .welcome {
-      margin-top: 36px;
-    }
-    h1 {
-      font-size: 30px;
-    }
-    .home-caption {
-      display: none;
-    }
-    .guide-items {
-      grid-template-columns: 1fr;
-      gap: 20px;
-    }
+  .toasts {
+    position: fixed;
+    z-index: 50;
+    top: 70px;
+    left: 0;
+    right: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    width: min(640px, 100% - 40px);
+    margin-inline: auto;
+    pointer-events: none;
   }
   .warning,
   .error {
-    position: fixed;
-    z-index: 50;
-    bottom: 12px;
-    left: 34px;
-    right: 34px;
-    padding: 12px 16px;
-    border: 1px solid #e2b88e;
-    border-radius: 6px;
-    background: #fff4e7;
-    font-size: 13px;
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 16px;
-  }
-  .error {
-    bottom: 64px;
+    padding: 10px 14px;
+    border: 1px solid var(--accent-line);
+    border-radius: var(--radius-lg);
+    background: var(--accent-soft);
+    box-shadow: var(--shadow-float);
+    color: var(--ink);
+    font-size: 13px;
+    pointer-events: auto;
   }
   .warning button,
   .error button {
-    background: transparent;
     border: 0;
-    cursor: pointer;
+    background: transparent;
     color: var(--accent);
     font-weight: 600;
+    cursor: pointer;
   }
   .dialog-actions {
     display: flex;
@@ -1596,5 +1478,28 @@
     justify-content: flex-end;
     gap: 8px;
     margin-top: 24px;
+  }
+  @media (max-width: 760px) {
+    .home-start {
+      max-width: none;
+      min-height: 0;
+      padding: 24px;
+    }
+    .home-art {
+      margin-top: 24px;
+    }
+    .home-projects {
+      justify-content: flex-start;
+      padding: 32px 24px 48px;
+    }
+    h1 {
+      font-size: 32px;
+    }
+  }
+  @media (max-width: 900px) {
+    /* Without its shortcut hint the Save button leaves the title centred. */
+    .save-hint {
+      display: none;
+    }
   }
 </style>
