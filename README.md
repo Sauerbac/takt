@@ -20,9 +20,9 @@ The application follows the [Takt design system](https://claude.ai/artifact/K1y9
 
 The earlier [Apricot prototype](ui-prototype/index.html) is superseded and kept for reference; its [guide](ui-prototype/README.md) describes it.
 
-The production logo uses the **Stagger** mark: three offset horizontal Gantt bars in Apricot. `apps/web/src/assets/takt-mark.svg` supplies the header mark; `takt-icon.svg` adds a soft cream tile for the favicon. Both keep a fixed light palette. `apps/web/public/favicon.ico` includes 16, 32, and 48 px browser fallbacks, and `apps/web/public/app-icon.png` is a 512 px rendering for future desktop packaging.
+The production logo uses the **Deep inks** mark: three offset horizontal Gantt bars in apricot, violet, and teal. `apps/web/src/assets/takt-mark.svg` supplies the header mark; `takt-icon.svg` adds a pale apricot tile for the favicon. Both keep a fixed light palette. On Home's apricot panel the same bars are white at stepped opacity. `apps/web/public/favicon.ico` includes 16, 32, and 48 px browser fallbacks, `apps/desktop/src-tauri/icons/icon.ico` carries 16 to 256 px for the Windows executable, window, and taskbar, and `apps/web/public/app-icon.png` is a 512 px rendering.
 
-After editing `takt-icon.svg`, run `npm run generate:icons` from the root to regenerate the ICO and PNG using the installed Playwright Chromium browser.
+After editing `takt-icon.svg`, run `npm run generate:icons` from the root to regenerate both ICO files and the PNG using the installed Playwright Chromium browser.
 
 The complete design exploration is preserved in [archive/ui-prototypes](archive/ui-prototypes/README.md), including all earlier directions, palette galleries, comparisons, research, and authoring scripts. `ui-prototype/` holds the last prototype before the design system.
 

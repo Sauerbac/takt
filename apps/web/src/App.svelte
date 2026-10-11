@@ -552,13 +552,21 @@
     <section class="home-start">
       <div class="home-brand">
         <svg viewBox="0 0 32 32" aria-hidden="true"
-          ><rect x="3" y="4" width="16" height="6" rx="1" /><rect
-            x="8"
+          ><rect x="3" y="5" width="15" height="6" rx="1.5" /><rect
+            x="9"
             y="13"
-            width="21"
+            width="17"
             height="6"
-            rx="1"
-          /><rect x="16" y="22" width="13" height="6" rx="1" /></svg
+            rx="1.5"
+            opacity="0.75"
+          /><rect
+            x="14"
+            y="21"
+            width="15"
+            height="6"
+            rx="1.5"
+            opacity="0.55"
+          /></svg
         >Takt.
       </div>
       <div class="home-art" aria-hidden="true">
