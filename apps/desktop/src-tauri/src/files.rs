@@ -25,8 +25,7 @@ impl RecoveryLeases {
             use std::os::windows::fs::OpenOptionsExt;
             options.share_mode(0);
         }
-        let path = store.recovery_path(id)?.with_extension("lock");
-        match options.open(path) {
+        match options.open(store.lock_path(id)?) {
             Ok(file) => {
                 self.held.insert(id.to_owned(), file);
                 Ok(true)
@@ -51,7 +50,7 @@ impl RecoveryLeases {
             Ok(record) => record,
             Err(error) => {
                 if !live {
-                    self.release(&source);
+                    self.release(store, &source);
                 }
                 return Err(error);
             }
@@ -64,13 +63,30 @@ impl RecoveryLeases {
             return Err("Recovery is being edited in another process".into());
         }
         if let Err(error) = store.write_recovery(record.clone()) {
-            self.release(id);
+            self.release(store, id);
             return Err(error);
         }
         Ok(record)
     }
-    pub fn release(&mut self, id: &str) {
-        self.held.remove(id);
+    /// Drop the lease and its lock file. Deletion fails harmlessly if another process took the lock.
+    pub fn release(&mut self, store: &Store, id: &str) {
+        if self.held.remove(id).is_some() {
+            if let Ok(path) = store.lock_path(id) {
+                let _ = fs::remove_file(path);
+            }
+        }
+    }
+    /// Remove a record this process may own. A record that was never written needs no lease.
+    pub fn remove(&mut self, store: &Store, id: &str) -> Result<(), String> {
+        if !self.held.contains_key(id) && !store.recovery_path(id)?.exists() {
+            return Ok(());
+        }
+        if !self.acquire(store, id)? {
+            return Err("Recovery is owned by another active process".into());
+        }
+        store.remove_recovery(id)?;
+        self.release(store, id);
+        Ok(())
     }
     pub fn abandon(&mut self, store: &Store, claimed: &str, source: &str) -> Result<(), String> {
         // Never delete an unowned record or the original interrupted source.
@@ -82,7 +98,7 @@ impl RecoveryLeases {
         } else {
             Ok(())
         };
-        self.release(claimed);
+        self.release(store, claimed);
         result
     }
 }
@@ -220,6 +236,23 @@ impl Store {
             return Err("Invalid recovery ID".into());
         }
         Ok(self.root.join("recovery").join(format!("{id}.json")))
+    }
+    fn lock_path(&self, id: &str) -> Result<PathBuf, String> {
+        Ok(self.recovery_path(id)?.with_extension("lock"))
+    }
+    /// Delete lock files left without a record. A lock held by a live process cannot be deleted.
+    pub fn sweep_locks(&self) {
+        let Ok(entries) = fs::read_dir(self.root.join("recovery")) else {
+            return;
+        };
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.extension().and_then(|v| v.to_str()) == Some("lock")
+                && !path.with_extension("json").exists()
+            {
+                let _ = fs::remove_file(path);
+            }
+        }
     }
     pub fn write_recovery(&self, record: serde_json::Value) -> Result<(), String> {
         let id = record
@@ -423,13 +456,57 @@ mod tests {
         child.wait().unwrap();
         let interrupted = leases.claim(&store, record).unwrap();
         assert_eq!(interrupted["id"], "interrupted");
-        store.remove_recovery("interrupted").unwrap();
-        leases.release("interrupted");
+        leases.remove(&store, "interrupted").unwrap();
         assert!(!store
             .list_recovery()
             .unwrap()
             .iter()
             .any(|item| item["id"] == "interrupted"));
+    }
+    #[cfg(windows)]
+    #[test]
+    fn released_and_removed_recoveries_leave_no_lock_files() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = Store::new(dir.path().into()).unwrap();
+        let locks = || {
+            fs::read_dir(dir.path().join("recovery"))
+                .unwrap()
+                .filter(|entry| {
+                    entry
+                        .as_ref()
+                        .unwrap()
+                        .path()
+                        .extension()
+                        .and_then(|v| v.to_str())
+                        == Some("lock")
+                })
+                .count()
+        };
+        let mut leases = RecoveryLeases::default();
+        // Closing from Home removes an ID that was never written.
+        leases.remove(&store, "never-written").unwrap();
+        assert_eq!(locks(), 0);
+        assert!(leases.acquire(&store, "edited").unwrap());
+        store
+            .write_recovery(serde_json::json!({"id":"edited","updatedAt":"2026-10-11"}))
+            .unwrap();
+        assert_eq!(locks(), 1);
+        leases.remove(&store, "edited").unwrap();
+        assert_eq!(locks(), 0);
+        assert!(store.list_recovery().unwrap().is_empty());
+        // A live owner keeps both its record and its lock.
+        let mut owner = RecoveryLeases::default();
+        assert!(owner.acquire(&store, "live").unwrap());
+        store
+            .write_recovery(serde_json::json!({"id":"live","updatedAt":"2026-10-11"}))
+            .unwrap();
+        assert!(leases.remove(&store, "live").is_err());
+        fs::write(store.lock_path("orphan").unwrap(), "").unwrap();
+        store.sweep_locks();
+        assert_eq!(locks(), 1);
+        assert_eq!(store.list_recovery().unwrap().len(), 1);
+        owner.release(&store, "live");
+        assert_eq!(locks(), 0);
     }
     #[test]
     fn safe_save_and_external_revision() {

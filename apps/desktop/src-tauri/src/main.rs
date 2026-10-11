@@ -71,7 +71,9 @@ fn remove_recent(app: tauri::AppHandle, path: String) -> Result<(), String> {
 }
 #[tauri::command]
 fn list_recovery(app: tauri::AppHandle) -> Result<Vec<serde_json::Value>, String> {
-    store(&app)?.list_recovery()
+    let store = store(&app)?;
+    store.sweep_locks();
+    store.list_recovery()
 }
 #[tauri::command]
 fn write_recovery(app: tauri::AppHandle, record: serde_json::Value) -> Result<(), String> {
@@ -90,14 +92,10 @@ fn write_recovery(app: tauri::AppHandle, record: serde_json::Value) -> Result<()
 #[tauri::command]
 fn remove_recovery(app: tauri::AppHandle, id: String) -> Result<(), String> {
     let store = store(&app)?;
-    let leases = app.state::<Mutex<files::RecoveryLeases>>();
-    let mut leases = leases.lock().map_err(|e| e.to_string())?;
-    if !leases.acquire(&store, &id)? {
-        return Err("Recovery is owned by another active process".into());
-    }
-    store.remove_recovery(&id)?;
-    leases.release(&id);
-    Ok(())
+    app.state::<Mutex<files::RecoveryLeases>>()
+        .lock()
+        .map_err(|e| e.to_string())?
+        .remove(&store, &id)
 }
 #[tauri::command]
 fn claim_recovery(
