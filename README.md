@@ -128,6 +128,8 @@ Changes reach `main` through pull requests. `.github/workflows/ci.yml` runs on e
 - **Windows executable** runs the native tests, builds the EXE, and runs the launch check. Pull requests that touch nothing under `apps/`, `scripts/`, the workflows, or the root manifests skip it.
 - **CI passed** summarizes the others and is the one required check.
 
+GitHub enforces branch rules on private repositories only with a paid plan, so the pull-request gate is a convention for now. `.github/rulesets/main.json` holds the intended rule: pull requests only, no force pushes or deletion, and `CI passed` required. Once the repository is public or on GitHub Pro, apply it with `gh api -X POST repos/Sauerbac/takt/rulesets --input .github/rulesets/main.json`.
+
 To release, set the same version in `package.json`, both workspace `package.json` files, `tauri.conf.json`, and `Cargo.toml` (`npm run check` verifies they agree), merge, then tag that commit:
 
 ```sh
