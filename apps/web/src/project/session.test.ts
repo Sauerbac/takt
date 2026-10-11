@@ -135,6 +135,7 @@ describe('document lifecycle', () => {
     adapter.writeRecovery = async () => {
       throw new Error('quota');
     };
+    session.update({ ...session.snapshot!, title: 'Editing' });
     await session.persist();
     expect(session.recoveryWarning).toContain('unavailable');
     session.update({ ...session.snapshot!, title: 'Still editing' });
@@ -168,6 +169,7 @@ describe('document lifecycle', () => {
     adapter.writeRecovery = () =>
       new Promise<void>((resolve) => (finish = resolve));
     session.create();
+    session.update({ ...session.snapshot!, title: 'Edited' });
     await Promise.resolve();
     const discarding = session.discard();
     session.replace({ snapshot: { ...newProject(), title: 'New' } });
@@ -222,5 +224,40 @@ describe('document lifecycle', () => {
       view: { ...session.snapshot!.view, scrollTop: -5 },
     });
     expect(session.modified).toBe(false);
+  });
+  it('an untouched project has no recovery record until its first edit', async () => {
+    const { adapter, session, records } = fake();
+    let removals = 0;
+    const remove = adapter.removeRecovery;
+    adapter.removeRecovery = async (id) => {
+      removals++;
+      await remove(id);
+    };
+    session.create();
+    session.update({
+      ...session.snapshot!,
+      view: { ...session.snapshot!.view, zoom: 2 },
+    });
+    await session.flush();
+    await session.persist();
+    expect(records.size).toBe(0);
+    expect(await session.discard()).toBe(true);
+    expect(removals).toBe(0);
+    session.replace({
+      snapshot: { ...newProject(), title: 'Opened' },
+      file: { path: 'opened.takt', revision: '1' },
+    });
+    await session.persist();
+    expect(records.size).toBe(0);
+    session.update({ ...session.snapshot!, title: 'Edited' });
+    await session.persist();
+    expect(records.get(session.recoveryId)!.snapshot.title).toBe('Edited');
+    session.update({ ...session.snapshot!, title: 'Opened' });
+    await session.persist();
+    expect(session.modified).toBe(false);
+    expect(records.get(session.recoveryId)!.snapshot.title).toBe('Opened');
+    expect(await session.discard()).toBe(true);
+    expect(removals).toBe(1);
+    expect(records.size).toBe(0);
   });
 });

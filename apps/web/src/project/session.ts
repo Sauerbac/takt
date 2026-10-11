@@ -23,6 +23,8 @@ export class ProjectSession {
   private writes = Promise.resolve();
   private viewTimer: ReturnType<typeof setTimeout> | undefined;
   private written = '';
+  /** Whether this document has a recovery record. An untouched document has nothing to recover. */
+  private recorded = false;
   private replacementRequest = 0;
   constructor(
     readonly adapter: PlatformAdapter,
@@ -70,7 +72,8 @@ export class ProjectSession {
   async persist() {
     clearTimeout(this.viewTimer);
     this.viewTimer = undefined;
-    if (!this.snapshot) return;
+    if (!this.snapshot || !(this.recorded || this.modified)) return;
+    this.recorded = true;
     const stored = {
       version: 1 as const,
       baseline: this.baseline,
@@ -109,6 +112,8 @@ export class ProjectSession {
     this.generation++;
     this.home = false;
     this.recoveryId = recoveryId;
+    this.recorded = recovered;
+    this.written = '';
     this.error = '';
     this.changed();
     void this.persist();
@@ -124,8 +129,10 @@ export class ProjectSession {
     this.viewTimer = undefined;
     await this.writes;
     if (generation !== this.generation || id !== this.recoveryId) return false;
+    if (!this.recorded) return true;
     try {
       await this.adapter.removeRecovery(id);
+      this.recorded = false;
       this.written = '';
     } catch {
       this.recoveryWarning =

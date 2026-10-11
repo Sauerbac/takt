@@ -74,8 +74,18 @@
   } | null = null;
   let closeResolve: ((allowed: boolean) => void) | undefined;
   let missing = $state<RecentFile | null>(null);
+  let draftRemoval = $state<RecoveryRecord | null>(null);
+  const draftTime = (updatedAt: string) =>
+    new Date(updatedAt).toLocaleString('en-GB', {
+      dateStyle: 'medium',
+      timeStyle: 'short',
+    });
   const shellDialog = $derived(
-    guard || conflict || reloadConfirm || missing !== null,
+    guard ||
+      conflict ||
+      reloadConfirm ||
+      missing !== null ||
+      draftRemoval !== null,
   );
   const dropBlocked = $derived(operation || shellDialog);
   const saveLabel = $derived(
@@ -215,6 +225,22 @@
     } finally {
       operation = false;
     }
+  }
+  async function removeDraft(record: RecoveryRecord) {
+    draftRemoval = null;
+    operation = true;
+    try {
+      await adapter.removeRecovery(record.id);
+    } catch {
+      session.error =
+        adapter.kind === 'web'
+          ? 'Could not delete this draft. It may be open in another tab.'
+          : 'Could not delete this unsaved work. It may be open in another window.';
+      revision++;
+    } finally {
+      operation = false;
+    }
+    await session.refreshDrafts();
   }
   async function abandonClaim() {
     const reservation = recoveryClaim;
@@ -579,18 +605,27 @@
             <h2>
               {adapter.kind === 'web' ? 'Resume draft' : 'Recover unsaved work'}
             </h2>
-            {#each availableDrafts as record}<button
-                class="draft"
-                disabled={operation}
-                onclick={() => resume(record)}
-                ><span class="list-icon"><ProjectIcon name="clock" /></span
-                ><span class="project-text"
-                  ><strong>{record.snapshot.title}</strong><small
-                    >{new Date(record.updatedAt).toLocaleString()}</small
-                  ></span
-                ><span class="resume-arrow"><ProjectIcon name="arrow" /></span
-                ></button
-              >{/each}
+            {#each availableDrafts as record}<div class="draft-entry">
+                <button
+                  class="draft"
+                  disabled={operation}
+                  onclick={() => resume(record)}
+                  ><span class="list-icon"><ProjectIcon name="clock" /></span
+                  ><span class="project-text"
+                    ><strong>{record.snapshot.title}</strong><small
+                      >{draftTime(record.updatedAt)}</small
+                    ></span
+                  ><span class="resume-arrow"><ProjectIcon name="arrow" /></span
+                  ></button
+                ><button
+                  class="remove-recent"
+                  disabled={operation}
+                  title="Delete"
+                  aria-label={`Delete ${record.snapshot.title} from ${draftTime(record.updatedAt)}`}
+                  onclick={() => (draftRemoval = record)}
+                  ><ProjectIcon name="close" /></button
+                >
+              </div>{/each}
           </section>{/if}
         {#if adapter.kind === 'desktop' && recents.length}<section
             class="drafts"
@@ -926,6 +961,23 @@
       >
     </div></Dialog
   >{/if}
+{#if draftRemoval}<Dialog
+    titleId="draft-removal-title"
+    onclose={() => (draftRemoval = null)}
+    ><h2 id="draft-removal-title">
+      {adapter.kind === 'web' ? 'Delete this draft?' : 'Delete unsaved work?'}
+    </h2>
+    <p>
+      “{draftRemoval.snapshot.title}” from {draftTime(draftRemoval.updatedAt)} will
+      be removed permanently.
+    </p>
+    <div class="dialog-actions">
+      <Button onclick={() => (draftRemoval = null)}>Cancel</Button><Button
+        variant="primary"
+        onclick={() => void removeDraft(draftRemoval!)}>Delete</Button
+      >
+    </div></Dialog
+  >{/if}
 {#if missing}<Dialog titleId="missing-title" onclose={() => (missing = null)}
     ><h2 id="missing-title">File unavailable</h2>
     <p>{missing.path}</p>
@@ -1151,6 +1203,7 @@
     cursor: pointer;
   }
   .draft:hover:enabled,
+  .draft-entry:hover,
   .recent-entry:hover {
     background: #e9edf2;
   }
@@ -1182,6 +1235,7 @@
     display: flex;
     color: var(--muted);
   }
+  .draft-entry,
   .recent-entry {
     display: flex;
     align-items: center;
@@ -1217,6 +1271,8 @@
     opacity: 0;
     cursor: pointer;
   }
+  .draft-entry:hover .remove-recent,
+  .draft-entry:focus-within .remove-recent,
   .recent-entry:hover .remove-recent,
   .recent-entry:focus-within .remove-recent {
     opacity: 1;

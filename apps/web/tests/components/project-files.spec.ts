@@ -1,5 +1,5 @@
 import { readFile } from 'node:fs/promises';
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
 import { draw, chooseZoom } from '../helpers';
 
 test('title trimming stays outside history and File menu supports keyboard/outside dismissal', async ({
@@ -218,10 +218,10 @@ test('unavailable recovery warns persistently, allows editing/download and Retry
   });
   await page.goto('/');
   await page.getByRole('button', { name: 'New project', exact: true }).click();
+  await draw(page, 0, 2, 'Still here');
   await expect(
     page.getByRole('status').filter({ hasText: 'Recovery is unavailable' }),
   ).toBeVisible();
-  await draw(page, 0, 2, 'Still here');
   const downloaded = page.waitForEvent('download');
   await page.keyboard.press('Control+s');
   await downloaded;
@@ -522,4 +522,73 @@ test('an overscrolled viewport still yields a valid view and modified state', as
   expect(saved.view.scrollTop).toBe(0);
   await expect(page.getByLabel('Modified', { exact: true })).toHaveCount(0);
   expect(errors).toEqual([]);
+});
+
+const draftKeys = (page: Page) =>
+  page.evaluate(
+    () =>
+      Object.keys(localStorage).filter((key) =>
+        key.startsWith('takt.draft.v1.'),
+      ).length,
+  );
+
+test('an untouched project leaves no draft; the first edit creates one', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: 'New project', exact: true }).click();
+  await chooseZoom(page, '2');
+  await page.getByRole('button', { name: 'Home', exact: true }).click();
+  await expect(
+    page.getByRole('button', { name: /Untitled.*Resume project/ }),
+  ).toBeVisible();
+  expect(await draftKeys(page)).toBe(0);
+  await page.reload();
+  await expect(
+    page.getByRole('heading', { name: 'Room for what’s next' }),
+  ).toBeVisible();
+  await page.getByRole('button', { name: 'New project', exact: true }).click();
+  await draw(page, 0, 2, 'First edit');
+  await expect.poll(() => draftKeys(page)).toBe(1);
+  await page.reload();
+  await expect(
+    page.getByRole('heading', { name: 'Resume draft' }),
+  ).toBeVisible();
+});
+
+test('a draft can be deleted from Home after confirmation, but not while another tab has it open', async ({
+  page,
+  context,
+}) => {
+  const source = await context.newPage();
+  await source.goto('/');
+  await source
+    .getByRole('button', { name: 'New project', exact: true })
+    .click();
+  await source.getByLabel('Project title').fill('Old plan');
+  await source.getByLabel('Project title').press('Enter');
+  await expect.poll(() => draftKeys(source)).toBe(1);
+  await page.goto('/');
+  const entry = page.getByRole('button', { name: /^Old plan/ });
+  const remove = page.getByRole('button', { name: /^Delete Old plan from/ });
+  await expect(entry).toBeVisible();
+  await entry.hover();
+  await remove.click();
+  await page.getByRole('button', { name: 'Delete', exact: true }).click();
+  await expect(page.getByRole('alert')).toContainText('open in another tab');
+  await expect(entry).toBeVisible();
+  expect(await draftKeys(page)).toBe(1);
+  await source.close();
+  await page.getByRole('button', { name: 'Dismiss error' }).click();
+  await remove.click();
+  await expect(
+    page.getByRole('heading', { name: 'Delete this draft?' }),
+  ).toBeVisible();
+  await page.getByRole('button', { name: 'Cancel', exact: true }).click();
+  await expect(entry).toBeVisible();
+  await remove.click();
+  await page.getByRole('button', { name: 'Delete', exact: true }).click();
+  await expect(entry).toHaveCount(0);
+  expect(await draftKeys(page)).toBe(0);
+  await expect(page.getByRole('alert')).toHaveCount(0);
 });

@@ -335,3 +335,43 @@ test('the window still closes when its recovery copy cannot be removed', async (
     .click();
   expect(await discarded).toBe(true);
 });
+
+test('unsaved work can be deleted from desktop Home after confirmation', async ({
+  page,
+}) => {
+  await fixture(page, true);
+  await page.getByRole('button', { name: /^Delete Recovered work/ }).click();
+  await expect(
+    page.getByRole('heading', { name: 'Delete unsaved work?' }),
+  ).toBeVisible();
+  await page.getByRole('button', { name: 'Delete', exact: true }).click();
+  await expect(
+    page.getByRole('button', { name: /Recovered work/ }),
+  ).toHaveCount(0);
+  expect(await control(page, (fixture) => fixture.state().recovery)).toEqual(
+    [],
+  );
+  expect(
+    await control(
+      page,
+      (fixture) => !!fixture.state().files['/projects/project-1.takt'],
+    ),
+  ).toBe(true);
+});
+
+test('an opened file has no recovery copy until it is edited', async ({
+  page,
+}) => {
+  await opened(page);
+  await fileAction(page, 'Home');
+  expect(await control(page, (fixture) => fixture.state().recovery)).toEqual(
+    [],
+  );
+  await page
+    .getByRole('button', { name: 'Open .takt file', exact: true })
+    .click();
+  await edit(page);
+  await expect
+    .poll(() => control(page, (fixture) => fixture.state().recovery.length))
+    .toBe(1);
+});
