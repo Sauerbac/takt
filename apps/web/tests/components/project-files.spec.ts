@@ -1,3 +1,4 @@
+import { readFile } from 'node:fs/promises';
 import { test, expect } from '@playwright/test';
 import { draw, chooseZoom } from '../helpers';
 
@@ -494,4 +495,31 @@ test('recovery is written for edits, not for every scroll step or drag preview',
     .getAttribute('data-first-week');
   await page.reload();
   expect(String((await draft()).view.firstWeek)).toBe(scrolled);
+});
+
+test('an overscrolled viewport still yields a valid view and modified state', async ({
+  page,
+}) => {
+  const errors: string[] = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+  await page.goto('/');
+  await page.getByRole('button', { name: 'New project', exact: true }).click();
+  await draw(page, 0, 2, 'Work');
+  await page.locator('.viewport').evaluate((viewport) => {
+    Object.defineProperty(viewport, 'scrollTop', {
+      configurable: true,
+      get: () => -5,
+      set: () => {},
+    });
+    viewport.dispatchEvent(new Event('scroll'));
+  });
+  await expect(page.getByLabel('Modified', { exact: true })).toBeVisible();
+  const downloading = page.waitForEvent('download');
+  await page.keyboard.press('Control+s');
+  const saved = JSON.parse(
+    await readFile(await (await downloading).path(), 'utf8'),
+  );
+  expect(saved.view.scrollTop).toBe(0);
+  await expect(page.getByLabel('Modified', { exact: true })).toHaveCount(0);
+  expect(errors).toEqual([]);
 });

@@ -324,7 +324,8 @@
   const projectView = (): ProjectView => ({
     zoom: view.zoom,
     firstWeek: view.firstWeek + (viewport?.scrollLeft ?? 0) / weekWidth,
-    scrollTop: viewport?.scrollTop ?? 0,
+    // Elastic overscroll can report a negative offset, which is not a storable view.
+    scrollTop: Math.max(0, viewport?.scrollTop ?? 0),
     collapsedSectionIds: (structural?.originalCollapsed ?? collapsed).filter(
       (id) => history.document.sections.some((section) => section.id === id),
     ),
