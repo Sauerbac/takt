@@ -11,9 +11,7 @@
     throw new Error(`Embedded frontend did not become ready during ${stage}`);
   };
   try {
-    await waitFor(() =>
-      document.querySelector('button[aria-label="New project"]'),
-    );
+    await waitFor(() => document.querySelector('button.new-project'));
     if (!document.body.textContent.includes('Open .takt file'))
       throw new Error('Desktop Home did not render');
     const bridge = await waitFor(() => window.__TAKT_TEST__);
@@ -33,7 +31,7 @@
     document.querySelector('button[aria-label="Home"]').click();
     stage = 'Return Home';
     await waitFor(() => document.querySelector('.drop-zone'));
-    document.querySelector('button[aria-label="New project"]').click();
+    document.querySelector('button.new-project').click();
     stage = 'Create project';
     const title = await waitFor(() =>
       document.querySelector('input[aria-label="Project title"]'),
