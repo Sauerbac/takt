@@ -495,7 +495,7 @@ Desktop projects are ordinary files in user-selected folders, including shared f
 - Home offers **New project** and **Open .takt**. New opens the existing empty editor immediately.
 - Both platforms accept a single `.takt` file dropped onto Home or the editor. Home has a visible drop zone that also opens the picker on click or keyboard activation; dragging a file over the editor shows a drop prompt. Leaving the window or cancelling the drag clears the feedback. Drops follow the existing Open validation and replacement guard. Desktop preserves the dropped path and revision for subsequent Save and recent history; browser drops open file contents for editing/download.
 - Multiple-file drops ask for one `.takt` file and leave current work untouched. Other file extensions are rejected with a useful message; `.takt` is case-insensitive. Invalid bytes preserve the current chart and recovery. Drops during an open/save operation or a modal dialog are ignored, and browser file drops never navigate away from the application. Text drags retain ordinary browser behavior.
-- Browser Home also offers **Resume draft** when a local draft exists; it has no recent-file list in this milestone.
+- Browser Home also offers **Resume draft** when a local draft exists; it has no recent-file list in this milestone. Drafts and desktop recoveries can be deleted from Home as described in section 17.11.
 - Desktop Home includes the recent-file list in section 17.6 and recovery when applicable.
 - There is one active chart per browser tab or desktop window, with no internal document tabs. Recovery ownership follows section 17.10.
 - The Takt logo is the Home action; its hit area ends at the logo, leaving the surrounding header space inactive. The header keeps the editable document title between the logo and controls. The compact File menu belongs to the right-hand toolbar with undo/redo, zoom, and Weeks/Dates.
@@ -519,7 +519,7 @@ On web, New or Open that would replace edits not yet downloaded offers **Downloa
 
 ### 17.5 Recovery
 
-Browser work is retained automatically in local browser storage so refresh or accidental closure does not ordinarily lose the current draft. This is recovery, not a project library or a substitute for downloading a portable file.
+Browser work is retained automatically in local browser storage so refresh or accidental closure does not ordinarily lose the current draft. This is recovery, not a project library or a substitute for downloading a portable file. Section 17.11 defines when a recovery copy first exists and how quickly changes reach it.
 
 Desktop retains recovery separately in the user's application-data directory. After an interrupted session, Home offers **Recover unsaved work**, with the title and recovery time. Recovery opens a modified document awaiting Save or Download, with fresh undo history. Deliberately discarding edits removes the associated recovery copy. Successfully saving/downloading establishes the new saved baseline; the browser's observable download-completion boundary follows section 17.10.
 
@@ -529,7 +529,7 @@ Selecting a recovery reads its latest valid stored snapshot and original-file id
 
 Show the ten most recently opened files, newest first, with filename and folder. Provide an expandable full list of all previously opened entries still retained by the user; ten is a display limit, not a history-retention limit. This is a history of opened files, not discovery of every `.takt` file on the computer.
 
-An entry can be removed from recents without deleting its file. If a file is unavailable, offer **Locate file / Remove from recents / Cancel**. Keep unavailable entries until the user locates or removes them; a temporarily disconnected shared drive is not grounds for silently dropping history.
+An entry can be removed from recents without deleting its file. If a file is unavailable, offer **Locate file / Remove from recents / Cancel**. If the file exists but is not a valid Takt project, offer **Remove from recents / Cancel** instead; locating it again cannot help. Keep unavailable entries until the user locates or removes them; a temporarily disconnected shared drive is not grounds for silently dropping history.
 
 Successfully locating a moved file repairs its recent entry by retaining the newly opened path and removing the old unavailable path. Cancelling the picker or replacement guard, invalid data, and failed opens keep the old entry.
 
@@ -578,5 +578,19 @@ The user authorized the orchestrator and implementers to choose unspecified deta
 6. **Release target:** the initial direct executable targets Windows 11 x64 with the installed Evergreen WebView2 runtime. A missing runtime must produce a clear prerequisite message where the native bootstrap permits it. Other Windows versions/architectures require separate validation. File associations, an installer, signing, and automatic updates are outside these milestones.
 
 File commands finish committed inline item/title naming and cancel active pointer previews before capturing a snapshot. Unapplied dialog drafts and temporary hover expansion are excluded. New/Open validate the replacement before deliberately removing the old recovery; failed or cancelled replacement retains it.
+
+### 17.11 Review decisions
+
+**Decision date:** October 11, 2026. The user confirmed these after an independent code review. They refine sections 17.3 to 17.10 and take precedence where they differ.
+
+1. **When recovery exists:** a project gets a recovery copy with its first edit: a chart-content, title, calendar-reference, or Weeks/Dates change. An untouched new Untitled chart, or a file that was only opened and navigated, has none and is not offered on Home after refresh or closure. Once a copy exists it is kept current until the project is discarded or replaced, including after the content returns to its saved state.
+2. **How quickly changes reach recovery:** committed edits are stored immediately. Zoom, scrolling, and collapse changes may wait up to one second, and are stored at once before file commands, returning Home, and refresh or closure. An interruption can therefore lose at most the last second of viewing position, never an edit. Gesture previews are never stored.
+3. **Deleting drafts and recoveries:** each **Resume draft** and **Recover unsaved work** entry has a delete control, shown on hover or keyboard focus like recent-file removal. Deleting asks for confirmation naming the title and time, and removes that copy permanently. A copy that is open in another tab or window is not deleted; a message explains why.
+4. **Closing the desktop window:** the window always closes once the user has chosen Save or Discard, or when nothing is unsaved. Removing the recovery copy at that point is best effort; if it fails, the copy may be offered again on the next launch and can be deleted there. Cancel still keeps the window open.
+5. **Unreadable stored records:** a recovery copy or recent entry that cannot be read is skipped without hiding the others. Desktop leaves the unreadable file on disk and shows no warning for it.
+6. **Hidden and covered editor:** editor shortcuts such as Delete, undo, and redo do nothing while Home is shown or a shell dialog is open.
+7. **Shortcut hints:** the web application does not show the Ctrl/Cmd+N hint because browsers reserve that shortcut for a new window. The shortcut still works where the browser delivers it, and desktop shows it.
+8. **Times:** draft and recovery times use one fixed English format, for example “11 Oct 2026, 14:05”, in the viewer's time zone.
+9. **Recent history:** a file enters recent history when it actually replaces the current project or is saved, not when it is merely chosen and the replacement is then cancelled.
 
 The [file-format proposal](takt-file-format.md) separates technical encoding choices from these product decisions. The [orchestrator handoff](project-files-orchestrator-handoff.md) gives the implementation sequence and ownership boundaries.
