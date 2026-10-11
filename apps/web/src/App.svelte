@@ -74,9 +74,10 @@
   } | null = null;
   let closeResolve: ((allowed: boolean) => void) | undefined;
   let missing = $state<RecentFile | null>(null);
-  const dropBlocked = $derived(
-    operation || guard || conflict || reloadConfirm || missing !== null,
+  const shellDialog = $derived(
+    guard || conflict || reloadConfirm || missing !== null,
   );
+  const dropBlocked = $derived(operation || shellDialog);
   const saveLabel = $derived(
     adapter.kind === 'web' ? 'Download .takt' : 'Save',
   );
@@ -660,6 +661,7 @@
         bind:this={editor}
         initial={current.snapshot.document}
         initialView={current.snapshot.view}
+        active={!current.home && !shellDialog}
         onhome={home}
         onchange={(document, view) => {
           if (session.snapshot)

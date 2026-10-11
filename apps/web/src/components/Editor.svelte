@@ -70,6 +70,7 @@
     fileControls,
     fileMenuControls,
     onhome,
+    active = true,
   }: {
     initial?: ChartDocument;
     initialView?: ProjectView;
@@ -77,6 +78,8 @@
     fileControls?: Snippet;
     fileMenuControls?: Snippet;
     onhome?: () => void;
+    /** False while the shell hides the editor or shows its own dialog; window shortcuts then stay out. */
+    active?: boolean;
   } = $props();
   // The initial document seeds this editor instance once; remount to open another document.
   // svelte-ignore state_referenced_locally
@@ -1032,6 +1035,7 @@
   });
   function keydown(event: KeyboardEvent) {
     if (
+      !active ||
       event.target instanceof HTMLInputElement ||
       event.target instanceof HTMLTextAreaElement ||
       (event.target instanceof HTMLElement && event.target.isContentEditable)

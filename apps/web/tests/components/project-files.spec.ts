@@ -415,3 +415,29 @@ test('cancelling a staged recovery frees its source for another tab without crea
     next.getByRole('button', { name: /Retained chart/ }),
   ).toBeVisible();
 });
+
+test('editor shortcuts leave the retained chart alone on Home and behind shell dialogs', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: 'New project', exact: true }).click();
+  await draw(page, 0, 2, 'Keep');
+  await page.getByRole('button', { name: 'Home', exact: true }).click();
+  await expect(
+    page.getByRole('heading', { name: 'Welcome to Takt' }),
+  ).toBeVisible();
+  await page.keyboard.press('Delete');
+  await page.keyboard.press('Control+z');
+  await page.keyboard.press('Control+z');
+  await page.getByRole('button', { name: /Untitled.*Resume project/ }).click();
+  await expect(page.locator('.bar')).toHaveCount(1);
+  await expect(page.locator('.bar').locator('span')).toHaveText('Keep');
+  await expect(page.getByLabel('Modified', { exact: true })).toBeVisible();
+  await page.keyboard.press('Control+n');
+  await expect(page.getByRole('dialog')).toBeVisible();
+  await page.keyboard.press('Delete');
+  await page.keyboard.press('Control+z');
+  await page.getByRole('button', { name: 'Cancel', exact: true }).click();
+  await expect(page.locator('.bar')).toHaveCount(1);
+  await expect(page.locator('.bar').locator('span')).toHaveText('Keep');
+});
