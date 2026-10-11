@@ -123,3 +123,24 @@ test('File chevron animates open and closed over 150ms', async ({ page }) => {
   );
   await expect(chevron).toHaveCSS('transform', 'none');
 });
+
+test('the web app does not advertise the browser-reserved new-window shortcut', async ({
+  page,
+}) => {
+  await page.goto('/');
+  const create = page.getByRole('button', { name: 'New project', exact: true });
+  await expect(create.locator('kbd')).toHaveCount(0);
+  await expect(
+    page
+      .getByRole('button', { name: 'Open .takt file', exact: true })
+      .locator('kbd'),
+  ).toHaveText(/O$/);
+  await create.click();
+  await page.getByRole('button', { name: 'File', exact: true }).click();
+  await expect(
+    page.getByRole('menuitem', { name: 'New project', exact: true }),
+  ).not.toContainText(/\bN$/);
+  await expect(
+    page.getByRole('menuitem', { name: 'Open .takt file', exact: true }),
+  ).toContainText(/O$/);
+});

@@ -67,6 +67,9 @@
     /Mac|iPhone|iPad/.test(navigator.platform)
       ? '⌘'
       : 'Ctrl';
+  // Browsers keep Ctrl/Cmd+N for their own new window, so the web app does not advertise it.
+  // svelte-ignore state_referenced_locally
+  const newShortcut = adapter.kind === 'web' ? undefined : `${modifier} N`;
   let pending: (() => void) | undefined;
   let recoveryClaim: {
     claimed: RecoveryRecord;
@@ -74,6 +77,7 @@
   } | null = null;
   let closeResolve: ((allowed: boolean) => void) | undefined;
   let missing = $state<RecentFile | null>(null);
+  let unreadable = $state<RecentFile | null>(null);
   let draftRemoval = $state<RecoveryRecord | null>(null);
   const draftTime = (updatedAt: string) =>
     new Date(updatedAt).toLocaleString('en-GB', {
@@ -85,6 +89,7 @@
       conflict ||
       reloadConfirm ||
       missing !== null ||
+      unreadable !== null ||
       draftRemoval !== null,
   );
   const dropBlocked = $derived(operation || shellDialog);
@@ -138,9 +143,13 @@
     session.update({ ...session.snapshot, title, ...(prepared ?? {}) });
     void session.flush();
   }
-  function replace(opened: OpenedProject) {
+  async function replace(opened: OpenedProject) {
     session.replace(opened);
     title = opened.snapshot.title;
+    if (!opened.file || !adapter.rememberRecent) return;
+    // Recent history records files that were really opened, not cancelled picks.
+    await adapter.rememberRecent(opened.file.path).catch(() => {});
+    await refreshRecents();
   }
   function guarded(action: () => void) {
     prepare();
@@ -195,7 +204,7 @@
     void abandonClaim();
     commandRequest++;
     session.cancelReplacement();
-    guarded(() => replace({ snapshot: newProject() }));
+    guarded(() => void replace({ snapshot: newProject() }));
   }
   async function resume(record: RecoveryRecord) {
     void abandonClaim();
@@ -277,7 +286,7 @@
         return;
       if (result.status === 'success')
         guarded(async () => {
-          replace(result.value);
+          await replace(result.value);
           if (locatePath) {
             await adapter.removeRecent?.(locatePath);
             await refreshRecents();
@@ -286,7 +295,9 @@
       else if (result.status === 'failure') {
         session.error = result.message;
         revision++;
-        if (path) missing = recents.find((item) => item.path === path) ?? null;
+        const recent = path && recents.find((item) => item.path === path);
+        if (recent && result.invalid) unreadable = recent;
+        else if (recent) missing = recent;
       }
     } catch (error) {
       session.error =
@@ -351,7 +362,7 @@
         }
         cancelGuard();
         reloadConfirm = false;
-        replace(result.value);
+        void replace(result.value);
       } else if (result.status === 'failure') {
         session.error = result.message;
         revision++;
@@ -431,7 +442,7 @@
     const key = event.key.toLowerCase();
     if (!['s', 'o', 'n'].includes(key)) return;
     event.preventDefault();
-    if (operation || guard || conflict || reloadConfirm) return;
+    if (operation || shellDialog) return;
     if (key === 's' && session.snapshot) void save(event.shiftKey);
     if (key === 'o') void open();
     if (key === 'n') create();
@@ -552,7 +563,7 @@
               >A blank canvas for your plan</small
             ></span
           >
-          <kbd aria-hidden="true">{modifier} N</kbd>
+          {#if newShortcut}<kbd aria-hidden="true">{newShortcut}</kbd>{/if}
         </button>
         <button
           class="start-action"
@@ -829,7 +840,7 @@
                 <MenuItem
                   icon="new"
                   disabled={operation}
-                  shortcut={`${modifier} N`}
+                  shortcut={newShortcut}
                   onclick={create}>New project</MenuItem
                 >
                 <MenuItem
@@ -975,6 +986,23 @@
       <Button onclick={() => (draftRemoval = null)}>Cancel</Button><Button
         variant="primary"
         onclick={() => void removeDraft(draftRemoval!)}>Delete</Button
+      >
+    </div></Dialog
+  >{/if}
+{#if unreadable}<Dialog
+    titleId="unreadable-title"
+    onclose={() => (unreadable = null)}
+    ><h2 id="unreadable-title">File can’t be opened</h2>
+    <p>{unreadable.path}</p>
+    <p>This file is not a valid Takt project.</p>
+    <div class="dialog-actions">
+      <Button onclick={() => (unreadable = null)}>Cancel</Button><Button
+        variant="primary"
+        onclick={() => {
+          const path = unreadable!.path;
+          unreadable = null;
+          void removeRecent(path);
+        }}>Remove from recents</Button
       >
     </div></Dialog
   >{/if}

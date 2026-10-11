@@ -11,7 +11,8 @@ export interface OpenedProject {
 export type Outcome<T> =
   | { status: 'success'; value: T }
   | { status: 'cancelled' }
-  | { status: 'failure'; message: string };
+  /** `invalid`: the file was read but is not a usable project, so locating it again cannot help. */
+  | { status: 'failure'; message: string; invalid?: boolean };
 export type SaveOutcome =
   Outcome<FileIdentity | undefined> | { status: 'conflict' };
 export interface RecoveryRecord extends OpenedProject {
@@ -51,6 +52,8 @@ export interface PlatformAdapter {
     source: RecoveryRecord,
   ): Promise<void>;
   listRecents?(): Promise<RecentFile[]>;
+  /** Called once an opened file has actually replaced the session, not when it was merely picked. */
+  rememberRecent?(path: string): Promise<void>;
   removeRecent?(path: string): Promise<void>;
   onCloseRequested?(handler: () => Promise<boolean>): () => void;
 }

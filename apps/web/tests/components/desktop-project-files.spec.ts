@@ -375,3 +375,75 @@ test('an opened file has no recovery copy until it is edited', async ({
     .poll(() => control(page, (fixture) => fixture.state().recovery.length))
     .toBe(1);
 });
+
+test('a recent file that is not a valid project offers removal, not Locate', async ({
+  page,
+}) => {
+  await fixture(page);
+  await control(page, (fixture) =>
+    fixture.corruptFile('/projects/project-2.takt'),
+  );
+  await page
+    .getByRole('button', { name: /project-2.takt.*\/projects/ })
+    .click();
+  await expect(
+    page.getByRole('heading', { name: 'File can’t be opened' }),
+  ).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Locate file' })).toHaveCount(
+    0,
+  );
+  await page.getByRole('button', { name: 'Cancel', exact: true }).click();
+  await expect(page.locator('.recent-entry')).toHaveCount(10);
+  await page
+    .getByRole('button', { name: /project-2.takt.*\/projects/ })
+    .click();
+  await page
+    .getByRole('button', { name: 'Remove from recents', exact: true })
+    .click();
+  await expect(
+    page.getByRole('button', { name: /project-2.takt.*\/projects/ }),
+  ).toHaveCount(0);
+  expect(
+    await control(
+      page,
+      (fixture) => !!fixture.state().files['/projects/project-2.takt'],
+    ),
+  ).toBe(true);
+});
+
+test('a file enters recents when it replaces the project, not when its guard is cancelled', async ({
+  page,
+}) => {
+  await fixture(page);
+  await control(page, (fixture) =>
+    fixture.addFile('/elsewhere/picked.takt', 'Picked'),
+  );
+  const remembered = () =>
+    control(page, (fixture) =>
+      fixture
+        .state()
+        .recents.some((item) => item.path === '/elsewhere/picked.takt'),
+    );
+  await page.getByRole('button', { name: 'New project', exact: true }).click();
+  await edit(page);
+  await control(page, (fixture) =>
+    fixture.queueOpen('success', '/elsewhere/picked.takt'),
+  );
+  await page.keyboard.press('Control+o');
+  await expect(page.getByRole('dialog')).toBeVisible();
+  await page.getByRole('button', { name: 'Cancel', exact: true }).click();
+  expect(await remembered()).toBe(false);
+  await control(page, (fixture) =>
+    fixture.queueOpen('success', '/elsewhere/picked.takt'),
+  );
+  await page.keyboard.press('Control+o');
+  await page
+    .getByRole('button', { name: 'Discard changes', exact: true })
+    .click();
+  await expect(page.getByLabel('Project title')).toHaveValue('Picked');
+  await expect.poll(remembered).toBe(true);
+  await page.getByRole('button', { name: 'Home', exact: true }).click();
+  await expect(page.locator('.recent-entry').first()).toContainText(
+    'picked.takt',
+  );
+});

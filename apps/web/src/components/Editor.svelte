@@ -898,7 +898,7 @@
     syncHistory();
     await tick();
     const element = chart.querySelector<HTMLElement>(
-      `[data-section-heading="${section.id}"]`,
+      `[data-section-heading="${CSS.escape(section.id)}"]`,
     );
     if (element) revealElement(element);
     rename(section.id);
@@ -1031,7 +1031,7 @@
       if (rowId) revealRow(rowId);
       else if (sectionId) {
         const element = chart.querySelector<HTMLElement>(
-          `[data-section-heading="${sectionId}"]`,
+          `[data-section-heading="${CSS.escape(sectionId)}"]`,
         );
         if (element) revealElement(element);
       } else if (document.sections.length === 0) {

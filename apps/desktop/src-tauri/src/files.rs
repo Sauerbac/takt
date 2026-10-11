@@ -128,7 +128,9 @@ pub fn revision(bytes: &[u8]) -> String {
 pub fn read(path: &Path) -> Result<OpenedFile, String> {
     let bytes = fs::read(path).map_err(|e| e.to_string())?;
     let hash = revision(&bytes);
-    let bytes = String::from_utf8(bytes).map_err(|e| e.to_string())?;
+    let text = String::from_utf8(bytes).map_err(|_| "Invalid .takt file: it is not UTF-8 text")?;
+    // Editors on Windows may prepend a byte-order mark; browsers strip it when reading text.
+    let bytes = text.strip_prefix('\u{feff}').unwrap_or(&text).to_owned();
     Ok(OpenedFile {
         path: path.to_string_lossy().into_owned(),
         bytes,
@@ -530,6 +532,17 @@ mod tests {
         let recents = store.recents().unwrap();
         assert_eq!(recents.len(), 1);
         assert_eq!(recents[0].name, "kept.takt");
+    }
+    #[test]
+    fn read_strips_a_byte_order_mark_and_rejects_other_encodings() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("marked.takt");
+        fs::write(&path, b"\xEF\xBB\xBF{}").unwrap();
+        let opened = read(&path).unwrap();
+        assert_eq!(opened.bytes, "{}");
+        assert_eq!(opened.revision, revision(b"\xEF\xBB\xBF{}"));
+        fs::write(&path, b"\xFF\xFE{\x00}\x00").unwrap();
+        assert!(read(&path).unwrap_err().starts_with("Invalid .takt file"));
     }
     #[test]
     fn safe_save_and_external_revision() {

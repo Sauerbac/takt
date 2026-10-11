@@ -52,6 +52,7 @@ let dropHandler: ((event: ProjectFileDrop) => void) | undefined;
 let deferredOpen = false;
 let resolvePending: (() => void) | undefined;
 let failingRemove = false;
+const invalid = new Set<string>();
 let deferredRemove = false;
 let resolveRemove: (() => void) | undefined;
 const adapter: PlatformAdapter = {
@@ -75,12 +76,12 @@ const adapter: PlatformAdapter = {
     const file = files.get(selected);
     if (!file)
       return { status: 'failure', message: 'Project file is unavailable.' };
-    if (!recents.some((item) => item.path === selected))
-      recents.unshift({
-        path: selected,
-        name: selected.split('/').at(-1)!,
-        folder: selected.substring(0, selected.lastIndexOf('/')),
-      });
+    if (invalid.has(selected))
+      return {
+        status: 'failure',
+        message: 'Invalid .takt file: JSON could not be parsed',
+        invalid: true,
+      };
     return {
       status: 'success',
       value: {
@@ -127,6 +128,16 @@ const adapter: PlatformAdapter = {
     recovery.set(claimed.id, claimed);
     return claimed;
   },
+  async rememberRecent(path) {
+    recents = [
+      {
+        path,
+        name: path.split('/').at(-1)!,
+        folder: path.substring(0, path.lastIndexOf('/')),
+      },
+      ...recents.filter((item) => item.path !== path),
+    ];
+  },
   async listRecents() {
     return clone(recents);
   },
@@ -160,6 +171,12 @@ export const controls = {
   },
   deleteFile(path: string) {
     files.delete(path);
+  },
+  corruptFile(path: string) {
+    invalid.add(path);
+  },
+  addFile(path: string, title: string) {
+    files.set(path, { snapshot: { ...newProject(), title }, revision: '1' });
   },
   deferOpen() {
     deferredOpen = true;

@@ -86,8 +86,22 @@ describe('native adapter boundary', () => {
       revision: 'hash',
       bytes: '{}',
     });
-    expect((await desktopAdapter.open('bad.takt')).status).toBe('failure');
-    expect(mocks.invoke).toHaveBeenCalledTimes(2);
+    expect(await desktopAdapter.open('bad.takt')).toMatchObject({
+      status: 'failure',
+      invalid: true,
+    });
+    mocks.invoke.mockRejectedValueOnce('The system cannot find the file.');
+    expect(await desktopAdapter.open('gone.takt')).toEqual({
+      status: 'failure',
+      message: 'The system cannot find the file.',
+    });
+    // Recent history is recorded by the shell once the file replaces the session.
+    expect(mocks.invoke).toHaveBeenCalledTimes(3);
+    mocks.invoke.mockResolvedValueOnce(undefined);
+    await desktopAdapter.rememberRecent!('opened.takt');
+    expect(mocks.invoke).toHaveBeenLastCalledWith('remember_recent', {
+      path: 'opened.takt',
+    });
   });
   it('keeps successful save identity when incidental recent-history writing fails', async () => {
     mocks.invoke

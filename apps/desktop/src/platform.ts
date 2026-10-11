@@ -18,10 +18,15 @@ interface NativeFile {
   bytes: string;
   revision: string;
 }
-const failure = (error: unknown) => ({
-  status: 'failure' as const,
-  message: String(error),
-});
+const INVALID = 'Invalid .takt file';
+const failure = (error: unknown) => {
+  const message = error instanceof Error ? error.message : String(error);
+  return {
+    status: 'failure' as const,
+    message,
+    ...(message.startsWith(INVALID) ? { invalid: true } : {}),
+  };
+};
 /** Native recovery records are external data: validate before they can replace a session. */
 function decodeRecovery(value: unknown): RecoveryRecord {
   if (!value || typeof value !== 'object')
@@ -83,7 +88,6 @@ export const desktopAdapter: PlatformAdapter = {
       const file = await invoke<NativeFile | null>('open_project', { path });
       if (!file) return { status: 'cancelled' };
       const snapshot = parseProject(file.bytes);
-      await invoke('remember_recent', { path: file.path }).catch(() => {});
       return {
         status: 'success',
         value: { snapshot, file: { path: file.path, revision: file.revision } },
@@ -152,6 +156,9 @@ export const desktopAdapter: PlatformAdapter = {
   },
   async removeRecovery(id) {
     await invoke('remove_recovery', { id });
+  },
+  async rememberRecent(path) {
+    await invoke('remember_recent', { path });
   },
   async listRecents() {
     return invoke<RecentFile[]>('list_recents');
