@@ -51,6 +51,7 @@ let closeHandler: (() => Promise<boolean>) | undefined;
 let dropHandler: ((event: ProjectFileDrop) => void) | undefined;
 let deferredOpen = false;
 let resolvePending: (() => void) | undefined;
+let failingRemove = false;
 let deferredRemove = false;
 let resolveRemove: (() => void) | undefined;
 const adapter: PlatformAdapter = {
@@ -114,6 +115,7 @@ const adapter: PlatformAdapter = {
     recovery.set(record.id, clone(record));
   },
   async removeRecovery(id) {
+    if (failingRemove) throw new Error('Application data is unavailable.');
     if (deferredRemove) {
       deferredRemove = false;
       await new Promise<void>((resolve) => (resolveRemove = resolve));
@@ -165,6 +167,9 @@ export const controls = {
   finishOpen() {
     resolvePending?.();
     resolvePending = undefined;
+  },
+  failRemove(failing = true) {
+    failingRemove = failing;
   },
   deferRemove() {
     deferredRemove = true;

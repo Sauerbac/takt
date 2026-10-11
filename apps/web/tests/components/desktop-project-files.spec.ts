@@ -315,3 +315,23 @@ test('successful Save and conflict Save another complete a pending guarded Open'
     ),
   ).toBe('Second local edits');
 });
+
+test('the window still closes when its recovery copy cannot be removed', async ({
+  page,
+}) => {
+  await fixture(page);
+  await control(page, (fixture) => fixture.failRemove());
+  expect(await control(page, (fixture) => fixture.requestClose())).toBe(true);
+  await control(page, (fixture) => fixture.failRemove(false));
+  await page.getByRole('button', { name: 'New project', exact: true }).click();
+  await edit(page);
+  await control(page, (fixture) => fixture.failRemove());
+  const cancelled = control(page, (fixture) => fixture.requestClose());
+  await page.getByRole('button', { name: 'Cancel', exact: true }).click();
+  expect(await cancelled).toBe(false);
+  const discarded = control(page, (fixture) => fixture.requestClose());
+  await page
+    .getByRole('button', { name: 'Discard changes', exact: true })
+    .click();
+  expect(await discarded).toBe(true);
+});

@@ -90,12 +90,13 @@
         new Promise((resolve) => {
           prepare();
           if (!session.modified) {
-            void session.discard().then(resolve);
+            // Removing recovery is best effort: a window must always be closable.
+            void session.discard().finally(() => resolve(true));
             return;
           }
           closeResolve = resolve;
           guard = true;
-          pending = () => void session.discard().then(resolve);
+          pending = () => resolve(true);
         }),
     );
     return () => {
@@ -164,10 +165,12 @@
     closeResolve?.(false);
     closeResolve = undefined;
   }
-  async function continueGuard(discard: boolean) {
+  async function continueGuard() {
     const action = pending;
     const generation = session.generation;
-    if (!(await session.discard())) return;
+    // A close proceeds even when its recovery copy could not be removed.
+    const closing = !!closeResolve;
+    if (!(await session.discard()) && !closing) return;
     if (action !== pending || generation !== session.generation) {
       void session.persist();
       return;
@@ -288,7 +291,7 @@
         adapter.kind === 'desktop' &&
         !session.modified
       )
-        await continueGuard(false);
+        await continueGuard();
       return result;
     } finally {
       operation = false;
@@ -355,7 +358,7 @@
     if (adapter.kind === 'web') {
       retainedDownload = requested;
       acknowledge = true;
-    } else await continueGuard(false);
+    } else await continueGuard();
   }
   async function confirmDownload() {
     if (
@@ -374,7 +377,7 @@
     )
       return;
     retainedDownload = null;
-    await continueGuard(false);
+    await continueGuard();
   }
   function home() {
     void abandonClaim();
@@ -866,7 +869,7 @@
       </p>
       <div class="dialog-actions">
         <Button onclick={cancelGuard}>Cancel</Button><Button
-          onclick={() => void continueGuard(true)}>Discard changes</Button
+          onclick={() => void continueGuard()}>Discard changes</Button
         ><Button
           variant="primary"
           disabled={operation}
